@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}تحويلات الوحدات - Mekawy ERP{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-exchange-alt"></i> تحويلات الوحدات
+        </h1>
+        {% if user.role != 'viewer' %}
+        <a href="{% url 'warehouses:unit_conversion_add' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> إضافة تحويل جديد
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Conversions Table -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">قائمة التحويلات</h6>
+            <span class="badge bg-info">{{ conversions|length }} تحويل</span>
+        </div>
+        <div class="card-body">
+            {% if conversions %}
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>من الوحدة</th>
+                            <th>إلى الوحدة</th>
+                            <th>معامل التحويل</th>
+                            <th>مثال</th>
+                            <th>الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for conversion in conversions %}
+                        <tr>
+                            <td>
+                                <span class="badge bg-primary">{{ conversion.from_unit.name }}</span>
+                                <small class="text-muted">({{ conversion.from_unit.symbol }})</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-success">{{ conversion.to_unit.name }}</span>
+                                <small class="text-muted">({{ conversion.to_unit.symbol }})</small>
+                            </td>
+                            <td>
+                                <strong>{{ conversion.conversion_factor }}</strong>
+                            </td>
+                            <td>
+                                <small class="text-info">
+                                    1 {{ conversion.from_unit.symbol }} = {{ conversion.conversion_factor }} {{ conversion.to_unit.symbol }}
+                                </small>
+                            </td>
+                            <td>
+                                {% if user.role != 'viewer' %}
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'warehouses:unit_conversion_edit' conversion.pk %}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% if user.role == 'admin' %}
+                                    <a href="{% url 'warehouses:unit_conversion_delete' conversion.pk %}" 
+                                       class="btn btn-sm btn-outline-danger"
+                                       onclick="return confirmDelete('هل أنت متأكد من حذف هذا التحويل؟')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if is_paginated %}
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1">الأولى</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">السابقة</a>
+                        </li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">{{ page_obj.number }} من {{ page_obj.paginator.num_pages }}</span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}">التالية</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">الأخيرة</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+            {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-exchange-alt fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">لا توجد تحويلات</h5>
+                <p class="text-muted">لم يتم إنشاء أي تحويلات للوحدات بعد</p>
+                {% if user.role != 'viewer' %}
+                <a href="{% url 'warehouses:unit_conversion_add' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> إضافة تحويل جديد
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Unit Conversion Calculator -->
+    <div class="card shadow">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-calculator"></i> حاسبة تحويل الوحدات
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <label class="form-label">الكمية</label>
+                    <input type="number" id="quantity" class="form-control" value="1" step="0.01">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">من الوحدة</label>
+                    <select id="fromUnit" class="form-select">
+                        <option value="">اختر الوحدة</option>
+                        {% for conversion in conversions %}
+                            <option value="{{ conversion.from_unit.id }}">{{ conversion.from_unit.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">إلى الوحدة</label>
+                    <select id="toUnit" class="form-select">
+                        <option value="">اختر الوحدة</option>
+                        {% for conversion in conversions %}
+                            <option value="{{ conversion.to_unit.id }}">{{ conversion.to_unit.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">النتيجة</label>
+                    <input type="text" id="result" class="form-control" readonly placeholder="النتيجة">
+                </div>
+            </div>
+            <div class="mt-3">
+                <button type="button" id="convertBtn" class="btn btn-primary">
+                    <i class="fas fa-calculator"></i> تحويل
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('convertBtn').addEventListener('click', function() {
+    const quantity = document.getElementById('quantity').value;
+    const fromUnit = document.getElementById('fromUnit').value;
+    const toUnit = document.getElementById('toUnit').value;
+    
+    if (!quantity || !fromUnit || !toUnit) {
+        showErrorToast('يرجى ملء جميع الحقول');
+        return;
+    }
+    
+    fetch(`{% url 'warehouses:unit_conversion_api' %}?quantity=${quantity}&from_unit=${fromUnit}&to_unit=${toUnit}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('result').value = data.converted_quantity;
+                showSuccessToast(`${quantity} ${data.from_unit} = ${data.converted_quantity} ${data.to_unit}`);
+            } else {
+                showErrorToast(data.error);
+            }
+        })
+        .catch(error => {
+            showErrorToast('حدث خطأ في التحويل');
+        });
+});
+</script>
+{% endblock %}

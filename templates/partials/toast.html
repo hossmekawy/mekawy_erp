@@ -1,0 +1,162 @@
+<!-- Toast Container -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055;">
+    <!-- Success Toast -->
+    <div id="successToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="fas fa-check-circle me-2"></i>
+                <span id="successMessage">تمت العملية بنجاح!</span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+
+    <!-- Error Toast -->
+    <div id="errorToast" class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <span id="errorMessage">حدث خطأ ما!</span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+
+    <!-- Warning Toast -->
+    <div id="warningToast" class="toast align-items-center text-white bg-warning border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                <span id="warningMessage">تحذير!</span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+
+    <!-- Info Toast -->
+    <div id="infoToast" class="toast align-items-center text-white bg-info border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="fas fa-info-circle me-2"></i>
+                <span id="infoMessage">معلومة مهمة!</span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+  <script>
+  // Toast Functions
+  function showToast(type, message, duration = 5000) {
+      const toastElement = document.getElementById(type + 'Toast');
+      const messageElement = document.getElementById(type + 'Message');
+    
+      if (toastElement && messageElement) {
+          messageElement.textContent = message;
+          const toast = new bootstrap.Toast(toastElement, {
+              delay: duration
+          });
+          toast.show();
+      }
+  }
+
+  function showSuccessToast(message, duration = 5000) {
+      showToast('success', message, duration);
+  }
+
+  function showErrorToast(message, duration = 7000) {
+      showToast('error', message, duration);
+  }
+
+  function showWarningToast(message, duration = 6000) {
+      showToast('warning', message, duration);
+  }
+
+  function showInfoToast(message, duration = 5000) {
+      showToast('info', message, duration);
+  }
+
+  // Auto show toasts based on Django messages
+  document.addEventListener('DOMContentLoaded', function() {
+      {% if messages %}
+          {% for message in messages %}
+              {% if message.tags == 'success' %}
+                  showSuccessToast('{{ message|escapejs }}');
+              {% elif message.tags == 'error' %}
+                  showErrorToast('{{ message|escapejs }}');
+              {% elif message.tags == 'warning' %}
+                  showWarningToast('{{ message|escapejs }}');
+              {% elif message.tags == 'info' %}
+                  showInfoToast('{{ message|escapejs }}');
+              {% endif %}
+          {% endfor %}
+      {% endif %}
+  });
+
+  // AJAX Success/Error handlers
+  $(document).ready(function() {
+      $(document).ajaxSuccess(function(event, xhr, settings) {
+          if (xhr.responseJSON && xhr.responseJSON.message) {
+              showSuccessToast(xhr.responseJSON.message);
+          }
+      });
+
+      $(document).ajaxError(function(event, xhr, settings) {
+          if (xhr.responseJSON && xhr.responseJSON.error) {
+              showErrorToast(xhr.responseJSON.error);
+          } else {
+              showErrorToast('حدث خطأ في الاتصال بالخادم');
+          }
+      });
+  });
+</script>
+
+<style>
+.toast-container {
+    z-index: 1055;
+}
+
+.toast {
+    min-width: 300px;
+    margin-bottom: 0.5rem;
+}
+
+.toast-body {
+    padding: 0.75rem;
+    font-weight: 500;
+}
+
+.toast .btn-close {
+    padding: 0.25rem;
+}
+
+/* Custom animations */
+.toast.showing {
+    animation: slideInLeft 0.3s ease-out;
+}
+
+.toast.hide {
+    animation: slideOutLeft 0.3s ease-in;
+}
+
+@keyframes slideInLeft {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutLeft {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+</style>

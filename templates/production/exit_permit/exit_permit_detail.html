@@ -1,0 +1,172 @@
+{% extends 'production/production_base.html' %}
+{% load static i18n %}
+
+{% block production_title %}
+    تفاصيل تصريح الخروج: {{ permit.permit_number }}
+{% endblock %}
+
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item"><a href="{% url 'production:exit_permits:exit_permit_list' %}" class="text-black-50">تصاريح الخروج</a></li>
+    <li class="breadcrumb-item active" aria-current="page">تفاصيل التصريح</li>
+{% endblock %}
+
+{% block production_header_actions %}
+<div class="d-flex flex-wrap justify-content-end gap-2">
+    <a href="{% url 'production:exit_permits:exit_permit_print_pdf' permit.pk %}" class="btn btn-production-outline" target="_blank">
+        <i class="fas fa-print me-2"></i> طباعة التصريح
+    </a>
+    
+    {# NEW: Add a button to print the receipt if it exists #}
+    {% if permit.receipt_confirmation %}
+    <a href="{% url 'production:exit_permits:exit_permit_receipt_print_pdf' permit.receipt_confirmation.pk %}" class="btn btn-info" target="_blank">
+        <i class="fas fa-print me-2"></i> طباعة إيصال الاستلام
+    </a>
+    {% endif %}
+
+    {% if permit.is_approvable %}
+    <form method="post" action="{% url 'production:exit_permits:exit_permit_approve' permit.pk %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-success"><i class="fas fa-check-circle me-2"></i> موافقة على التصريح</button>
+    </form>
+    {% endif %}
+    {% if permit.is_usable %}
+    <form method="post" action="{% url 'production:exit_permits:exit_permit_use' permit.pk %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-warning"><i class="fas fa-truck me-2"></i> تسجيل استخدام التصريح</button>
+    </form>
+    {% endif %}
+
+    {% if permit.status == 'used' and not permit.receipt_confirmation %}
+    <a href="{% url 'production:exit_permits:exit_permit_receipt' permit.pk %}" class="btn btn-primary">
+        <i class="fas fa-receipt me-2"></i> تسجيل إيصال الاستلام
+    </a>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block production_content %}
+<div class="row">
+    {% if permit.receipt_confirmation %}
+    <div class="col-12 mb-4">
+        <div class="production-alert alert-success d-flex align-items-center">
+            <i class="fas fa-check-circle fa-2x me-3"></i>
+            <div>
+                <h5 class="alert-heading mb-1">تم تأكيد الاستلام</h5>
+                تم تأكيد استلام هذا التصريح بواسطة <strong>{{ permit.receipt_confirmation.received_by_name }}</strong> في تاريخ {{ permit.receipt_confirmation.received_at|date:"d M Y, H:i" }}.
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Permit Details Column -->
+    <div class="col-lg-8">
+        <div class="production-card mb-4">
+            <div class="production-card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="fas fa-file-alt me-2"></i>
+                    تفاصيل التصريح: <span class="fw-bold">{{ permit.permit_number }}</span>
+                </div>
+                <!-- Status Badge -->
+                <span class="badge fs-6 rounded-pill
+                    {% if permit.status == 'approved' %} bg-success-subtle text-success-emphasis border border-success-subtle {% endif %}
+                    {% if permit.status == 'pending' %} bg-warning-subtle text-warning-emphasis border border-warning-subtle {% endif %}
+                    {% if permit.status == 'rejected' %} bg-danger-subtle text-danger-emphasis border border-danger-subtle {% endif %}
+                    {% if permit.status == 'used' %} bg-info-subtle text-info-emphasis border border-info-subtle {% endif %}
+                    {% if permit.status == 'expired' %} bg-dark-subtle text-dark-emphasis border border-dark-subtle {% endif %}
+                ">
+                    {{ permit.get_status_display }}
+                </span>
+            </div>
+            <div class="production-card-body">
+                <div class="list-group list-group-flush">
+                    <div class="list-group-item px-0 d-flex justify-content-between">
+                        <strong class="text-secondary"><i class="fas fa-industry fa-fw me-2"></i> أمر الإنتاج</strong>
+                        <span>
+                            {% if permit.production_order %}
+                                <a href="{% url 'production:order_detail' permit.production_order.pk %}">{{ permit.production_order.order_number }}</a>
+                            {% else %}
+                                --
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="list-group-item px-0 d-flex justify-content-between">
+                        <strong class="text-secondary"><i class="fas fa-tags fa-fw me-2"></i> نوع التصريح</strong>
+                        <span>{{ permit.get_permit_type_display }}</span>
+                    </div>
+                    <div class="list-group-item px-0 d-flex justify-content-between">
+                        <strong class="text-secondary"><i class="fas fa-box-open fa-fw me-2"></i> الكمية</strong>
+                        <span>{{ permit.quantity }} قطعة</span>
+                    </div>
+                     <div class="list-group-item px-0 d-flex justify-content-between">
+                        <strong class="text-secondary"><i class="fas fa-map-marker-alt fa-fw me-2"></i> الوجهة</strong>
+                        <span>{{ permit.destination }}</span>
+                    </div>
+                    <div class="list-group-item px-0">
+                        <strong class="text-secondary d-block mb-2"><i class="fas fa-align-left fa-fw me-2"></i> وصف المواد</strong>
+                        <p class="mb-0 p-3 bg-light rounded">{{ permit.items_description }}</p>
+                    </div>
+                    <div class="list-group-item px-0">
+                        <strong class="text-secondary d-block mb-2"><i class="fas fa-bullseye fa-fw me-2"></i> الغرض</strong>
+                        <p class="mb-0 p-3 bg-light rounded">{{ permit.purpose }}</p>
+                    </div>
+                     {% if permit.notes %}
+                    <div class="list-group-item px-0">
+                        <strong class="text-secondary d-block mb-2"><i class="fas fa-sticky-note fa-fw me-2"></i> ملاحظات</strong>
+                        <p class="mb-0 p-3 bg-light rounded">{{ permit.notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeline and Approval Column -->
+    <div class="col-lg-4">
+        <div class="production-card">
+            <div class="production-card-header">
+                <i class="fas fa-history me-2"></i>
+                سجل التصريح
+            </div>
+            <div class="production-card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item px-0">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">تاريخ الطلب</h6>
+                            <small class="text-muted">{{ permit.requested_at|date:"d M Y" }}</small>
+                        </div>
+                        <p class="mb-1">تم الطلب بواسطة: <strong>{{ permit.requested_by.username }}</strong></p>
+                        <small class="text-muted">{{ permit.requested_at|date:"H:i" }}</small>
+                    </li>
+                     <li class="list-group-item px-0">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">الصلاحية</h6>
+                            <small class="text-danger">ينتهي في: {{ permit.valid_until|date:"d M Y" }}</small>
+                        </div>
+                        <p class="mb-1">هذا التصريح صالح للاستخدام حتى تاريخ الانتهاء.</p>
+                    </li>
+                    {% if permit.approved_by %}
+                    <li class="list-group-item px-0">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1 text-success">تاريخ الموافقة</h6>
+                            <small class="text-muted">{{ permit.approved_at|date:"d M Y" }}</small>
+                        </div>
+                        <p class="mb-1">تمت الموافقة بواسطة: <strong>{{ permit.approved_by.username }}</strong></p>
+                        <small class="text-muted">{{ permit.approved_at|date:"H:i" }}</small>
+                    </li>
+                    {% endif %}
+                    {% if permit.used_at %}
+                    <li class="list-group-item px-0">
+                         <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1 text-info">تاريخ الاستخدام</h6>
+                            <small class="text-muted">{{ permit.used_at|date:"d M Y" }}</small>
+                        </div>
+                        <p class="mb-1">تم تسجيل استخدام هذا التصريح.</p>
+                        <small class="text-muted">{{ permit.used_at|date:"H:i" }}</small>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

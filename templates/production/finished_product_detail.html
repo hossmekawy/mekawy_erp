@@ -1,0 +1,288 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block production_title %}تفاصيل المنتج - {{ product.name }}{% endblock %}
+
+{% block production_page_title %}تفاصيل المنتج{% endblock %}
+
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item"><a href="{% url 'production:finished_product_list' %}">المنتجات النهائية</a></li>
+    <li class="breadcrumb-item active">{{ product.name }}</li>
+{% endblock %}
+
+{% block production_header_actions %}
+    <div class="d-flex gap-2">
+        <a href="{% url 'production:finished_product_update' product.pk %}" class="btn btn-production">
+            <i class="fas fa-edit me-2"></i>تعديل
+        </a>
+        <a href="{% url 'production:finished_product_list' %}" class="btn btn-production-outline">
+            <i class="fas fa-arrow-right me-2"></i>العودة للقائمة
+        </a>
+    </div>
+{% endblock %}
+
+{% block production_content %}
+<div class="row g-4">
+    <!-- Product Info -->
+    <div class="col-lg-8">
+        <div class="production-card">
+            <div class="production-card-header">
+                <h5><i class="fas fa-info-circle me-2"></i>معلومات المنتج</h5>
+            </div>
+            <div class="production-card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label text-production-secondary">اسم المنتج</label>
+                        <div class="form-control-plaintext fw-bold">{{ product.name }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-production-secondary">كود المنتج</label>
+                        <div class="form-control-plaintext">{{ product.code }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-production-secondary">الفئة</label>
+                        <div class="form-control-plaintext">
+                            <span class="badge bg-info">{{ product.category.name }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-production-secondary">المقاسات : {{ product.size_group.name }}</label>
+                        <div class="form-control-plaintext">
+                            {% if product.size_group %}
+                                {% for size in product.size_group.sizes %}
+                                    <span class="badge bg-secondary me-1">{{ size }}</span>
+                                {% endfor %}
+                            {% else %}
+                                <span class="text-muted">لا توجد مقاسات</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-production-secondary">سعر البيع</label>
+                        <div class="form-control-plaintext">
+                            {% if product.selling_price %}
+                                <span class="text-success fw-bold">{{ product.selling_price }} ج.م</span>
+                            {% else %}
+                                <span class="text-muted">غير محدد</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-production-secondary">الوصف</label>
+                        <div class="form-control-plaintext">{{ product.description|default:"لا يوجد وصف" }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Production Orders -->
+        <div class="production-card">
+            <div class="production-card-header d-flex justify-content-between">
+                <h5><i class="fas fa-clipboard-list me-2"></i>أوامر الإنتاج</h5>
+                <span class="badge badge-count">{{ production_orders.count }}</span>
+            </div>
+            <div class="production-card-body">
+                {% if production_orders %}
+                    <div class="table-responsive">
+                        <table class="table production-table">
+                            <thead>
+                                <tr>
+                                    <th>رقم الأمر</th>
+                                    <th>الكمية</th>
+                                    <th>الحالة</th>
+                                    <th>تاريخ الإنشاء</th>
+                                    <th>الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in production_orders %}
+                                <tr>
+                                    <td>{{ order.order_number }}</td>
+                                    <td>{{ order.quantity_ordered }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if order.status == 'completed' %}success{% elif order.status == 'pending' %}warning{% else %}primary{% endif %}">
+                                            {{ order.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ order.created_at|date:"Y/m/d" }}</td>
+                                    <td>
+                                        <a href="{% url 'production:order_detail' order.pk %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="production-empty">
+                        <i class="fas fa-clipboard-list"></i>
+                        <h6>لا توجد أوامر إنتاج</h6>
+                        <p>لم يتم إنشاء أوامر إنتاج لهذا المنتج بعد</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- BOM Items -->
+        <div class="production-card">
+            <div class="production-card-header d-flex justify-content-between">
+                <h5><i class="fas fa-list me-2"></i>قوائم المواد (BOM)</h5>
+                <span class="badge badge-count">{{ bom_items.count }}</span>
+            </div>
+            <div class="production-card-body">
+                {% if bom_items %}
+                    <div class="table-responsive">
+                        <table class="table production-table">
+                            <thead>
+                                <tr>
+                                    <th>المقاس</th>
+                                    <th>أمتار القماش</th>
+                                    <th>أمتار الخيط</th>
+                                    <th>عدد الأزرار</th>
+                                    <th>التكلفة الإجمالية</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for bom in bom_items %}
+                                <tr>
+                                    <td><span class="badge bg-secondary">{{ bom.size }}</span></td>
+                                    <td>{{ bom.fabric_meters }}</td>
+                                    <td>{{ bom.thread_meters }}</td>
+                                    <td>{{ bom.buttons_count }}</td>
+                                    <td class="text-success fw-bold">{{ bom.total_material_cost }} ج.م</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="production-empty">
+                        <i class="fas fa-list"></i>
+                        <h6>لا توجد قوائم مواد</h6>
+                        <p>لم يتم إنشاء قوائم مواد لهذا المنتج بعد</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- Statistics -->
+        <div class="production-card">
+            <div class="production-card-header">
+                <h5><i class="fas fa-chart-bar me-2"></i>إحصائيات الإنتاج</h5>
+            </div>
+            <div class="production-card-body">
+                <div class="row g-3 text-center">
+                    <div class="col-6">
+                        <div class="stat-item">
+                            <div class="stat-value text-primary">{{ production_stats.total_orders }}</div>
+                            <div class="stat-label">إجمالي الأوامر</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="stat-item">
+                            <div class="stat-value text-success">{{ production_stats.completed_orders }}</div>
+                            <div class="stat-label">أوامر مكتملة</div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="stat-item">
+                            <div class="stat-value text-info">{{ production_stats.total_pieces_produced }}</div>
+                            <div class="stat-label">إجمالي القطع المنتجة</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="production-card">
+            <div class="production-card-header">
+                <h5><i class="fas fa-bolt me-2"></i>إجراءات سريعة</h5>
+            </div>
+            <div class="production-card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'production:order_create' %}?product={{ product.pk }}" class="btn btn-production">
+                        <i class="fas fa-plus me-2"></i>إنشاء أمر إنتاج
+                    </a>
+                    <a href="{% url 'production:bom_create' %}?product={{ product.pk }}" class="btn btn-production-outline">
+                        <i class="fas fa-list me-2"></i>إضافة قائمة مواد
+                    </a>
+                    <button class="btn btn-production-outline" onclick="printProduct()">
+                        <i class="fas fa-print me-2"></i>طباعة التفاصيل
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Product Status -->
+        <div class="production-card">
+            <div class="production-card-header">
+                <h5><i class="fas fa-toggle-on me-2"></i>حالة المنتج</h5>
+            </div>
+            <div class="production-card-body text-center">
+                <div class="status-indicator mb-3">
+                    {% if product.is_active %}
+                        <i class="fas fa-check-circle text-success fa-3x"></i>
+                        <h6 class="text-success mt-2">المنتج نشط</h6>
+                    {% else %}
+                        <i class="fas fa-times-circle text-danger fa-3x"></i>
+                        <h6 class="text-danger mt-2">المنتج غير نشط</h6>
+                    {% endif %}
+                </div>
+                <small class="text-muted">
+                    {% if product.is_active %}
+                        يمكن استخدام هذا المنتج في أوامر الإنتاج
+                    {% else %}
+                        لا يمكن استخدام هذا المنتج في أوامر الإنتاج
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block production_extra_css %}
+<style>
+.stat-item {
+    padding: 1rem;
+    border-radius: 0.5rem;
+    background: linear-gradient(135deg, rgba(44, 90, 160, 0.1), rgba(74, 144, 226, 0.1));
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: var(--production-secondary);
+}
+
+.status-indicator {
+    padding: 1rem;
+    border-radius: 0.5rem;
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.badge-count {
+    background: linear-gradient(45deg, var(--production-accent), #e84393);
+    color: white;
+}
+</style>
+{% endblock %}
+
+{% block production_extra_js %}
+<script>
+function printProduct() {
+    window.print();
+}
+</script>
+{% endblock %}

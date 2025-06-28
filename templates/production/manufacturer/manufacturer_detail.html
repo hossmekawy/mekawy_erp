@@ -1,0 +1,288 @@
+{% extends 'production/production_base.html' %}
+{% load static i18n humanize %}
+
+{% block production_title %}
+    تفاصيل المصنع - {{ manufacturer.name }}
+{% endblock %}
+
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item"><a href="{% url 'production:manufacturers:manufacturer_list' %}" class="text-black-50">المصانع الخارجية</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ manufacturer.name }}</li>
+{% endblock %}
+
+{% block production_header_actions %}
+    <a href="{% url 'production:manufacturers:manufacturer_update' manufacturer.pk %}" class="btn btn-production-outline">
+        <i class="fas fa-edit me-2"></i>تعديل
+    </a>
+{% endblock %}
+
+{% block production_content %}
+<div class="row">
+    <div class="col-lg-5">
+        <div class="production-card mb-4">
+            <div class="production-card-header">
+                <i class="fas fa-info-circle me-2"></i>بيانات المصنع
+            </div>
+            <div class="production-card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item px-0 d-flex justify-content-between"><strong>الشخص المسؤول:</strong> <span>{{ manufacturer.contact_person }}</span></li>
+                    <li class="list-group-item px-0 d-flex justify-content-between"><strong>الهاتف:</strong> <span>{{ manufacturer.phone }}</span></li>
+                     <li class="list-group-item px-0">
+                        <strong>العنوان:</strong>
+                        <p class="mb-0 mt-1 text-muted">{{ manufacturer.address }}</p>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12 mb-4">
+                <div class="production-metric">
+                    <div class="production-metric-icon success"><i class="fas fa-coins"></i></div>
+                    <div class="production-metric-value">{{ manufacturer.total_value_of_completed_jobs|intcomma }}<span class="fs-6 ms-1">جنيه</span></div>
+                    <div class="production-metric-label">قيمة الأعمال المكتملة</div>
+                </div>
+            </div>
+            <div class="col-12 mb-4">
+                <div class="production-metric">
+                     <div class="production-metric-icon warning"><i class="fas fa-tasks"></i></div>
+                    <div class="production-metric-value">{{ manufacturer.total_value_of_active_jobs|intcomma }}<span class="fs-6 ms-1">جنيه</span></div>
+                    <div class="production-metric-label">قيمة الأعمال النشطة (تقديري)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="production-card mb-4">
+            <div class="production-card-header bg-warning-subtle d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-tasks me-2"></i>المهام النشطة</span>
+                 <span class="badge bg-warning text-dark rounded-pill">{{ active_jobs.count }}</span>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for job in active_jobs %}
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <a href="{% url 'production:assembly_detail' job.pk %}" class="text-decoration-none text-dark">
+                                <h6 class="mb-1">أمر إنتاج: {{ job.production_order.order_number }}</h6>
+                            </a>
+                            <small class="text-muted">أرسل: {{ job.start_date|date:"d M Y" }}</small>
+                        </div>
+                        <p class="mb-1 text-muted">المنتج: {{ job.production_order.product.name }} | الكمية: {{ job.quantity_sent }} قطعة</p>
+                        
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary send-materials-btn" 
+                                    data-bs-toggle="modal" data-bs-target="#sendMaterialsModal"
+                                    data-assembly-id="{{ job.pk }}"
+                                    data-assembly-name="{{ job.production_order.order_number }}">
+                                <i class="fas fa-box-open me-2"></i>إرسال/سحب مواد
+                            </button>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="list-group-item text-center text-muted p-4">لا توجد مهام نشطة حالياً.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="production-card">
+            <div class="production-card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-history me-2"></i>سجل المهام المكتملة</span>
+                 <span class="badge bg-secondary rounded-pill">{{ job_history.count }}</span>
+            </div>
+            <div class="list-group list-group-flush">
+                 {% for job in job_history %}
+                    <a href="{% url 'production:assembly_detail' job.pk %}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">أمر إنتاج: {{ job.production_order.order_number }}</h6>
+                            <small class="text-success">اكتمل: {{ job.actual_completion_date|date:"d M Y" }}</small>
+                        </div>
+                        <p class="mb-1 text-muted">التكلفة: <strong class="text-dark">{{ job.assembly_cost|intcomma }} جنيه</strong></p>
+                    </a>
+                {% empty %}
+                    <div class="list-group-item text-center text-muted p-4">لا توجد مهام مكتملة.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="sendMaterialsModal" tabindex="-1" aria-labelledby="sendMaterialsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="sendMaterialsModalLabel">إرسال مواد خام إضافية</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>إرسال مواد إلى المصنع <strong>{{ manufacturer.name }}</strong> لعملية التشغيل <strong id="modal-assembly-name"></strong>.</p>
+                
+                <form id="sendMaterialsForm" method="POST" action="">
+                    {% csrf_token %}
+                    
+                    <div class="p-3 mb-3 bg-light rounded border">
+                        <label for="material-search" class="form-label fw-bold">إضافة مادة خام</label>
+                        <select class="form-control" id="material-search" data-placeholder="ابحث عن مادة خام بالاسم أو الكود..."></select>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>المادة الخام</th>
+                                    <th style="width: 25%;">المخزن المصدر</th>
+                                    <th style="width: 15%;">الكمية المتاحة</th>
+                                    <th style="width: 15%;">الكمية للإرسال</th>
+                                    <th style="width: 5%;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="selected-materials-list">
+                                </tbody>
+                        </table>
+                    </div>
+                    
+                    <div id="formset-management"></div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">إرسال المواد وإنشاء إذن خروج</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+<script>
+$(document).ready(function() {
+    const modalForm = $('#sendMaterialsForm');
+    const selectedMaterialsList = $('#selected-materials-list');
+    const formsetManagementContainer = $('#formset-management');
+    const modalAssemblyName = $('#modal-assembly-name');
+    const materialSearch = $('#material-search');
+    let bomMaterialIds = [];
+    let materialIndex = 0;
+
+    $('#sendMaterialsModal').on('show.bs.modal', async function(event) {
+        // Reset state
+        selectedMaterialsList.html('');
+        materialIndex = 0;
+        updateFormsetManagement();
+        bomMaterialIds = [];
+
+        const button = $(event.relatedTarget);
+        const assemblyId = button.data('assembly-id');
+        const assemblyName = button.data('assembly-name');
+
+        modalAssemblyName.text(assemblyName);
+        modalForm.attr('action', `/production/assembly/${assemblyId}/send-materials/`);
+
+        try {
+            const bomResponse = await fetch(`/production/ajax/get-bom-for-assembly/?assembly_id=${assemblyId}`);
+            const bomData = await bomResponse.json();
+            if (bomData.success) {
+                bomMaterialIds = bomData.components.map(c => c.material_id);
+            }
+        } catch (error) {
+            console.error('Could not fetch BOM IDs:', error);
+        }
+
+        materialSearch.select2({
+            dropdownParent: $('#sendMaterialsModal'),
+            width: '100%',
+            ajax: {
+                url: "{% url 'production:search_raw_materials_ajax' %}",
+                dataType: 'json',
+                delay: 250,
+                data: params => ({ term: params.term }),
+                processResults: data => ({
+                    results: data.results.map(item => ({ id: item.id, text: `${item.name} (${item.code})`, ...item }))
+                }),
+                cache: true
+            },
+            templateResult: formatRepo,
+            templateSelection: formatRepoSelection
+        });
+    });
+
+    function formatRepo(repo) {
+        if (repo.loading) return repo.text;
+        return $(`<div><strong>${repo.name}</strong> (${repo.code})<br><small class="text-muted">المتاح: ${repo.available} | التكلفة: ${repo.cost}</small></div>`);
+    }
+
+    function formatRepoSelection(repo) {
+        return repo.name || repo.text;
+    }
+
+    materialSearch.on('select2:select', function(e) {
+        addMaterialRow(e.params.data);
+        materialSearch.val(null).trigger('change');
+    });
+
+    function addMaterialRow(data) {
+        if ($(`#material-row-${data.id}`).length > 0) {
+            showToast('هذه المادة تم إضافتها بالفعل.', 'warning');
+            return;
+        }
+
+        const isBomItem = bomMaterialIds.includes(data.id);
+        const hasStock = data.warehouses && data.warehouses.length > 0;
+        const warehouseOptions = hasStock
+            ? data.warehouses.map(wh => `<option value="${wh.id}" data-available="${wh.available_quantity}">${wh.name} (${wh.available_quantity})</option>`).join('')
+            : '<option value="">لا يوجد مخزون</option>';
+        
+        const newRowHTML = `
+            <tr id="material-row-${data.id}">
+                <td>
+                    <input type="hidden" name="materials-${materialIndex}-material" value="${data.id}">
+                    <strong>${data.name}</strong> <small class="text-muted">(${data.code})</small>
+                    ${isBomItem ? '<span class="badge bg-success-subtle text-success-emphasis ms-2">BOM</span>' : '<span class="badge bg-warning-subtle text-warning-emphasis ms-2" title="هذه المادة ليست في قائمة المواد الأصلية">ليست BOM</span>'}
+                </td>
+                <td>
+                    <select name="materials-${materialIndex}-source_warehouse" class="form-select form-select-sm source-warehouse-select" required ${!hasStock ? 'disabled' : ''}>
+                        <option value="">اختر مخزن...</option>
+                        ${warehouseOptions}
+                    </select>
+                </td>
+                <td><span class="available-qty-text text-muted">--</span></td>
+                <td><input type="number" name="materials-${materialIndex}-quantity_to_send" class="form-control form-control-sm" placeholder="الكمية" step="0.01" min="0" required ${!hasStock ? 'disabled' : ''}></td>
+                <td><button type="button" class="btn btn-sm btn-danger remove-material-btn">&times;</button></td>
+            </tr>
+        `;
+
+        selectedMaterialsList.append(newRowHTML);
+        materialIndex++;
+        updateFormsetManagement();
+    }
+
+    selectedMaterialsList.on('click', '.remove-material-btn', function() {
+        $(this).closest('tr').remove();
+    });
+    
+    selectedMaterialsList.on('change', '.source-warehouse-select', function() {
+        const selectedOption = $(this).find('option:selected');
+        const availableQty = selectedOption.data('available') || '--';
+        $(this).closest('tr').find('.available-qty-text').text(availableQty);
+    });
+
+    function updateFormsetManagement() {
+        formsetManagementContainer.html(`
+            <input type="hidden" name="materials-TOTAL_FORMS" value="${materialIndex}" id="id_materials-TOTAL_FORMS">
+            <input type="hidden" name="materials-INITIAL_FORMS" value="0" id="id_materials-INITIAL_FORMS">
+        `);
+    }
+
+    $('#sendMaterialsModal').on('hidden.bs.modal', function() {
+        if (materialSearch.data('select2')) {
+            materialSearch.select2('destroy');
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,956 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block production_title %}إدارة الفئات ومجموعات المقاسات{% endblock %}
+
+{% block production_page_title %}إدارة الفئات ومجموعات المقاسات{% endblock %}
+
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item active">إدارة الفئات والمقاسات</li>
+{% endblock %}
+
+{% block production_header_actions %}
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-production" data-bs-toggle="modal" data-bs-target="#categoryModal">
+            <i class="fas fa-plus me-2"></i>إضافة فئة
+        </button>
+        <button type="button" class="btn btn-production-outline" data-bs-toggle="modal" data-bs-target="#sizeGroupModal">
+            <i class="fas fa-plus me-2"></i>إضافة مجموعة مقاسات
+        </button>
+    </div>
+{% endblock %}
+
+{% block production_extra_css %}
+<style>
+    .nav-pills .nav-link.active {
+        background: linear-gradient(135deg, var(--production-primary), var(--production-secondary));
+        color: white;
+    }
+    
+    .nav-pills .nav-link {
+        color: var(--production-primary);
+        border-radius: 0.5rem;
+        margin-left: 0.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .nav-pills .nav-link:hover {
+        background-color: rgba(44, 90, 160, 0.1);
+        color: var(--production-primary);
+    }
+    
+    .category-hierarchy {
+        padding-right: 1rem;
+        border-right: 2px solid var(--production-light);
+        margin-right: 0.5rem;
+    }
+    
+    .size-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+    
+    .size-tag {
+        background: linear-gradient(45deg, var(--production-info), #74b9ff);
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 15px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        border: none;
+    }
+    
+    .status-toggle {
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .status-toggle:hover {
+        transform: scale(1.1);
+    }
+    
+    .action-buttons .btn {
+        padding: 0.25rem 0.5rem;
+        margin: 0 0.125rem;
+        border-radius: 0.375rem;
+    }
+    
+    .modal-header {
+        background: linear-gradient(135deg, var(--production-primary), var(--production-secondary));
+        color: white;
+        border-bottom: none;
+    }
+    
+    .modal-header .btn-close {
+        filter: invert(1);
+    }
+    
+    .form-floating > label {
+        color: var(--production-secondary);
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: var(--production-primary);
+        box-shadow: 0 0 0 0.2rem rgba(44, 90, 160, 0.25);
+    }
+    
+    .table-hover tbody tr:hover {
+        background-color: rgba(44, 90, 160, 0.05);
+    }
+    
+    .badge-count {
+        background: linear-gradient(45deg, var(--production-accent), #e84393);
+        color: white;
+        font-size: 0.7rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block production_content %}
+<!-- Navigation Tabs -->
+<div class="production-card mb-4">
+    <div class="production-card-body p-3">
+        <ul class="nav nav-pills justify-content-center" id="managementTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="categories-tab" data-bs-toggle="pill" data-bs-target="#categories" type="button" role="tab">
+                    <i class="fas fa-tags me-2"></i>الفئات
+                    <span class="badge badge-count ms-2">{{ categories.paginator.count }}</span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="size-groups-tab" data-bs-toggle="pill" data-bs-target="#size-groups" type="button" role="tab">
+                    <i class="fas fa-ruler me-2"></i>مجموعات المقاسات
+                    <span class="badge badge-count ms-2">{{ size_groups.paginator.count }}</span>
+                </button>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<!-- Tab Content -->
+<div class="tab-content" id="managementTabsContent">
+    <!-- Categories Tab -->
+    <div class="tab-pane fade show active" id="categories" role="tabpanel">
+        <div class="production-card">
+            <div class="production-card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-tags me-2"></i>فئات المنتجات
+                </h5>
+            </div>
+            <div class="production-card-body">
+                {% if categories %}
+                    <div class="table-responsive">
+                        <table class="table production-table" id="categoriesTable">
+                            <thead>
+                                <tr>
+                                    <th>اسم الفئة</th>
+                                    <th>الفئة الأساسية</th>
+                                    <th>الحالة</th>
+                                    <th>عدد المنتجات</th>
+                                    <th>الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for category in categories %}
+                                <tr data-category-id="{{ category.id }}">
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if category.parent %}
+                                                <div class="category-hierarchy">
+                                                    <i class="fas fa-arrow-left text-muted me-2"></i>
+                                                </div>
+                                            {% endif %}
+                                            <strong class="text-production-dark">{{ category.name }}</strong>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if category.parent %}
+                                            <span class="badge bg-info">{{ category.parent.name }}</span>
+                                        {% else %}
+                                            <span class="text-muted">فئة رئيسية</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input status-toggle" type="checkbox" 
+                                                   {% if category.is_active %}checked{% endif %}
+                                                   data-category-id="{{ category.id }}"
+                                                   onchange="toggleCategoryStatus({{ category.id }})">
+                                            <label class="form-check-label">
+                                                <span class="badge {% if category.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                                                    {% if category.is_active %}نشط{% else %}غير نشط{% endif %}
+                                                </span>
+                                            </label>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ category.finishedproduct_set.count }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button type="button" class="btn btn-sm btn-outline-primary" 
+                                                    onclick="editCategory({{ category.id }})"
+                                                    data-bs-toggle="tooltip" title="تعديل">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                    onclick="deleteCategory({{ category.id }})"
+                                                    data-bs-toggle="tooltip" title="حذف">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    {% if categories.has_other_pages %}
+                        <nav aria-label="Categories pagination" class="mt-4">
+                            <ul class="pagination justify-content-center">
+                                {% if categories.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?category_page={{ categories.previous_page_number }}">السابق</a>
+                                    </li>
+                                {% endif %}
+                                
+                                {% for num in categories.paginator.page_range %}
+                                    {% if categories.number == num %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ num }}</span>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?category_page={{ num }}">{{ num }}</a>
+                                        </li>
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if categories.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?category_page={{ categories.next_page_number }}">التالي</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <div class="production-empty">
+                        <i class="fas fa-tags"></i>
+                        <h5>لا توجد فئات</h5>
+                        <p>لم يتم إنشاء أي فئات بعد</p>
+                        <button type="button" class="btn btn-production" data-bs-toggle="modal" data-bs-target="#categoryModal">
+                            <i class="fas fa-plus me-2"></i>إضافة فئة جديدة
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Size Groups Tab -->
+    <div class="tab-pane fade" id="size-groups" role="tabpanel">
+        <div class="production-card">
+            <div class="production-card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-ruler me-2"></i>مجموعات المقاسات
+                </h5>
+            </div>
+            <div class="production-card-body">
+                {% if size_groups %}
+                    <div class="table-responsive">
+                        <table class="table production-table" id="sizeGroupsTable">
+                            <thead>
+                                <tr>
+                                    <th>اسم المجموعة</th>
+                                    <th>المقاسات</th>
+                                    <th>عدد المقاسات</th>
+                                    <th>عدد المنتجات</th>
+                                    <th>الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for size_group in size_groups %}
+                                <tr data-size-group-id="{{ size_group.id }}">
+                                    <td>
+                                        <strong class="text-production-dark">{{ size_group.name }}</strong>
+                                    </td>
+                                    <td>
+                                        <div class="size-tags">
+                                            {% for size in size_group.sizes %}
+                                                <span class="size-tag">{{ size }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ size_group.sizes|length }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ size_group.finishedproduct_set.count }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button type="button" class="btn btn-sm btn-outline-primary" 
+                                                    onclick="editSizeGroup({{ size_group.id }})"
+                                                    data-bs-toggle="tooltip" title="تعديل">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                    onclick="deleteSizeGroup({{ size_group.id }})"
+                                                    data-bs-toggle="tooltip" title="حذف">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    {% if size_groups.has_other_pages %}
+                        <nav aria-label="Size groups pagination" class="mt-4">
+                            <ul class="pagination justify-content-center">
+                                {% if size_groups.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?size_page={{ size_groups.previous_page_number }}">السابق</a>
+                                    </li>
+                                {% endif %}
+                                
+                                {% for num in size_groups.paginator.page_range %}
+                                    {% if size_groups.number == num %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ num }}</span>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?size_page={{ num }}">{{ num }}</a>
+                                        </li>
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if size_groups.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?size_page={{ size_groups.next_page_number }}">التالي</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <div class="production-empty">
+                        <i class="fas fa-ruler"></i>
+                        <h5>لا توجد مجموعات مقاسات</h5>
+                        <p>لم يتم إنشاء أي مجموعات مقاسات بعد</p>
+                        <button type="button" class="btn btn-production" data-bs-toggle="modal" data-bs-target="#sizeGroupModal">
+                            <i class="fas fa-plus me-2"></i>إضافة مجموعة مقاسات جديدة
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block production_modals %}
+    {{ block.super }}
+    
+    <!-- Category Modal -->
+    <div class="modal fade" id="categoryModal" tabindex="-1" aria-labelledby="categoryModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="categoryModalLabel">
+                        <i class="fas fa-tags me-2"></i>
+                        <span id="categoryModalTitle">إضافة فئة جديدة</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="categoryForm" method="post">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <div class="form-floating">
+                                    {{ category_form.name|add_class:"form-control" }}
+                                    <label for="{{ category_form.name.id_for_label }}">{{ category_form.name.label }}</label>
+                                </div>
+                                {% if category_form.name.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {{ category_form.name.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="form-floating">
+                                    {{ category_form.parent|add_class:"form-select" }}
+                                    <label for="{{ category_form.parent.id_for_label }}">{{ category_form.parent.label }}</label>
+                                </div>
+                                {% if category_form.parent.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {{ category_form.parent.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="form-check form-switch">
+                                    {{ category_form.is_active|add_class:"form-check-input" }}
+                                    <label class="form-check-label" for="{{ category_form.is_active.id_for_label }}">
+                                        {{ category_form.is_active.label }}
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>إلغاء
+                        </button>
+                        <button type="submit" class="btn btn-production">
+                            <i class="fas fa-save me-1"></i>
+                            <span id="categorySaveBtn">حفظ</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Size Group Modal -->
+    <div class="modal fade" id="sizeGroupModal" tabindex="-1" aria-labelledby="sizeGroupModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="sizeGroupModalLabel">
+                        <i class="fas fa-ruler me-2"></i>
+                        <span id="sizeGroupModalTitle">إضافة مجموعة مقاسات جديدة</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="sizeGroupForm" method="post">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <div class="form-floating">
+                                    {{ size_group_form.name|add_class:"form-control" }}
+                                    <label for="{{ size_group_form.name.id_for_label }}">{{ size_group_form.name.label }}</label>
+                                </div>
+                                {% if size_group_form.name.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {{ size_group_form.name.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="form-floating">
+                                    {{ size_group_form.sizes_input|add_class:"form-control" }}
+                                    <label for="{{ size_group_form.sizes_input.id_for_label }}">{{ size_group_form.sizes_input.label }}</label>
+                                </div>
+                                <div class="form-text">
+                                    {{ size_group_form.sizes_input.help_text }}
+                                </div>
+                                {% if size_group_form.sizes_input.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {{ size_group_form.sizes_input.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong>أمثلة على المقاسات:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li>للملابس العامة: XS, S, M, L, XL, XXL</li>
+                                        <li>للأحذية: 38, 39, 40, 41, 42, 43, 44</li>
+                                        <li>للبناطيل: 28, 30, 32, 34, 36, 38, 40</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>إلغاء
+                        </button>
+                        <button type="submit" class="btn btn-production">
+                            <i class="fas fa-save me-1"></i>
+                            <span id="sizeGroupSaveBtn">حفظ</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block production_extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize tooltips
+    $('[data-bs-toggle="tooltip"]').tooltip();
+    
+    // Reset forms when modals are hidden
+    $('#categoryModal').on('hidden.bs.modal', function() {
+        resetCategoryForm();
+    });
+    
+    $('#sizeGroupModal').on('hidden.bs.modal', function() {
+        resetSizeGroupForm();
+    });
+    
+    // Handle category form submission
+    $('#categoryForm').on('submit', function(e) {
+        e.preventDefault();
+        submitCategoryForm();
+    });
+    
+    // Handle size group form submission
+    $('#sizeGroupForm').on('submit', function(e) {
+        e.preventDefault();
+        submitSizeGroupForm();
+    });
+});
+
+// Category Functions
+function resetCategoryForm() {
+    $('#categoryForm')[0].reset();
+    $('#categoryForm').removeData('category-id');
+    $('#categoryModalTitle').text('إضافة فئة جديدة');
+    $('#categorySaveBtn').text('حفظ');
+    $('.text-danger').remove();
+    $('.form-control, .form-select').removeClass('is-invalid is-valid');
+}
+
+function editCategory(categoryId) {
+    $.ajax({
+        url: `{% url 'production:get_category_ajax' 0 %}`.replace('0', categoryId),
+        method: 'GET',
+        success: function(response) {
+            if (response.success) {
+                const category = response.category;
+                $('#categoryForm').data('category-id', categoryId);
+                $('#categoryModalTitle').text('تعديل الفئة');
+                $('#categorySaveBtn').text('تحديث');
+                
+                $('#id_name').val(category.name);
+                $('#id_parent').val(category.parent_id || '');
+                $('#id_is_active').prop('checked', category.is_active);
+                
+                $('#categoryModal').modal('show');
+            } else {
+                showErrorToast(response.message);
+            }
+        },
+        error: function() {
+            showErrorToast('حدث خطأ في تحميل بيانات الفئة');
+        }
+    });
+}
+
+function submitCategoryForm() {
+    const categoryId = $('#categoryForm').data('category-id');
+    const isEdit = categoryId !== undefined;
+    const url = isEdit ? 
+        `{% url 'production:update_category_ajax' 0 %}`.replace('0', categoryId) :
+        '{% url "production:create_category_ajax" %}';
+    
+    const formData = new FormData($('#categoryForm')[0]);
+    
+    $.ajax({
+        url: url,
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            if (response.success) {
+                showSuccessToast(response.message);
+                $('#categoryModal').modal('hide');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showFormErrors(response.errors, '#categoryForm');
+                showErrorToast(response.message);
+            }
+        },
+        error: function() {
+            showErrorToast('حدث خطأ في حفظ الفئة');
+        }
+    });
+}
+
+function deleteCategory(categoryId) {
+    if (confirm('هل أنت متأكد من حذف هذه الفئة؟')) {
+        $.ajax({
+            url: `{% url 'production:delete_category_ajax' 0 %}`.replace('0', categoryId),
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    showSuccessToast(response.message);
+                    $(`tr[data-category-id="${categoryId}"]`).fadeOut(300, function() {
+                        $(this).remove();
+                    });
+                } else {
+                    showErrorToast(response.message);
+                }
+            },
+            error: function() {
+                showErrorToast('حدث خطأ في حذف الفئة');
+            }
+        });
+    }
+}
+
+function toggleCategoryStatus(categoryId) {
+    $.ajax({
+        url: `{% url 'production:toggle_category_status_ajax' 0 %}`.replace('0', categoryId),
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+        },
+        success: function(response) {
+            if (response.success) {
+                showSuccessToast(response.message);
+                const badge = $(`tr[data-category-id="${categoryId}"] .badge`);
+                if (response.is_active) {
+                    badge.removeClass('bg-secondary').addClass('bg-success').text('نشط');
+                } else {
+                    badge.removeClass('bg-success').addClass('bg-secondary').text('غير نشط');
+                }
+            } else {
+                showErrorToast(response.message);
+                // Revert checkbox state
+                $(`input[data-category-id="${categoryId}"]`).prop('checked', !$(`input[data-category-id="${categoryId}"]`).prop('checked'));
+            }
+        },
+        error: function() {
+            showErrorToast('حدث خطأ في تغيير حالة الفئة');
+            // Revert checkbox state
+            $(`input[data-category-id="${categoryId}"]`).prop('checked', !$(`input[data-category-id="${categoryId}"]`).prop('checked'));
+        }
+    });
+}
+
+// Size Group Functions
+function resetSizeGroupForm() {
+    $('#sizeGroupForm')[0].reset();
+    $('#sizeGroupForm').removeData('size-group-id');
+    $('#sizeGroupModalTitle').text('إضافة مجموعة مقاسات جديدة');
+    $('#sizeGroupSaveBtn').text('حفظ');
+    $('.text-danger').remove();
+    $('.form-control').removeClass('is-invalid is-valid');
+}
+
+function editSizeGroup(sizeGroupId) {
+    $.ajax({
+        url: `{% url 'production:get_size_group_ajax' 0 %}`.replace('0', sizeGroupId),
+        method: 'GET',
+        success: function(response) {
+            if (response.success) {
+                const sizeGroup = response.size_group;
+                $('#sizeGroupForm').data('size-group-id', sizeGroupId);
+                $('#sizeGroupModalTitle').text('تعديل مجموعة المقاسات');
+                $('#sizeGroupSaveBtn').text('تحديث');
+                
+                $('#id_name').val(sizeGroup.name);
+                $('#id_sizes_input').val(sizeGroup.sizes.join(', '));
+                
+                $('#sizeGroupModal').modal('show');
+            } else {
+                showErrorToast(response.message);
+            }
+        },
+        error: function() {
+            showErrorToast('حدث خطأ في تحميل بيانات مجموعة المقاسات');
+        }
+    });
+}
+
+function submitSizeGroupForm() {
+    const sizeGroupId = $('#sizeGroupForm').data('size-group-id');
+    const isEdit = sizeGroupId !== undefined;
+    const url = isEdit ? 
+        `{% url 'production:update_size_group_ajax' 0 %}`.replace('0', sizeGroupId) :
+        '{% url "production:create_size_group_ajax" %}';
+    
+    const formData = new FormData($('#sizeGroupForm')[0]);
+    
+    $.ajax({
+        url: url,
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            if (response.success) {
+                showSuccessToast(response.message);
+                $('#sizeGroupModal').modal('hide');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showFormErrors(response.errors, '#sizeGroupForm');
+                showErrorToast(response.message);
+            }
+        },
+        error: function() {
+            showErrorToast('حدث خطأ في حفظ مجموعة المقاسات');
+        }
+    });
+}
+
+function deleteSizeGroup(sizeGroupId) {
+    if (confirm('هل أنت متأكد من حذف مجموعة المقاسات هذه؟')) {
+        $.ajax({
+            url: `{% url 'production:delete_size_group_ajax' 0 %}`.replace('0', sizeGroupId),
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    showSuccessToast(response.message);
+                    $(`tr[data-size-group-id="${sizeGroupId}"]`).fadeOut(300, function() {
+                        $(this).remove();
+                    });
+                } else {
+                    showErrorToast(response.message);
+                }
+            },
+            error: function() {
+                showErrorToast('حدث خطأ في حذف مجموعة المقاسات');
+            }
+        });
+    }
+}
+
+// Utility Functions
+function showFormErrors(errors, formSelector) {
+    // Clear previous errors
+    $(formSelector + ' .text-danger').remove();
+    $(formSelector + ' .form-control, ' + formSelector + ' .form-select').removeClass('is-invalid');
+    
+    // Show new errors
+    for (const field in errors) {
+        const fieldElement = $(formSelector + ' #id_' + field);
+        fieldElement.addClass('is-invalid');
+        fieldElement.closest('.form-floating, .form-check').after(
+            `<div class="text-danger small mt-1">${errors[field][0]}</div>`
+        );
+    }
+}
+
+function showSuccessToast(message) {
+    // Create and show success toast
+    const toast = $(`
+        <div class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="fas fa-check-circle me-2"></i>${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    `);
+    
+    $('.toast-container').append(toast);
+    const bsToast = new bootstrap.Toast(toast[0]);
+    bsToast.show();
+    
+    // Remove toast element after it's hidden
+    toast.on('hidden.bs.toast', function() {
+        $(this).remove();
+    });
+}
+
+function showErrorToast(message) {
+    // Create and show error toast
+    const toast = $(`
+        <div class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="fas fa-exclamation-circle me-2"></i>${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    `);
+    
+    $('.toast-container').append(toast);
+    const bsToast = new bootstrap.Toast(toast[0]);
+    bsToast.show();
+    
+    // Remove toast element after it's hidden
+    toast.on('hidden.bs.toast', function() {
+        $(this).remove();
+    });
+}
+
+// Tab switching with URL hash
+$(document).ready(function() {
+    // Handle tab switching
+    $('button[data-bs-toggle="pill"]').on('shown.bs.tab', function(e) {
+        const target = $(e.target).attr('data-bs-target');
+        window.location.hash = target.replace('#', '');
+    });
+    
+    // Load tab from URL hash
+    const hash = window.location.hash;
+    if (hash) {
+        const tabButton = $(`button[data-bs-target="${hash}"]`);
+        if (tabButton.length) {
+            tabButton.tab('show');
+        }
+    }
+});
+
+// Search functionality (if needed in future)
+function initSearch() {
+    $('#categoriesTable').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/ar.json'
+        },
+        pageLength: 10,
+        responsive: true,
+        order: [[0, 'asc']],
+        columnDefs: [
+            { orderable: false, targets: [4] } // Actions column
+        ]
+    });
+    
+    $('#sizeGroupsTable').DataTable({
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/ar.json'
+        },
+        pageLength: 10,
+        responsive: true,
+        order: [[0, 'asc']],
+        columnDefs: [
+            { orderable: false, targets: [4] } // Actions column
+        ]
+    });
+}
+
+// Auto-save functionality for forms
+function enableAutoSave() {
+    let saveTimeout;
+    
+    $('#categoryForm input, #categoryForm select').on('input change', function() {
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(function() {
+            // Auto-save logic here if needed
+        }, 2000);
+    });
+    
+    $('#sizeGroupForm input').on('input', function() {
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(function() {
+            // Auto-save logic here if needed
+        }, 2000);
+    });
+}
+
+// Keyboard shortcuts
+$(document).keydown(function(e) {
+    // Ctrl+N or Cmd+N for new category
+    if ((e.ctrlKey || e.metaKey) && e.keyCode === 78) {
+        e.preventDefault();
+        if ($('#categories').hasClass('show')) {
+            $('#categoryModal').modal('show');
+        } else if ($('#size-groups').hasClass('show')) {
+            $('#sizeGroupModal').modal('show');
+        }
+    }
+    
+    // Escape to close modals
+    if (e.keyCode === 27) {
+        $('.modal').modal('hide');
+    }
+});
+
+// Bulk operations (for future enhancement)
+function initBulkOperations() {
+    // Add checkboxes to tables for bulk operations
+    // This can be implemented later if needed
+}
+
+// Export functionality
+function exportCategories() {
+    window.location.href = '{% url "production:export_categories" %}';
+}
+
+function exportSizeGroups() {
+    window.location.href = '{% url "production:export_size_groups" %}';
+}
+
+// Print functionality
+function printCategories() {
+    const printContent = document.getElementById('categoriesTable').outerHTML;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>فئات المنتجات</title>
+                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+                <style>
+                    body { font-family: 'Cairo', sans-serif; direction: rtl; }
+                    @media print { 
+                        .no-print { display: none !important; }
+                        .table { font-size: 12px; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container-fluid">
+                    <h2 class="text-center mb-4">فئات المنتجات</h2>
+                    ${printContent}
+                </div>
+            </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+}
+
+function printSizeGroups() {
+    const printContent = document.getElementById('sizeGroupsTable').outerHTML;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>مجموعات المقاسات</title>
+                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+                <style>
+                    body { font-family: 'Cairo', sans-serif; direction: rtl; }
+                    @media print { 
+                        .no-print { display: none !important; }
+                        .table { font-size: 12px; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container-fluid">
+                    <h2 class="text-center mb-4">مجموعات المقاسات</h2>
+                    ${printContent}
+                </div>
+            </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+}
+</script>
+{% endblock %}

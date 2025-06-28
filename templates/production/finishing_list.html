@@ -1,0 +1,109 @@
+{% extends 'production/production_base.html' %}
+{% load static i18n %}
+
+{% block production_title %}عمليات التشطيب{% endblock %}
+
+{% block production_page_title %}قائمة عمليات التشطيب{% endblock %}
+
+{% block production_header_actions %}
+    <a href="{% url 'production:finishing_create' %}" class="btn btn-production">
+        <i class="fas fa-plus me-2"></i> إضافة عملية تشطيب
+    </a>
+{% endblock %}
+
+{% block production_content %}
+<div class="production-card">
+    <div class="production-card-header">
+        <i class="fas fa-filter me-2"></i>خيارات البحث والتصفية
+    </div>
+    <div class="production-card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label for="search" class="form-label">بحث</label>
+                <input type="text" name="search" id="search" class="form-control" placeholder="ابحث برقم الأمر أو المنتج..." value="{{ request.GET.search }}">
+            </div>
+            <div class="col-md-3">
+                <label for="type" class="form-label">نوع التشطيب</label>
+                <select name="type" id="type" class="form-select">
+                    <option value="">الكل</option>
+                    <option value="in_house" {% if request.GET.type == 'in_house' %}selected{% endif %}>داخلي</option>
+                    <option value="outsourced" {% if request.GET.type == 'outsourced' %}selected{% endif %}>خارجي</option>
+                </select>
+            </div>
+             <div class="col-md-3">
+                <label for="status" class="form-label">الحالة</label>
+                <select name="status" id="status" class="form-select">
+                    <option value="">كل الحالات</option>
+                    <option value="pending" {% if request.GET.status == 'pending' %}selected{% endif %}>قيد التنفيذ</option>
+                    <option value="completed" {% if request.GET.status == 'completed' %}selected{% endif %}>مكتمل</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-production w-100">
+                    <i class="fas fa-search"></i> بحث
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="production-card mt-4">
+    <div class="production-card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover production-table mb-0">
+                <thead>
+                    <tr>
+                        <th>أمر الإنتاج</th>
+                        <th>النوع</th>
+                        <th>المسؤول/المصنع</th>
+                        <th class="text-center">الكمية</th>
+                        <th>تاريخ البدء</th>
+                        <th>الحالة</th>
+                        <th class="text-center">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for process in finishing_processes %}
+                    <tr>
+                        <td><a href="{% url 'production:order_detail' process.dyeing_process.assembly_process.production_order.pk %}">{{ process.dyeing_process.assembly_process.production_order.order_number }}</a></td>
+                        <td><span class="badge bg-info-subtle text-info-emphasis">{{ process.get_finishing_type_display }}</span></td>
+                        <td>
+                            {% if process.finishing_type == 'outsourced' and process.external_manufacturer %}
+                                <a href="{% url 'production:manufacturers:manufacturer_detail' process.external_manufacturer.pk %}">{{ process.external_manufacturer.name }}</a>
+                            {% elif process.finisher %}
+                                {{ process.finisher.get_full_name|default:process.finisher.username }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td class="text-center">{{ process.quantity_input }}</td>
+                        <td>{{ process.start_date|date:"d-m-Y" }}</td>
+                        <td>
+                            {% if process.is_completed %}
+                                <span class="badge bg-success-subtle text-success-emphasis">مكتمل</span>
+                            {% else %}
+                                <span class="badge bg-warning-subtle text-warning-emphasis">قيد التنفيذ</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="btn-group">
+                                <a href="{{ process.get_absolute_url }}" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="عرض التفاصيل"><i class="fas fa-eye"></i></a>
+                                {% if not process.is_completed %}
+                                <a href="{% url 'production:finishing_update' process.pk %}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="تعديل"><i class="fas fa-edit"></i></a>
+                                <a href="#" data-delete-url="{% url 'production:finishing_delete' process.pk %}" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-item-name="عملية التشطيب لأمر {{process.dyeing_process.assembly_process.production_order.order_number}}" class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" title="حذف"><i class="fas fa-trash"></i></a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center p-4">لا توجد عمليات تشطيب حالياً.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% include 'partials/pagination.html' %}
+{% endblock %}

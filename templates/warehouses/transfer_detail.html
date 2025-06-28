@@ -1,0 +1,257 @@
+{% extends 'warehouses/base.html' %}
+{% load static %}
+
+{% block title %}تفاصيل التحويل {{ transfer.transfer_number }}{% endblock %}
+
+{% block warehouse_content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2>تفاصيل التحويل {{ transfer.transfer_number }}</h2>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'warehouses:transfer_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> رجوع للقائمة
+            </a>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Transfer Details Card -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5>معلومات التحويل</h5>
+                    <span class="badge {% if transfer.status == 'pending' %}bg-warning{% elif transfer.status == 'approved' %}bg-info{% elif transfer.status == 'completed' %}bg-success{% else %}bg-danger{% endif %} fs-6">
+                        {{ transfer.get_status_display }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>رقم التحويل:</strong></td>
+                                    <td>{{ transfer.transfer_number }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>المنتج:</strong></td>
+                                    <td>{{ transfer.product.name }} ({{ transfer.product.code }})</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>الكمية:</strong></td>
+                                    <td>{{ transfer.quantity }} {{ transfer.product.get_unit_display }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>من المخزن:</strong></td>
+                                    <td>{{ transfer.from_warehouse.name }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>إلى المخزن:</strong></td>
+                                    <td>{{ transfer.to_warehouse.name }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>طلب بواسطة:</strong></td>
+                                    <td>{{ transfer.requested_by.get_full_name|default:transfer.requested_by.username }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>تاريخ الطلب:</strong></td>
+                                    <td>{{ transfer.requested_at|date:"Y-m-d H:i" }}</td>
+                                </tr>
+                                {% if transfer.approved_by %}
+                                <tr>
+                                    <td><strong>وافق عليه:</strong></td>
+                                    <td>{{ transfer.approved_by.get_full_name|default:transfer.approved_by.username }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>تاريخ الموافقة:</strong></td>
+                                    <td>{{ transfer.approved_at|date:"Y-m-d H:i" }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if transfer.completed_by %}
+                                <tr>
+                                    <td><strong>أكمل بواسطة:</strong></td>
+                                    <td>{{ transfer.completed_by.get_full_name|default:transfer.completed_by.username }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>تاريخ الإكمال:</strong></td>
+                                    <td>{{ transfer.completed_at|date:"Y-m-d H:i" }}</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                    </div>
+                    
+                    {% if transfer.reason %}
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <h6>سبب التحويل:</h6>
+                            <p class="text-muted">{{ transfer.reason }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if transfer.notes %}
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <h6>ملاحظات:</h6>
+                            <p class="text-muted">{{ transfer.notes }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <!-- Actions Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h5>الإجراءات</h5>
+                </div>
+                <div class="card-body">
+                    {% if transfer.status == 'pending' and user.role in 'admin,warehouse_manager' %}
+                    <form method="post" action="{% url 'warehouses:transfer_approve' transfer.pk %}" class="mb-2">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-success w-100" onclick="return confirm('هل أنت متأكد من الموافقة على هذا التحويل؟')">
+                            <i class="fas fa-check"></i> الموافقة على التحويل
+                        </button>
+                    </form>
+                    <button class="btn btn-danger w-100" onclick="cancelTransfer()">
+                        <i class="fas fa-times"></i> إلغاء التحويل
+                    </button>
+                    {% elif transfer.status == 'approved' and user.role in 'admin,warehouse_manager' %}
+                    <form method="post" action="{% url 'warehouses:transfer_complete' transfer.pk %}" class="mb-2">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-primary w-100" onclick="return confirm('هل أنت متأكد من إتمام هذا التحويل؟ سيتم تحديث المخزون تلقائياً.')">
+                            <i class="fas fa-check-double"></i> إتمام التحويل
+                        </button>
+                    </form>
+                    {% elif transfer.status == 'completed' %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> تم إتمام التحويل بنجاح
+                    </div>
+                    {% elif transfer.status == 'cancelled' %}
+                    <div class="alert alert-danger">
+                        <i class="fas fa-times-circle"></i> تم إلغاء التحويل
+                    </div>
+                    {% endif %}
+                    
+                    <hr>
+                    
+                    <button class="btn btn-outline-primary w-100 mb-2" onclick="printTransfer()">
+                        <i class="fas fa-print"></i> طباعة
+                    </button>
+                    
+                    <a href="{% url 'warehouses:transfer_list' %}" class="btn btn-outline-secondary w-100">
+                        <i class="fas fa-list"></i> جميع التحويلات
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Stock Information Card -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5>معلومات المخزون</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <h6>{{ transfer.from_warehouse.name }}</h6>
+                        <div class="d-flex justify-content-between">
+                            <span>الكمية الحالية:</span>
+                            <span class="fw-bold" id="source-quantity">-</span>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h6>{{ transfer.to_warehouse.name }}</h6>
+                        <div class="d-flex justify-content-between">
+                            <span>الكمية الحالية:</span>
+                            <span class="fw-bold" id="target-quantity">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load current stock quantities
+    loadStockQuantities();
+});
+
+function loadStockQuantities() {
+    const productId = {{ transfer.product.id }};
+    const sourceWarehouseId = {{ transfer.from_warehouse.id }};
+    const targetWarehouseId = {{ transfer.to_warehouse.id }};
+    
+    // Load source warehouse quantity
+    fetch(`/warehouses/api/stock/check/?warehouse=${sourceWarehouseId}&product=${productId}`)
+        .then(response => response.json())
+        .then(data => {
+            const quantity = data.stock_item ? data.stock_item.quantity : 0;
+            document.getElementById('source-quantity').textContent = quantity;
+        })
+        .catch(error => console.error('Error loading source quantity:', error));
+    
+    // Load target warehouse quantity
+    fetch(`/warehouses/api/stock/check/?warehouse=${targetWarehouseId}&product=${productId}`)
+        .then(response => response.json())
+        .then(data => {
+            const quantity = data.stock_item ? data.stock_item.quantity : 0;
+            document.getElementById('target-quantity').textContent = quantity;
+        })
+        .catch(error => console.error('Error loading target quantity:', error));
+}
+
+function cancelTransfer() {
+    if (confirm('هل أنت متأكد من إلغاء هذا التحويل؟')) {
+        fetch(`/warehouses/transfers/{{ transfer.pk }}/cancel/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('حدث خطأ أثناء إلغاء التحويل');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('حدث خطأ أثناء إلغاء التحويل');
+        });
+    }
+}
+
+function printTransfer() {
+    window.print();
+}
+</script>
+
+<style>
+@media print {
+    .btn, .card-header, nav, .sidebar {
+        display: none !important;
+    }
+    
+    .card {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    .container-fluid {
+        padding: 0 !important;
+    }
+}
+</style>
+{% endblock %}

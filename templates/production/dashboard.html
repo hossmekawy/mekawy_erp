@@ -1,0 +1,1123 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+
+{% block production_title %}لوحة تحكم الإنتاج{% endblock %}
+
+{% block production_page_title %}لوحة تحكم الإنتاج{% endblock %}
+
+{% block production_header_actions %}
+    <div class="d-flex justify-content-end align-items-center gap-3">
+        <!-- Date Range Selector -->
+        <div class="d-flex align-items-center">
+            <input type="date" class="form-control form-control-sm" id="startDate" style="max-width: 140px;">
+            <span class="text-white-50 mx-2">إلى</span>
+            <input type="date" class="form-control form-control-sm" id="endDate" style="max-width: 140px;">
+            <button class="btn btn-light btn-sm ms-2" onclick="refreshDashboard()" data-bs-toggle="tooltip" title="تحديث">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="dropdown">
+            <button class="btn btn-production-outline dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="fas fa-plus me-1"></i>
+                إجراءات سريعة
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                    <a class="dropdown-item" href="{% url 'production:order_create' %}">
+                        <i class="fas fa-plus-circle me-2"></i>أمر إنتاج جديد
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item" href="{% url 'production:textile_stock_create' %}">
+                        <i class="fas fa-plus-square me-2"></i>إضافة مخزون قماش
+                    </a>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <a class="dropdown-item" href="{% url 'production:daily_report' %}">
+                        <i class="fas fa-chart-line me-2"></i>التقارير
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+{% endblock %}  
+{% block production_extra_css %}
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .dashboard-card {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 1rem 0;
+        }
+        
+        .process-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .process-card:hover {
+            transform: scale(1.05);
+        }
+        
+        .alert-card {
+            border-left: 4px solid;
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .alert-warning { border-left-color: #f39c12; }
+        .alert-danger { border-left-color: #e74c3c; }
+        .alert-info { border-left-color: #3498db; }
+
+        /* Fullscreen Chart Modal Styles */
+        .chart-fullscreen-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .chart-fullscreen-modal.show {
+            display: flex;
+            opacity: 1;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chart-fullscreen-content {
+            background: white;
+            border-radius: 15px;
+            width: 95%;
+            height: 90%;
+            max-width: 1400px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                transform: scale(0.8) translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1) translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .chart-fullscreen-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 30px;
+            border-bottom: 2px solid #f8f9fa;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px 15px 0 0;
+        }
+
+        .chart-fullscreen-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .chart-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .chart-controls button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .chart-controls button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .chart-controls .btn-close {
+            background: rgba(220, 53, 69, 0.8);
+            border: 1px solid rgba(220, 53, 69, 0.9);
+            font-size: 1.2rem;
+            padding: 8px 12px;
+            font-weight: bold;
+        }
+
+        .chart-controls .btn-close:hover {
+            background: rgba(220, 53, 69, 1);
+        }
+
+        .chart-fullscreen-body {
+            flex: 1;
+            padding: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border-radius: 0 0 15px 15px;
+        }
+
+        .chart-fullscreen-canvas {
+            width: 100% !important;
+            height: 100% !important;
+            max-height: 600px;
+        }
+
+        /* Loading Spinner */
+        .chart-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: #667eea;
+        }
+
+        .chart-loading .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .chart-fullscreen-content {
+                width: 98%;
+                height: 95%;
+                border-radius: 10px;
+            }
+
+            .chart-fullscreen-header {
+                padding: 15px 20px;
+                border-radius: 10px 10px 0 0;
+            }
+
+            .chart-fullscreen-title {
+                font-size: 1.2rem;
+            }
+
+            .chart-controls {
+                gap: 5px;
+            }
+
+            .chart-controls button {
+                padding: 6px 10px;
+                font-size: 0.8rem;
+            }
+
+            .chart-fullscreen-body {
+                padding: 20px;
+                border-radius: 0 0 10px 10px;
+            }
+        }
+
+        /* Chart Container Fullscreen Button */
+        .chart-fullscreen-btn {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #ddd;
+            color: #667eea;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .chart-fullscreen-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+    </style>
+{% endblock %}
+
+{% block production_content %}
+    <!-- Statistics Cards Row -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="production-card dashboard-card h-100" onclick="location.href='{% url 'production:order_list' %}'">
+                <div class="production-card-body">
+                    <div class="production-metric">
+                        <div class="production-metric-icon primary">
+                            <i class="fas fa-clipboard-list"></i>
+                        </div>
+                        <div class="production-metric-value">{{ total_orders }}</div>
+                        <div class="production-metric-label">إجمالي أوامر الإنتاج</div>
+                        <small class="text-success">
+                            <i class="fas fa-arrow-up"></i> +{{ monthly_stats.orders_created }} هذا الشهر
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="production-card dashboard-card h-100">
+                <div class="production-card-body">
+                    <div class="production-metric">
+                        <div class="production-metric-icon warning">
+                            <i class="fas fa-cogs"></i>
+                        </div>
+                        <div class="production-metric-value">{{ active_orders }}</div>
+                        <div class="production-metric-label">الأوامر النشطة</div>
+                        <div class="production-progress mt-2">
+                            <div class="production-progress-bar" style="width: {{ active_orders|floatformat:0 }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="production-card dashboard-card h-100">
+                <div class="production-card-body">
+                    <div class="production-metric">
+                        <div class="production-metric-icon success">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="production-metric-value">{{ completed_orders }}</div>
+                        <div class="production-metric-label">الأوامر المكتملة</div>
+                        <small class="text-success">
+                            معدل الإنجاز: {{ monthly_stats.orders_completed }}%
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="production-card dashboard-card h-100">
+                <div class="production-card-body">
+                    <div class="production-metric">
+                        <div class="production-metric-icon danger">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="production-metric-value">{{ pending_orders }}</div>
+                        <div class="production-metric-label">الأوامر المعلقة</div>
+                        {% if pending_orders > 5 %}
+                            <small class="text-danger">
+                                <i class="fas fa-exclamation-triangle"></i> يحتاج متابعة
+                            </small>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="row mb-4">
+        <div class="col-lg-6 mb-3">
+            <div class="production-card">
+                <div class="production-card-header">
+                    <i class="fas fa-chart-pie me-2"></i>
+                    توزيع أوامر الإنتاج حسب المراحل
+                </div>
+                <div class="production-card-body">
+                    <div class="chart-container">
+                        <button class="chart-fullscreen-btn" onclick="openChartFullscreen('productionProgressChart', 'توزيع أوامر الإنتاج حسب المراحل')" 
+                                data-bs-toggle="tooltip" title="عرض بملء الشاشة">
+                            <i class="fas fa-expand"></i>
+                        </button>
+                        <canvas id="productionProgressChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6 mb-3">
+            <div class="production-card">
+                <div class="production-card-header">
+                    <i class="fas fa-chart-line me-2"></i>
+                    اتجاه الإنتاج الشهري
+                </div>
+                <div class="production-card-body">
+                    <div class="chart-container">
+                        <button class="chart-fullscreen-btn" onclick="openChartFullscreen('monthlyTrendChart', 'اتجاه الإنتاج الشهري')" 
+                                data-bs-toggle="tooltip" title="عرض بملء الشاشة">
+                            <i class="fas fa-expand"></i>
+                        </button>
+                        <canvas id="monthlyTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Processes Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h5 class="mb-3">
+                <i class="fas fa-tasks me-2"></i>
+                العمليات النشطة
+            </h5>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="process-card" onclick="location.href='{% url 'production:cutting_list' %}'">
+                <div class="process-icon">
+                    <i class="fas fa-cut fa-2x"></i>
+                </div>
+                <h6 class="mt-3">عمليات القص</h6>
+                <div class="process-count">{{ active_cutting }}</div>
+                <small>عملية نشطة</small>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="process-card" onclick="location.href='{% url 'production:assembly_list' %}'">
+                <div class="process-icon">
+                    <i class="fas fa-cogs fa-2x"></i>
+                </div>
+                <h6 class="mt-3">عمليات التجميع</h6>
+                <div class="process-count">{{ active_assembly }}</div>
+                <small>عملية نشطة</small>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="process-card" onclick="location.href='{% url 'production:dyeing_list' %}'">
+                <div class="process-icon">
+                    <i class="fas fa-tint fa-2x"></i>
+                </div>
+                <h6 class="mt-3">عمليات الصباغة</h6>
+                <div class="process-count">{{ active_dyeing }}</div>
+                <small>عملية نشطة</small>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="process-card" onclick="location.href='{% url 'production:finishing_list' %}'">
+                <div class="process-icon">
+                    <i class="fas fa-magic fa-2x"></i>
+                </div>
+                <h6 class="mt-3">عمليات التشطيب</h6>
+                <div class="process-count">{{ active_finishing }}</div>
+                <small>عملية نشطة</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Orders and Alerts Section -->
+    <div class="row">
+        <div class="col-lg-8 mb-4">
+            <div class="production-card">
+                <div class="production-card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-history me-2"></i>
+                        أوامر الإنتاج الحديثة
+                    </div>
+                    <a href="{% url 'production:order_list' %}" class="btn btn-sm btn-outline-primary">
+                        عرض الكل
+                    </a>
+                </div>
+                <div class="production-card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>رقم الأمر</th>
+                                    <th>المنتج</th>
+                                    <th>الكمية</th>
+                                    <th>الحالة</th>
+                                    <th>التاريخ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in recent_orders %}
+                                <tr onclick="location.href='{% url 'production:order_detail' order.pk %}'" style="cursor: pointer;">
+                                    <td>
+                                        <strong>{{ order.order_number }}</strong>
+                                    </td>
+                                    <td>{{ order.product.name }}</td>
+                                    <td>{{ order.quantity_ordered }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ order.status|yesno:'success,warning,danger' }}">
+                                            {{ order.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ order.created_at|date:"Y/m/d" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">
+                                        <i class="fas fa-inbox fa-2x mb-2"></i>
+                                        <br>لا توجد أوامر إنتاج حديثة
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4 mb-4">
+            <div class="production-card">
+                <div class="production-card-header">
+                    <i class="fas fa-bell me-2"></i>
+                    التنبيهات والإشعارات
+                </div>
+                <div class="production-card-body">
+                    {% if low_textile_stock > 0 %}
+                    <div class="alert-card alert-warning">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-exclamation-triangle fa-lg me-3"></i>
+                            <div>
+                                <strong>مخزون منخفض</strong>
+                                <br><small>{{ low_textile_stock }} نوع قماش بحاجة لإعادة تموين</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if pending_exit_permits > 0 %}
+                    <div class="alert-card alert-info">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-file-export fa-lg me-3"></i>
+                            <div>
+                                <strong>تصاريح معلقة</strong>
+                                <br><small>{{ pending_exit_permits }} تصريح خروج بانتظار الموافقة</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if pending_quality_checks > 0 %}
+                    <div class="alert-card alert-danger">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-search fa-lg me-3"></i>
+                            <div>
+                                <strong>فحوصات جودة</strong>
+                                <br><small>{{ pending_quality_checks }} فحص بانتظار الاعتماد</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if low_textile_stock == 0 and pending_exit_permits == 0 and pending_quality_checks == 0 %}
+                    <div class="text-center text-success py-4">
+                        <i class="fas fa-check-circle fa-3x mb-3"></i>
+                        <br><strong>كل شيء على ما يرام!</strong>
+                        <br><small class="text-muted">لا توجد تنبيهات في الوقت الحالي</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fullscreen Chart Modal -->
+    <div id="chartFullscreenModal" class="chart-fullscreen-modal">
+        <div class="chart-fullscreen-content">
+            <div class="chart-fullscreen-header">
+                <h5 class="chart-fullscreen-title" id="fullscreenChartTitle">الرسم البياني</h5>
+                <div class="chart-controls">
+                    <button onclick="exportChart()" data-bs-toggle="tooltip" title="تصدير كصورة">
+                        <i class="fas fa-download me-1"></i>تصدير
+                    </button>
+                    <button onclick="printChart()" data-bs-toggle="tooltip" title="طباعة">
+                        <i class="fas fa-print me-1"></i>طباعة
+                    </button>
+                    <button class="btn-close" onclick="closeChartFullscreen()" data-bs-toggle="tooltip" title="إغلاق">
+                        ×
+                    </button>
+                </div>
+            </div>
+            <div class="chart-fullscreen-body">
+                <div class="chart-loading" id="chartLoading">
+                    <div class="spinner"></div>
+                    <p>جاري تحضير الرسم البياني...</p>
+                </div>
+                <canvas id="fullscreenChart" class="chart-fullscreen-canvas" style="display: none;"></canvas>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block production_extra_js %}
+<script>
+    // Chart.js Configuration for RTL
+    Chart.defaults.font.family = 'Cairo';
+    Chart.defaults.plugins.legend.rtl = true;
+    Chart.defaults.plugins.tooltip.rtl = true;
+
+    // Global chart instances
+    let progressChart, trendChart, fullscreenChartInstance;
+
+    // Production Progress Doughnut Chart
+    const progressCtx = document.getElementById('productionProgressChart').getContext('2d');
+    progressChart = new Chart(progressCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['في القص', 'في التجميع', 'في الصباغة', 'في التشطيب', 'مكتملة'],
+            datasets: [{
+                data: [
+                    {{ active_cutting }},
+                    {{ active_assembly }},
+                    {{ active_dyeing }},
+                    {{ active_finishing }},
+                    {{ completed_orders }}
+                ],
+                backgroundColor: [
+                    '#3498db',
+                    '#f39c12',
+                    '#9b59b6',
+                    '#e74c3c',
+                    '#27ae60'
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 20,
+                        usePointStyle: true
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            },
+            onClick: function(event, elements) {
+                if (elements.length > 0) {
+                    const index = elements[0].index;
+                    const urls = [
+                        '{% url "production:cutting_list" %}',
+                        '{% url "production:assembly_list" %}',
+                        '{% url "production:dyeing_list" %}',
+                        '{% url "production:finishing_list" %}',
+                        '{% url "production:order_list" %}?status=completed'
+                    ];
+                    if (urls[index]) {
+                        window.location.href = urls[index];
+                    }
+                }
+            }
+        }
+    });
+
+    // Monthly Trend Line Chart
+    const trendCtx = document.getElementById('monthlyTrendChart').getContext('2d');
+    trendChart = new Chart(trendCtx, {
+        type: 'line',
+        data: {
+            labels: {{ monthly_trend_data.months|safe }},
+            datasets: [
+                {
+                    label: 'أوامر منشأة',
+                    data: {{ monthly_trend_data.orders_created|safe }},
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'أوامر مكتملة',
+                    data: {{ monthly_trend_data.orders_completed|safe }},
+                    borderColor: '#27ae60',
+                    backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'إجمالي القطع',
+                    data: {{ monthly_trend_data.total_pieces|safe }},
+                    borderColor: '#f39c12',
+                    backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                    tension: 0.4,
+                    fill: false,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                x: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'الشهر'
+                    }
+                },
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'عدد الأوامر'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'عدد القطع'
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 20,
+                        usePointStyle: true
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleColor: 'white',
+                    bodyColor: 'white',
+                    borderColor: '#ddd',
+                    borderWidth: 1,
+                    callbacks: {
+                        title: function(context) {
+                            return 'شهر ' + context[0].label;
+                        },
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += new Intl.NumberFormat('ar-EG').format(context.parsed.y);
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Fullscreen Chart Functions
+    function openChartFullscreen(chartId, title) {
+        const modal = document.getElementById('chartFullscreenModal');
+        const titleElement = document.getElementById('fullscreenChartTitle');
+        const loadingElement = document.getElementById('chartLoading');
+        const canvasElement = document.getElementById('fullscreenChart');
+        
+        // Set title
+        titleElement.textContent = title;
+        
+        // Show modal with loading
+        modal.classList.add('show');
+        loadingElement.style.display = 'flex';
+        canvasElement.style.display = 'none';
+        
+        // Clone chart after a short delay for smooth animation
+        setTimeout(() => {
+            cloneChart(chartId, title);
+        }, 300);
+    }
+
+    function cloneChart(originalChartId, title) {
+        const loadingElement = document.getElementById('chartLoading');
+        const canvasElement = document.getElementById('fullscreenChart');
+        
+        // Get original chart instance
+        let originalChart;
+        if (originalChartId === 'productionProgressChart') {
+            originalChart = progressChart;
+        } else if (originalChartId === 'monthlyTrendChart') {
+            originalChart = trendChart;
+        }
+        
+        if (!originalChart) {
+            console.error('Chart not found:', originalChartId);
+            return;
+        }
+        
+        // Destroy existing fullscreen chart if exists
+        if (fullscreenChartInstance) {
+            fullscreenChartInstance.destroy();
+        }
+        
+        // Clone chart configuration
+        const config = JSON.parse(JSON.stringify(originalChart.config));
+        
+        // Enhance configuration for fullscreen
+        config.options = config.options || {};
+        config.options.responsive = true;
+        config.options.maintainAspectRatio = false;
+        
+        // Enhance fonts and sizes for fullscreen
+        config.options.plugins = config.options.plugins || {};
+        config.options.plugins.legend = config.options.plugins.legend || {};
+        config.options.plugins.legend.labels = config.options.plugins.legend.labels || {};
+        config.options.plugins.legend.labels.font = { size: 16 };
+        
+        // Enhance tooltip for fullscreen
+        config.options.plugins.tooltip = config.options.plugins.tooltip || {};
+        config.options.plugins.tooltip.titleFont = { size: 16 };
+        config.options.plugins.tooltip.bodyFont = { size: 14 };
+        
+        // Enhance scales for fullscreen
+        if (config.options.scales) {
+            Object.keys(config.options.scales).forEach(scaleKey => {
+                const scale = config.options.scales[scaleKey];
+                if (scale.title) {
+                    scale.title.font = { size: 16 };
+                }
+                if (scale.ticks) {
+                    scale.ticks.font = { size: 14 };
+                } else {
+                    scale.ticks = { font: { size: 14 } };
+                }
+            });
+        }
+        
+        // Create fullscreen chart
+        const ctx = canvasElement.getContext('2d');
+        fullscreenChartInstance = new Chart(ctx, config);
+        
+        // Hide loading and show chart
+        loadingElement.style.display = 'none';
+        canvasElement.style.display = 'block';
+        
+        // Trigger resize to ensure proper rendering
+        setTimeout(() => {
+            fullscreenChartInstance.resize();
+        }, 100);
+    }
+
+    function closeChartFullscreen() {
+        const modal = document.getElementById('chartFullscreenModal');
+        
+        // Add closing animation
+        modal.style.opacity = '0';
+        
+        setTimeout(() => {
+            modal.classList.remove('show');
+            modal.style.opacity = '1';
+            
+            // Destroy fullscreen chart instance
+            if (fullscreenChartInstance) {
+                fullscreenChartInstance.destroy();
+                fullscreenChartInstance = null;
+            }
+        }, 300);
+    }
+
+    function exportChart() {
+        if (!fullscreenChartInstance) {
+            showErrorToast('لا يوجد رسم بياني للتصدير');
+            return;
+        }
+        
+        try {
+            // Create download link
+            const link = document.createElement('a');
+            link.download = `chart-${Date.now()}.png`;
+            link.href = fullscreenChartInstance.toBase64Image('image/png', 1);
+            
+            // Trigger download
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showSuccessToast('تم تصدير الرسم البياني بنجاح');
+        } catch (error) {
+            console.error('Export error:', error);
+            showErrorToast('حدث خطأ أثناء تصدير الرسم البياني');
+        }
+    }
+
+    function printChart() {
+        if (!fullscreenChartInstance) {
+            showErrorToast('لا يوجد رسم بياني للطباعة');
+            return;
+        }
+        
+        try {
+            // Create print window
+            const printWindow = window.open('', '_blank');
+            const chartTitle = document.getElementById('fullscreenChartTitle').textContent;
+            const chartImage = fullscreenChartInstance.toBase64Image('image/png', 1);
+            
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html dir="rtl" lang="ar">
+                <head>
+                    <meta charset="utf-8">
+                    <title>طباعة الرسم البياني</title>
+                    <style>
+                        body {
+                            font-family: 'Cairo', Arial, sans-serif;
+                            margin: 0;
+                            padding: 20px;
+                            text-align: center;
+                            background: white;
+                        }
+                        h1 {
+                            color: #333;
+                            margin-bottom: 30px;
+                            font-size: 24px;
+                        }
+                        img {
+                            max-width: 100%;
+                            height: auto;
+                            border: 1px solid #ddd;
+                            border-radius: 8px;
+                            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                        }
+                        .print-info {
+                            margin-top: 30px;
+                            font-size: 12px;
+                            color: #666;
+                        }
+                        @media print {
+                            body { margin: 0; padding: 10px; }
+                            .print-info { page-break-inside: avoid; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h1>${chartTitle}</h1>
+                    <img src="${chartImage}" alt="الرسم البياني">
+                    <div class="print-info">
+                        <p>تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG')}</p>
+                        <p>نظام إدارة الإنتاج - Mekawy ERP</p>
+                    </div>
+                </body>
+                </html>
+            `);
+            
+            printWindow.document.close();
+            
+            // Wait for image to load then print
+            printWindow.onload = function() {
+                setTimeout(() => {
+                    printWindow.print();
+                    printWindow.close();
+                }, 500);
+            };
+            
+            showSuccessToast('تم إرسال الرسم البياني للطباعة');
+        } catch (error) {
+            console.error('Print error:', error);
+            showErrorToast('حدث خطأ أثناء طباعة الرسم البياني');
+        }
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(event) {
+        const modal = document.getElementById('chartFullscreenModal');
+        
+        if (modal.classList.contains('show')) {
+            switch(event.key) {
+                case 'Escape':
+                    closeChartFullscreen();
+                    break;
+                case 's':
+                case 'S':
+                    if (event.ctrlKey) {
+                        event.preventDefault();
+                        exportChart();
+                    }
+                    break;
+                case 'p':
+                case 'P':
+                    if (event.ctrlKey) {
+                        event.preventDefault();
+                        printChart();
+                    }
+                    break;
+            }
+        }
+    });
+
+    // Click outside modal to close
+    document.getElementById('chartFullscreenModal').addEventListener('click', function(event) {
+        if (event.target === this) {
+            closeChartFullscreen();
+        }
+    });
+
+    // Dashboard refresh function
+    function refreshDashboard() {
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+        
+        let url = window.location.pathname;
+        const params = new URLSearchParams();
+        
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+        
+        if (params.toString()) {
+            url += '?' + params.toString();
+        }
+        
+        // Show loading state
+        const refreshBtn = event.target;
+        const originalIcon = refreshBtn.innerHTML;
+        refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        refreshBtn.disabled = true;
+        
+        // Redirect with parameters
+        window.location.href = url;
+    }
+
+    // Initialize tooltips
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Bootstrap tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+        
+        // Set default date range (last 30 days)
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 30);
+        
+        document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+        document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+        
+        // Auto-refresh every 5 minutes
+        setInterval(function() {
+            if (!document.getElementById('chartFullscreenModal').classList.contains('show')) {
+                location.reload();
+            }
+        }, 300000); // 5 minutes
+    });
+
+    // Handle window resize for fullscreen chart
+    window.addEventListener('resize', function() {
+        if (fullscreenChartInstance) {
+            setTimeout(() => {
+                fullscreenChartInstance.resize();
+            }, 100);
+        }
+    });
+
+    // Touch gestures for mobile
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    document.getElementById('chartFullscreenModal').addEventListener('touchstart', function(e) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+    });
+
+    document.getElementById('chartFullscreenModal').addEventListener('touchend', function(e) {
+        if (!touchStartX || !touchStartY) return;
+        
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        
+        const diffX = touchStartX - touchEndX;
+        const diffY = touchStartY - touchEndY;
+        
+        // Swipe down to close
+        if (Math.abs(diffY) > Math.abs(diffX) && diffY < -100) {
+            closeChartFullscreen();
+        }
+        
+        touchStartX = 0;
+        touchStartY = 0;
+    });
+
+    // Performance optimization: Lazy load charts
+    const observerOptions = {
+        root: null,
+        rootMargin: '0px',
+        threshold: 0.1
+    };
+
+    const chartObserver = new IntersectionObserver(function(entries) {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                // Chart is visible, ensure it's properly rendered
+                const chartId = entry.target.querySelector('canvas').id;
+                if (chartId === 'productionProgressChart' && progressChart) {
+                    progressChart.update();
+                } else if (chartId === 'monthlyTrendChart' && trendChart) {
+                    trendChart.update();
+                }
+            }
+        });
+    }, observerOptions);
+
+    // Observe chart containers
+    document.querySelectorAll('.chart-container').forEach(container => {
+        chartObserver.observe(container);
+    });
+</script>
+{% endblock %}

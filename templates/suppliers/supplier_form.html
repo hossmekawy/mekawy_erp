@@ -1,0 +1,935 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+    {% if object %}تعديل المورد - {{ object.name }}{% else %}إضافة مورد جديد{% endif %} - Mekawy ERP
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-section {
+        background: #fff;
+        border-radius: 0.5rem;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        margin-bottom: 2rem;
+        padding: 2rem;
+    }
+    
+    .section-header {
+        border-bottom: 2px solid #e3e6f0;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+    }
+    
+    .section-title {
+        color: #5a5c69;
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin: 0;
+    }
+    
+    .section-description {
+        color: #858796;
+        font-size: 0.875rem;
+        margin: 0.5rem 0 0 0;
+    }
+    
+    .form-label {
+        font-weight: 600;
+        color: #5a5c69;
+        margin-bottom: 0.5rem;
+    }
+    
+    .required-field::after {
+        content: " *";
+        color: #e74a3b;
+    }
+    
+    .form-control, .form-select {
+        border: 1px solid #d1d3e2;
+        border-radius: 0.35rem;
+        padding: 0.75rem;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #4e73df;
+        box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+    }
+    
+    .form-text {
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+    
+    .payment-methods {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-top: 0.5rem;
+    }
+    
+    .payment-method-item {
+        background: #f8f9fc;
+        border: 2px solid #e3e6f0;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        text-align: center;
+        transition: all 0.2s ease-in-out;
+        cursor: pointer;
+    }
+    
+    .payment-method-item:hover {
+        border-color: #4e73df;
+        background: #eef2ff;
+    }
+    
+    .payment-method-item.selected {
+        border-color: #4e73df;
+        background: #4e73df;
+        color: white;
+    }
+    
+    .payment-method-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+    
+    .btn-save {
+        background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+        border: none;
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+        border-radius: 0.5rem;
+        transition: all 0.2s ease-in-out;
+    }
+    
+    .btn-save:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 0.5rem 1rem rgba(78, 115, 223, 0.3);
+    }
+    
+    .form-actions {
+        background: #f8f9fc;
+        border-radius: 0.5rem;
+        padding: 2rem;
+        text-align: center;
+        margin-top: 2rem;
+    }
+    
+    .code-generator {
+        position: relative;
+    }
+    
+    .generate-code-btn {
+        position: absolute;
+        left: 5px;
+        top: 50%;
+        transform: translateY(-50%);
+        border: none;
+        background: #4e73df;
+        color: white;
+        border-radius: 0.25rem;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+    
+    .validation-feedback {
+        display: block;
+        width: 100%;
+        margin-top: 0.25rem;
+        font-size: 0.875rem;
+        color: #e74a3b;
+    }
+    
+    .is-invalid {
+        border-color: #e74a3b;
+    }
+    
+    .is-valid {
+        border-color: #1cc88a;
+    }
+    
+    @media (max-width: 768px) {
+        .form-section {
+            padding: 1rem;
+        }
+        
+        .payment-methods {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">
+                <i class="fas fa-truck text-primary"></i>
+                {% if object %}
+                    تعديل المورد
+                {% else %}
+                    إضافة مورد جديد
+                {% endif %}
+            </h1>
+            <p class="text-muted mb-0">
+                {% if object %}
+                    تعديل بيانات المورد: {{ object.name }}
+                {% else %}
+                    إضافة مورد جديد إلى النظام
+                {% endif %}
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'suppliers:list' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-right"></i>
+                العودة للقائمة
+            </a>
+        </div>
+    </div>
+
+    <form method="post" id="supplierForm" novalidate>
+        {% csrf_token %}
+        
+        <!-- Basic Information Section -->
+        <div class="form-section">
+            <div class="section-header">
+                <h3 class="section-title">
+                    <i class="fas fa-info-circle text-primary"></i>
+                    المعلومات الأساسية
+                </h3>
+                <p class="section-description">البيانات الأساسية للمورد</p>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="id_name" class="form-label required-field">اسم المورد</label>
+                    <input type="text" class="form-control" id="id_name" name="name" 
+                           value="{{ form.name.value|default:'' }}" required>
+                    {% if form.name.errors %}
+                        <div class="validation-feedback">{{ form.name.errors.0 }}</div>
+                    {% endif %}
+                    <div class="form-text">أدخل الاسم الكامل للمورد</div>
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                    <label for="id_code" class="form-label required-field">كود المورد</label>
+                    <div class="code-generator">
+                        <input type="text" class="form-control" id="id_code" name="code" 
+                               value="{{ form.code.value|default:'' }}" required>
+                        <button type="button" class="generate-code-btn" onclick="generateSupplierCode()">
+                            <i class="fas fa-magic"></i>
+                        </button>
+                    </div>
+                    {% if form.code.errors %}
+                        <div class="validation-feedback">{{ form.code.errors.0 }}</div>
+                    {% endif %}
+                    <div class="form-text">كود فريد للمورد أو اضغط على الزر لتوليد كود تلقائي</div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="id_supplier_type" class="form-label required-field">نوع المورد</label>
+                    <select class="form-select" id="id_supplier_type" name="supplier_type" required>
+                        <option value="">اختر نوع المورد</option>
+                        <option value="fabric" {% if form.supplier_type.value == 'fabric' %}selected{% endif %}>مورد أقمشة</option>
+                        <option value="thread" {% if form.supplier_type.value == 'thread' %}selected{% endif %}>مورد خيوط</option>
+                        <option value="accessories" {% if form.supplier_type.value == 'accessories' %}selected{% endif %}>مورد إكسسوارات</option>
+                        <option value="mixed" {% if form.supplier_type.value == 'mixed' %}selected{% endif %}>مورد متنوع</option>
+                    </select>
+                    {% if form.supplier_type.errors %}
+                        <div class="validation-feedback">{{ form.supplier_type.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                    <label for="id_is_active" class="form-label">حالة المورد</label>
+                    <div class="form-check form-switch mt-2">
+                        <input class="form-check-input" type="checkbox" id="id_is_active" name="is_active" 
+                               {% if form.is_active.value %}checked{% endif %}>
+                        <label class="form-check-label" for="id_is_active">
+                            مورد نشط
+                        </label>
+                    </div>
+                    <div class="form-text">تحديد ما إذا كان المورد نشطاً أم لا</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact Information Section -->
+        <div class="form-section">
+            <div class="section-header">
+                <h3 class="section-title">
+                    <i class="fas fa-address-book text-success"></i>
+                    معلومات الاتصال
+                </h3>
+                <p class="section-description">بيانات التواصل مع المورد</p>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="id_contact_person" class="form-label required-field">الشخص المسؤول</label>
+                    <input type="text" class="form-control" id="id_contact_person" name="contact_person" 
+                           value="{{ form.contact_person.value|default:'' }}" required>
+                    {% if form.contact_person.errors %}
+                        <div class="validation-feedback">{{ form.contact_person.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                    <label for="id_phone" class="form-label required-field">رقم الهاتف</label>
+                    <input type="tel" class="form-control" id="id_phone" name="phone" 
+                           value="{{ form.phone.value|default:'' }}" required>
+                    {% if form.phone.errors %}
+                        <div class="validation-feedback">{{ form.phone.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="id_email" class="form-label">البريد الإلكتروني</label>
+                    <input type="email" class="form-control" id="id_email" name="email" 
+                           value="{{ form.email.value|default:'' }}">
+                    {% if form.email.errors %}
+                        <div class="validation-feedback">{{ form.email.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                    <label for="id_address" class="form-label required-field">العنوان</label>
+                    <textarea class="form-control" id="id_address" name="address" rows="3" required>{{ form.address.value|default:'' }}</textarea>
+                    {% if form.address.errors %}
+                        <div class="validation-feedback">{{ form.address.errors.0 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Banking Information Section -->
+        <div class="form-section">
+            <div class="section-header">
+                <h3 class="section-title">
+                    <i class="fas fa-university text-info"></i>
+                    المعلومات المصرفية
+                </h3>
+                <p class="section-description">بيانات الحساب المصرفي للمورد</p>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label for="id_bank_name" class="form-label">اسم البنك</label>
+                    <input type="text" class="form-control" id="id_bank_name" name="bank_name" 
+                           value="{{ form.bank_name.value|default:'' }}">
+                    {% if form.bank_name.errors %}
+                        <div class="validation-feedback">{{ form.bank_name.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-4 mb-3">
+                    <label for="id_account_number" class="form-label">رقم الحساب</label>
+                    <input type="text" class="form-control" id="id_account_number" name="account_number" 
+                           value="{{ form.account_number.value|default:'' }}">
+                    {% if form.account_number.errors %}
+                        <div class="validation-feedback">{{ form.account_number.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-4 mb-3">
+                    <label for="id_account_holder_name" class="form-label">اسم صاحب الحساب</label>
+                    <input type="text" class="form-control" id="id_account_holder_name" name="account_holder_name" 
+                           value="{{ form.account_holder_name.value|default:'' }}">
+                    {% if form.account_holder_name.errors %}
+                        <div class="validation-feedback">{{ form.account_holder_name.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+    
+<!-- Payment Methods Section -->
+<div class="form-section">
+    <div class="section-header">
+        <h3 class="section-title">
+            <i class="fas fa-credit-card text-warning"></i>
+            طرق الدفع المدعومة
+        </h3>
+        <p class="section-description">اختر طرق الدفع التي يدعمها المورد</p>
+    </div>
+    
+    <div class="payment-methods">
+        <div class="payment-method-item" data-method="smart_wallet">
+            <i class="fas fa-mobile-alt payment-method-icon"></i>
+            <div class="fw-bold">Smart Wallet</div>
+            <small class="text-muted">المحفظة الذكية</small>
+            <input type="checkbox" name="supported_payment_methods" value="smart_wallet" class="d-none payment-method-checkbox"
+                   {% if 'smart_wallet' in form.supported_payment_methods.value %}checked{% endif %}>
+        </div>
+        
+        <div class="payment-method-item" data-method="instapay">
+            <i class="fas fa-bolt payment-method-icon"></i>
+            <div class="fw-bold">InstaPay</div>
+            <small class="text-muted">الدفع الفوري</small>
+            <input type="checkbox" name="supported_payment_methods" value="instapay" class="d-none payment-method-checkbox"
+                   {% if 'instapay' in form.supported_payment_methods.value %}checked{% endif %}>
+        </div>
+        
+        <div class="payment-method-item" data-method="bank_transfer">
+            <i class="fas fa-university payment-method-icon"></i>
+            <div class="fw-bold">تحويل بنكي</div>
+            <small class="text-muted">التحويل المصرفي</small>
+            <input type="checkbox" name="supported_payment_methods" value="bank_transfer" class="d-none payment-method-checkbox"
+                   {% if 'bank_transfer' in form.supported_payment_methods.value %}checked{% endif %}>
+        </div>
+        
+        <div class="payment-method-item" data-method="cash">
+            <i class="fas fa-money-bill-wave payment-method-icon"></i>
+            <div class="fw-bold">كاش</div>
+            <small class="text-muted">الدفع النقدي</small>
+            <input type="checkbox" name="supported_payment_methods" value="cash" class="d-none payment-method-checkbox"
+                   {% if 'cash' in form.supported_payment_methods.value %}checked{% endif %}>
+        </div>
+    </div>
+    
+    <!-- Smart Wallet Details -->
+    <div id="smart_wallet_details" class="payment-details mt-3" 
+         style="display: {% if 'smart_wallet' in form.supported_payment_methods.value %}block{% else %}none{% endif %};">
+        <div class="row">
+            <div class="col-md-6">
+                <label for="id_smart_wallet_phone" class="form-label">رقم هاتف Smart Wallet</label>
+                {{ form.smart_wallet_phone }}
+                {% if form.smart_wallet_phone.errors %}
+                    <div class="validation-feedback">{{ form.smart_wallet_phone.errors.0 }}</div>
+                {% endif %}
+                <div class="form-text">رقم الهاتف المرتبط بحساب Smart Wallet</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- InstaPay Details -->
+    <div id="instapay_details" class="payment-details mt-3" 
+         style="display: {% if 'instapay' in form.supported_payment_methods.value %}block{% else %}none{% endif %};">
+        <div class="row">
+            <div class="col-md-6">
+                <label for="id_instapay_identifier" class="form-label">معرف InstaPay</label>
+                {{ form.instapay_identifier }}
+                {% if form.instapay_identifier.errors %}
+                    <div class="validation-feedback">{{ form.instapay_identifier.errors.0 }}</div>
+                {% endif %}
+                <div class="form-text">رقم الهاتف أو الرابط أو معرف InstaPay</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+    
+            <!-- Financial Information Section -->
+            <div class="form-section">
+                <div class="section-header">
+                    <h3 class="section-title">
+                        <i class="fas fa-dollar-sign text-success"></i>
+                        المعلومات المالية
+                    </h3>
+                    <p class="section-description">الحدود المالية وشروط الدفع</p>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="id_credit_limit" class="form-label">حد الائتمان</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="id_credit_limit" name="credit_limit" 
+                                   value="{{ form.credit_limit.value|default:'0' }}" min="0" step="0.01">
+                            <span class="input-group-text">جنيه</span>
+                        </div>
+                        {% if form.credit_limit.errors %}
+                            <div class="validation-feedback">{{ form.credit_limit.errors.0 }}</div>
+                        {% endif %}
+                        <div class="form-text">الحد الأقصى للائتمان المسموح للمورد</div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="id_payment_terms_days" class="form-label">مدة السداد</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="id_payment_terms_days" name="payment_terms_days" 
+                                   value="{{ form.payment_terms_days.value|default:'30' }}" min="1" max="365">
+                            <span class="input-group-text">يوم</span>
+                        </div>
+                        {% if form.payment_terms_days.errors %}
+                            <div class="validation-feedback">{{ form.payment_terms_days.errors.0 }}</div>
+                        {% endif %}
+                        <div class="form-text">عدد الأيام المسموحة للسداد</div>
+                    </div>
+                </div>
+            </div>
+    
+            <!-- Form Actions -->
+            <div class="form-actions">
+                <div class="d-flex justify-content-center gap-3">
+                    <button type="submit" class="btn btn-primary btn-save">
+                        <i class="fas fa-save"></i>
+                        {% if object %}تحديث المورد{% else %}حفظ المورد{% endif %}
+                    </button>
+                    
+                    <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
+                        <i class="fas fa-undo"></i>
+                        إعادة تعيين
+                    </button>
+                    
+                    <a href="{% url 'suppliers:list' %}" class="btn btn-outline-danger">
+                        <i class="fas fa-times"></i>
+                        إلغاء
+                    </a>
+                </div>
+                
+                <div class="mt-3">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle"></i>
+                        الحقول المميزة بـ <span class="text-danger">*</span> مطلوبة
+                    </small>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Confirmation Modal -->
+    <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmModalLabel">تأكيد الحفظ</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center">
+                        <i class="fas fa-question-circle fa-3x text-warning mb-3"></i>
+                        <h5>هل أنت متأكد من حفظ بيانات المورد؟</h5>
+                        <p class="text-muted">تأكد من صحة جميع البيانات المدخلة قبل الحفظ</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="button" class="btn btn-primary" id="confirmSave">
+                        <i class="fas fa-save"></i>
+                        تأكيد الحفظ
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Temporary Debug Section - Remove after fixing -->
+{% if form.errors %}
+<div class="alert alert-danger">
+    <h4>Form Errors:</h4>
+    {{ form.errors }}
+</div>
+{% endif %}
+
+{% if form.non_field_errors %}
+<div class="alert alert-danger">
+    <h4>Non-field Errors:</h4>
+    {{ form.non_field_errors }}
+</div>
+{% endif %}
+<!-- End Debug Section -->
+
+    {% endblock %}
+    
+    {% block extra_js %}
+<script>
+// Generate supplier code - Move this function to the top
+function generateSupplierCode() {
+    const supplierType = $('#id_supplier_type').val();
+    const supplierName = $('#id_name').val();
+    
+    if (!supplierType) {
+        showWarningToast('يرجى اختيار نوع المورد أولاً');
+        return;
+    }
+    
+    // Generate code based on type and name
+    let prefix = '';
+    switch(supplierType) {
+        case 'fabric': prefix = 'FAB'; break;
+        case 'thread': prefix = 'THR'; break;
+        case 'accessories': prefix = 'ACC'; break;
+        case 'mixed': prefix = 'MIX'; break;
+        default: prefix = 'SUP';
+    }
+    
+    // Add name initials if available
+    if (supplierName) {
+        const words = supplierName.trim().split(' ');
+        const initials = words.map(word => word.charAt(0).toUpperCase()).join('').substring(0, 2);
+        prefix += initials;
+    }
+    
+    // Add timestamp
+    const timestamp = Date.now().toString().slice(-4);
+    const code = prefix + timestamp;
+    
+    $('#id_code').val(code);
+    showSuccessToast('تم توليد الكود بنجاح');
+}
+
+// Reset form
+function resetForm() {
+    if (confirm('هل أنت متأكد من إعادة تعيين النموذج؟ سيتم فقدان جميع البيانات المدخلة.')) {
+        document.getElementById('supplierForm').reset();
+        
+        // Reset payment methods
+        $('.payment-method-item').removeClass('selected');
+        $('.payment-method-checkbox').prop('checked', false);
+        $('.payment-details').hide();
+        
+        // Reset validation classes
+        $('.form-control, .form-select').removeClass('is-valid is-invalid');
+        $('.validation-feedback').hide();
+        
+        // Focus on first field
+        $('#id_name').focus();
+        
+        showInfoToast('تم إعادة تعيين النموذج');
+    }
+}
+
+$(document).ready(function() {
+    // Initialize form
+    initializeForm();
+    
+    // Initialize payment methods
+    initializePaymentMethods();
+    
+    // Form validation
+    setupFormValidation();
+});
+
+// Initialize form
+function initializeForm() {
+    // Set focus on first input
+    $('#id_name').focus();
+    
+    // Initialize tooltips
+    $('[data-bs-toggle="tooltip"]').tooltip();
+    
+    // Format phone number input for Egyptian numbers (11 digits)
+    $('#id_phone').on('input', function() {
+        let value = this.value.replace(/\D/g, '');
+        if (value.length > 0) {
+            if (value.length <= 3) {
+                this.value = value;
+            } else if (value.length <= 6) {
+                this.value = value.slice(0, 3) + '-' + value.slice(3);
+            } else {
+                this.value = value.slice(0, 3) + '-' + value.slice(3, 6) + '-' + value.slice(6, 11);
+            }
+        }
+    });
+    
+    // Auto-generate account holder name from supplier name
+    $('#id_name').on('blur', function() {
+        const supplierName = $(this).val();
+        const accountHolderName = $('#id_account_holder_name').val();
+        
+        if (supplierName && !accountHolderName) {
+            $('#id_account_holder_name').val(supplierName);
+        }
+    });
+}
+
+// Initialize payment methods
+// Initialize payment methods
+function initializePaymentMethods() {
+    // Initialize selected payment methods on page load
+    $('input[name="supported_payment_methods"]:checked').each(function() {
+        const method = $(this).val();
+        $(`.payment-method-item[data-method="${method}"]`).addClass('selected');
+        $(`#${method}_details`).show();
+    });
+    
+    // Handle payment method selection
+    $('.payment-method-item').click(function() {
+        const checkbox = $(this).find('.payment-method-checkbox');
+        const method = $(this).data('method');
+        const isSelected = $(this).hasClass('selected');
+        
+        if (isSelected) {
+            $(this).removeClass('selected');
+            checkbox.prop('checked', false);
+            $(`#${method}_details`).hide();
+        } else {
+            $(this).addClass('selected');
+            checkbox.prop('checked', true);
+            $(`#${method}_details`).show();
+        }
+    });
+}
+
+// Setup form validation
+function setupFormValidation() {
+    const form = document.getElementById('supplierForm');
+    
+    // Real-time validation
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        input.addEventListener('blur', function() {
+            validateField(this);
+        });
+        
+        input.addEventListener('input', function() {
+            if (this.classList.contains('is-invalid')) {
+                validateField(this);
+            }
+        });
+    });
+    
+    // Form submission
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        if (validateForm()) {
+            showConfirmModal();
+        }
+    });
+}
+
+// Validate individual field
+function validateField(field) {
+    const value = field.value.trim();
+    const isRequired = field.hasAttribute('required');
+    let isValid = true;
+    let errorMessage = '';
+    
+    // Remove existing validation classes
+    field.classList.remove('is-valid', 'is-invalid');
+    
+    // Required field validation
+    if (isRequired && !value) {
+        isValid = false;
+        errorMessage = 'هذا الحقل مطلوب';
+    }
+    
+    // Specific field validations
+    switch(field.name) {
+        case 'email':
+            if (value && !isValidEmail(value)) {
+                isValid = false;
+                errorMessage = 'البريد الإلكتروني غير صحيح';
+            }
+            break;
+            
+        case 'phone':
+            if (value && !isValidPhone(value)) {
+                isValid = false;
+                errorMessage = 'رقم الهاتف غير صحيح';
+            }
+            break;
+            
+        case 'code':
+            if (value && value.length < 3) {
+                isValid = false;
+                errorMessage = 'كود المورد يجب أن يكون 3 أحرف على الأقل';
+            }
+            break;
+            
+        case 'credit_limit':
+            if (value && parseFloat(value) < 0) {
+                isValid = false;
+                errorMessage = 'حد الائتمان لا يمكن أن يكون سالباً';
+            }
+            break;
+            
+        case 'payment_terms_days':
+            if (value && (parseInt(value) < 1 || parseInt(value) > 365)) {
+                isValid = false;
+                errorMessage = 'مدة السداد يجب أن تكون بين 1 و 365 يوم';
+            }
+            break;
+    }
+    
+    // Apply validation result
+    if (isValid) {
+        field.classList.add('is-valid');
+        hideFieldError(field);
+    } else {
+        field.classList.add('is-invalid');
+        showFieldError(field, errorMessage);
+    }
+    
+    return isValid;
+}
+
+// Validate entire form
+function validateForm() {
+    const form = document.getElementById('supplierForm');
+    const inputs = form.querySelectorAll('input[required], select[required], textarea[required]');
+    let isFormValid = true;
+    
+    inputs.forEach(input => {
+        if (!validateField(input)) {
+            isFormValid = false;
+        }
+    });
+    
+    return isFormValid;
+}
+
+// Show field error
+function showFieldError(field, message) {
+    let errorDiv = field.parentNode.querySelector('.validation-feedback');
+    if (!errorDiv) {
+        errorDiv = document.createElement('div');
+        errorDiv.className = 'validation-feedback';
+        field.parentNode.appendChild(errorDiv);
+    }
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+}
+
+// Hide field error
+function hideFieldError(field) {
+    const errorDiv = field.parentNode.querySelector('.validation-feedback');
+    if (errorDiv) {
+        errorDiv.style.display = 'none';
+    }
+}
+
+// Email validation
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
+
+// Phone validation
+function isValidPhone(phone) {
+    const phoneRegex = /^[\d\-\+\(\)\s]+$/;
+    return phoneRegex.test(phone) && phone.replace(/\D/g, '').length >= 10;
+}
+
+// Show confirmation modal
+function showConfirmModal() {
+    const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    modal.show();
+    
+    // Handle confirmation
+    document.getElementById('confirmSave').onclick = function() {
+        modal.hide();
+        submitForm();
+    };
+}
+
+// Submit form
+function submitForm() {
+    const form = document.getElementById('supplierForm');
+    const submitBtn = form.querySelector('button[type="submit"]');
+    
+    // Show loading state
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
+    submitBtn.disabled = true;
+    
+    // Submit form
+    form.submit();
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    // Ctrl + S to save
+    if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        if (validateForm()) {
+            showConfirmModal();
+        }
+    }
+    
+    // Escape to cancel
+    if (e.key === 'Escape') {
+        const activeModal = document.querySelector('.modal.show');
+        if (activeModal) {
+            bootstrap.Modal.getInstance(activeModal).hide();
+        }
+    }
+});
+</script>
+
+    
+    <style>
+    /* Additional responsive styles */
+    @media (max-width: 576px) {
+        .form-section {
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .section-title {
+            font-size: 1.1rem;
+        }
+        
+        .form-actions {
+            padding: 1rem;
+        }
+        
+        .form-actions .btn {
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
+        
+        .payment-methods {
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+        
+        .payment-method-item {
+            padding: 0.75rem;
+        }
+        
+        .payment-method-icon {
+            font-size: 1.5rem;
+        }
+    }
+    
+    /* Print styles */
+    @media print {
+        .form-actions,
+        .btn,
+        .modal {
+            display: none !important;
+        }
+        
+        .form-section {
+            break-inside: avoid;
+            box-shadow: none;
+            border: 1px solid #ddd;
+        }
+    }
+    
+    /* Dark mode support (if needed) */
+    @media (prefers-color-scheme: dark) {
+        .form-section {
+            background: #2d3748;
+            color: #e2e8f0;
+        }
+        
+        .section-title {
+            color: #e2e8f0;
+        }
+        
+        .form-control,
+        .form-select {
+            background: #4a5568;
+            border-color: #718096;
+            color: #e2e8f0;
+        }
+        
+        .payment-method-item {
+            background: #4a5568;
+            border-color: #718096;
+            color: #e2e8f0;
+        }
+    }
+    </style>
+    {% endblock %}
+    

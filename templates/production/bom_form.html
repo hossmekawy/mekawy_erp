@@ -1,0 +1,632 @@
+{% extends 'production/production_base.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block production_title %}
+    {% if is_update_view %}
+        {% trans "إنشاء إصدار جديد من قائمة المواد" %}
+    {% else %}
+        {% trans "إنشاء قائمة مواد" %}
+    {% endif %}
+{% endblock %}
+
+{% block production_extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<style>
+    /* General Page Styling */
+    :root {
+        --form-row-bg: #ffffff;
+        --form-row-alt-bg: #f8f9fa;
+        --form-row-hover-bg: #f1f5f9;
+        --form-row-border: #e2e8f0;
+    }
+
+    /* Production Card Refinement */
+    .production-card {
+        border-radius: 0.75rem;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    }
+
+    .production-card-header h5 {
+        color: var(--production-primary);
+    }
+    
+    /* Formset Styling */
+    .formset-header {
+        background-color: #f1f5f9;
+        font-weight: 600;
+        color: #334155;
+        font-size: 0.9rem;
+        padding: 0.75rem 1.25rem;
+        border-bottom: 2px solid var(--form-row-border);
+    }
+    
+    .formset-row {
+        padding: 1.25rem;
+        border-bottom: 1px solid var(--form-row-border);
+        background-color: var(--form-row-bg);
+        transition: background-color 0.3s ease;
+        position: relative;
+    }
+    
+    .formset-row:nth-child(even) {
+        background-color: var(--form-row-alt-bg);
+    }
+    
+    .formset-row:hover {
+        background-color: var(--form-row-hover-bg);
+    }
+    
+    .formset-row:last-of-type {
+        border-bottom: none;
+        border-radius: 0 0 0.75rem 0.75rem;
+    }
+
+    /* Z-index fix for overlapping Select2 */
+    .formset-row-active {
+        z-index: 1050 !important;
+    }
+
+    /* Info display below inputs */
+    .field-info {
+        font-size: 0.8rem;
+        color: #64748b;
+    }
+    
+    .field-info .fw-bold {
+        color: #334155;
+    }
+    
+    .line-total-cost {
+        color: var(--production-success);
+        font-weight: 700 !important;
+    }
+
+    /* Total Cost Section */
+    .total-cost-section {
+        background: linear-gradient(135deg, var(--production-dark), var(--production-secondary));
+        color: white;
+        padding: 1.25rem 1.5rem;
+        border-radius: 0.75rem;
+        margin-top: 1.5rem;
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    }
+    
+    .total-cost-section h4 {
+        margin-bottom: 0;
+        font-weight: 600;
+    }
+    
+    .total-cost-section #total-cost {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #f39c12;
+    }
+    
+    /* Custom Select2 Result Styling */
+    .select2-result-material {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        cursor: pointer;
+    }
+    
+    .select2-result-material__meta { 
+        flex-grow: 1; 
+    }
+    
+    .select2-result-material__title {
+        font-weight: 600;
+        color: #343a40;
+    }
+    
+    .select2-result-material__description {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    
+    .select2-result-material__statistics {
+        text-align: right;
+        font-size: 0.8rem;
+        color: #495057;
+        flex-shrink: 0;
+        padding-right: 15px;
+    }
+    
+    .select2-result-material__cost i, 
+    .select2-result-material__available i {
+        color: #888;
+        width: 14px;
+        text-align: center;
+        margin-left: 4px;
+    }
+
+    /* Hide DELETE checkboxes */
+    input[name$="-DELETE"] {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block production_page_title %}
+    {% if is_update_view %}
+        {% blocktrans with product_name=form.instance.product.name size_group=form.instance.size_group.name version=form.instance.version|add:1 %}
+            إصدار جديد لـ "{{ product_name }}" - مجموعة مقاسات {{ size_group }} (v{{ version }})
+        {% endblocktrans %}
+    {% else %}
+        {% trans "إنشاء قائمة مواد جديدة" %}
+    {% endif %}
+{% endblock %}
+
+{% block production_breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'production:bom_list' %}">{% trans "قوائم المواد" %}</a></li>
+<li class="breadcrumb-item active" aria-current="page">
+    {% if is_update_view %}{% trans "إصدار جديد" %}{% else %}{% trans "إنشاء" %}{% endif %}
+</li>
+{% endblock %}
+
+{% block production_content %}
+<form method="post" id="bom-form" class="needs-validation" novalidate>
+    {% csrf_token %}
+    
+    <!-- Basic Information Card -->
+    <div class="production-card">
+        <div class="production-card-header">
+            <h5 class="mb-0">{% trans "معلومات أساسية" %}</h5>
+        </div>
+        <div class="production-card-body">
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+            
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="{{ form.product.id_for_label }}" class="form-label fw-bold">
+                        {% trans "المنتج النهائي" %}
+                    </label>
+                    {{ form.product }}
+                    <div class="invalid-feedback">{{ form.product.errors }}</div>
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="{{ form.size_group.id_for_label }}" class="form-label fw-bold">
+                        {% trans "مجموعة المقاسات" %}
+                    </label>
+                    {{ form.size_group }}
+                    <div class="invalid-feedback">{{ form.size_group.errors }}</div>
+                </div>
+                
+                <div class="col-12">
+                    <label for="{{ form.notes.id_for_label }}" class="form-label fw-bold">
+                        {% trans "ملاحظات" %}
+                    </label>
+                    {{ form.notes }}
+                    <div class="invalid-feedback">{{ form.notes.errors }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Raw Materials Card -->
+    <div class="production-card mt-4">
+        <div class="production-card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">{% trans "عناصر المواد الخام" %}</h5>
+            <button type="button" id="add-item-btn" class="btn btn-sm btn-success rounded-pill px-3">
+                <i class="fas fa-plus me-1"></i> {% trans "إضافة مادة" %}
+            </button>
+        </div>
+        
+        <div class="p-0">
+            {% if formset.non_form_errors %}
+                <div class="alert alert-danger m-3">{{ formset.non_form_errors }}</div>
+            {% endif %}
+            
+            {{ formset.management_form }}
+            
+            <!-- Header Row (Desktop Only) -->
+            <div class="row g-3 align-items-center formset-header d-none d-lg-flex mx-0">
+                <div class="col-lg-5">{% trans "المادة الخام" %}</div>
+                <div class="col-lg-2">{% trans "الكمية" %}</div>
+                <div class="col-lg-4">{% trans "ملاحظات" %}</div>
+                <div class="col-lg-1 text-center">{% trans "إجراء" %}</div>
+            </div>
+
+            <!-- Formset Container -->
+            <div id="formset-container">
+                {% for item_form in formset %}
+                <div class="formset-row" data-form-index="{{ forloop.counter0 }}">
+                    <!-- Hidden Fields -->
+                    {{ item_form.id }}
+                    {% if item_form.instance.pk %}{{ item_form.DELETE }}{% endif %}
+                    
+                    <div class="row g-3 align-items-center mx-0">
+                        <!-- Material Selection -->
+                        <div class="col-lg-5">
+                            <label class="form-label d-lg-none fw-bold">{% trans "المادة الخام" %}</label>
+                            {{ item_form.material }}
+                            <div class="invalid-feedback">{{ item_form.material.errors|striptags }}</div>
+                        </div>
+                        
+                        <!-- Quantity -->
+                        <div class="col-lg-2">
+                            <label class="form-label d-lg-none fw-bold">{% trans "الكمية" %}</label>
+                            {{ item_form.quantity }}
+                            <div class="invalid-feedback">{{ item_form.quantity.errors|striptags }}</div>
+                        </div>
+                        
+                        <!-- Notes -->
+                        <div class="col-lg-4">
+                            <label class="form-label d-lg-none fw-bold">{% trans "ملاحظات" %}</label>
+                            {{ item_form.notes }}
+                        </div>
+                        
+                        <!-- Remove Button -->
+                        <div class="col-lg-1 text-center">
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn w-100">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Info Row -->
+                        <div class="col-12 mt-1">
+                            <div class="d-flex justify-content-between field-info">
+                                <span>{% trans "التكلفة:" %} <span class="cost-value fw-bold">0.00</span></span>
+                                <span>{% trans "الإجمالي:" %} <span class="line-total-cost fw-bold">0.00</span></span>
+                                <span>{% trans "المتاح:" %} <span class="available-value fw-bold">--</span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Total Cost Section -->
+    <div class="total-cost-section d-flex justify-content-between align-items-center">
+        <h4 class="text-white">{% trans "إجمالي التكلفة:" %}</h4>
+        <h4><span id="total-cost">0.00</span> {% trans "جنيه" %}</h4>
+    </div>
+
+    <!-- Form Actions -->
+    <div class="mt-4 d-flex justify-content-end gap-2">
+        <a href="{% url 'production:bom_list' %}" class="btn btn-secondary">
+            <i class="fas fa-times me-1"></i> {% trans "إلغاء" %}
+        </a>
+        <button type="submit" class="btn btn-production">
+            <i class="fas fa-save me-1"></i> {% trans "حفظ" %}
+        </button>
+    </div>
+</form>
+
+<!-- Empty Form Template (Hidden) -->
+<template id="empty-form-template">
+    <div class="formset-row" data-form-index="__prefix__">
+        {{ formset.empty_form.id }}
+        
+        <div class="row g-3 align-items-center mx-0">
+            <!-- Material Selection -->
+            <div class="col-lg-5">
+                <label class="form-label d-lg-none fw-bold">{% trans "المادة الخام" %}</label>
+                {{ formset.empty_form.material }}
+                <div class="invalid-feedback"></div>
+            </div>
+            
+            <!-- Quantity -->
+            <div class="col-lg-2">
+                <label class="form-label d-lg-none fw-bold">{% trans "الكمية" %}</label>
+                {{ formset.empty_form.quantity }}
+                <div class="invalid-feedback"></div>
+            </div>
+            
+            <!-- Notes -->
+            <div class="col-lg-4">
+                <label class="form-label d-lg-none fw-bold">{% trans "ملاحظات" %}</label>
+                {{ formset.empty_form.notes }}
+            </div>
+            
+            <!-- Remove Button -->
+            <div class="col-lg-1 text-center">
+                <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn w-100">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+            
+            <!-- Info Row -->
+            <div class="col-12 mt-1">
+                <div class="d-flex justify-content-between field-info">
+                    <span>{% trans "التكلفة:" %} <span class="cost-value fw-bold">0.00</span></span>
+                    <span>{% trans "الإجمالي:" %} <span class="line-total-cost fw-bold">0.00</span></span>
+                    <span>{% trans "المتاح:" %} <span class="available-value fw-bold">--</span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+{% endblock %}
+
+{% block production_extra_js %}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+$(document).ready(function() {
+    
+    // Configuration
+    const CONFIG = {
+        urls: {
+            searchMaterials: "{% url 'production:search_raw_materials_ajax' %}",
+            getSizeGroup: "{% url 'production:get_size_group_for_product_ajax' %}"
+        },
+        selectors: {
+            formsetContainer: '#formset-container',
+            totalFormsInput: '#id_items-TOTAL_FORMS',
+            addButton: '#add-item-btn',
+            productSelect: '#id_product',
+            sizeGroupSelect: '#id_size_group',
+            totalCost: '#total-cost',
+            emptyTemplate: '#empty-form-template'
+        }
+    };
+
+    // Material Result Formatter for Select2
+    function formatMaterialResult(data) {
+        if (data.loading) return data.text;
+        if (!data.name) return data.text;
+
+        return $(
+            `<div class="select2-result-material">
+                <div class="select2-result-material__meta">
+                    <div class="select2-result-material__title">${data.name}</div>
+                    <div class="select2-result-material__description">الكود: ${data.code}</div>
+                </div>
+                <div class="select2-result-material__statistics">
+                    <div class="select2-result-material__cost">
+                        <i class="fas fa-tag"></i> ${data.cost} / ${data.unit}
+                    </div>
+                    <div class="select2-result-material__available">
+                        <i class="fas fa-boxes"></i> ${data.available}
+                    </div>
+                </div>
+            </div>`
+        );
+    }
+
+    // Initialize Material Select2
+    function initializeMaterialSelect(element) {
+        $(element).select2({
+            theme: 'bootstrap-5',
+            placeholder: "{% trans 'ابحث عن مادة خام بالكود أو الاسم' %}",
+            dir: "rtl",
+            width: '100%',
+            ajax: {
+                url: CONFIG.urls.searchMaterials,
+                dataType: 'json',
+                delay: 250,
+                data: function(params) {
+                    return { term: params.term };
+                },
+                processResults: function(data) {
+                    return { results: data.results || [] };
+                },
+                cache: true
+            },
+            language: {
+                searching: function() { return "{% trans 'جاري البحث...' %}"; },
+                noResults: function() { return "{% trans 'لم يتم العثور على نتائج' %}"; },
+                errorLoading: function() { return "{% trans 'حدث خطأ في الاتصال بالخادم' %}"; }
+            },
+            templateResult: formatMaterialResult,
+            escapeMarkup: function(markup) { return markup; }
+        });
+    }
+
+    // Initialize Product and SizeGroup Select2
+    function initializeMainSelects() {
+        $(CONFIG.selectors.productSelect).select2({
+            theme: 'bootstrap-5',
+            dir: "rtl",
+            width: '100%'
+        });
+        $(CONFIG.selectors.sizeGroupSelect).select2({
+            theme: 'bootstrap-5',
+            dir: "rtl",
+            width: '100%'
+        });
+    }
+
+    // Setup Row Event Handlers
+    function setupRowEventHandlers(row) {
+        const materialSelect = row.find('select[name$="-material"]');
+        const quantityInput = row.find('input[name$="-quantity"]');
+        const removeButton = row.find('.remove-item-btn');
+
+        materialSelect.on('select2:select', function(e) {
+            updateRowUI(row, e.params.data);
+        });
+
+        quantityInput.on('input', function() {
+            updateLineTotal(row);
+        });
+
+        removeButton.on('click', function() {
+            removeFormsetRow(row);
+        });
+
+        materialSelect.on('select2:open', function() {
+            row.addClass('formset-row-active');
+        }).on('select2:close', function() {
+            row.removeClass('formset-row-active');
+        });
+    }
+
+    // Add New Formset Row
+    function addFormsetRow() {
+        const container = $(CONFIG.selectors.formsetContainer);
+        const totalFormsInput = $(CONFIG.selectors.totalFormsInput);
+        const currentFormCount = parseInt(totalFormsInput.val());
+        const template = $(CONFIG.selectors.emptyTemplate).html();
+        if (!template) {
+            console.error('Empty form template not found');
+            return;
+        }
+
+        const newRowHtml = template.replace(/__prefix__/g, currentFormCount);
+        const newRow = $(newRowHtml);
+        newRow.attr('data-form-index', currentFormCount);
+        container.append(newRow);
+
+        const materialSelect = newRow.find('select[name$="-material"]');
+        initializeMaterialSelect(materialSelect);
+        setupRowEventHandlers(newRow);
+
+        totalFormsInput.val(currentFormCount + 1);
+        newRow.hide().fadeIn(300);
+    }
+
+    // Remove Formset Row
+    function removeFormsetRow(row) {
+        const deleteCheckbox = row.find('input[name$="-DELETE"]');
+        if (deleteCheckbox.length > 0) {
+            deleteCheckbox.prop('checked', true);
+            row.fadeOut(300, function() {
+                updateTotalCost();
+            });
+        } else {
+            row.fadeOut(300, function() {
+                $(this).remove();
+                updateTotalCost();
+            });
+        }
+    }
+
+    // Update Row UI with Material Data
+    function updateRowUI(row, materialData) {
+        if (!materialData) return;
+        row.find('.cost-value').text(parseFloat(materialData.cost || 0).toFixed(2));
+        row.find('.available-value').text(materialData.available || '--');
+        updateLineTotal(row);
+    }
+
+    // Update Line Total
+    function updateLineTotal(row) {
+        const quantity = parseFloat(row.find('input[name$="-quantity"]').val()) || 0;
+        const cost = parseFloat(row.find('.cost-value').text()) || 0;
+        const lineTotal = quantity * cost;
+        row.find('.line-total-cost').text(lineTotal.toFixed(2));
+        updateTotalCost();
+    }
+
+    // Update Total Cost
+    function updateTotalCost() {
+        let total = 0;
+        $('.formset-row:visible').each(function() {
+            const lineTotal = parseFloat($(this).find('.line-total-cost').text()) || 0;
+            total += lineTotal;
+        });
+        $(CONFIG.selectors.totalCost).text(
+            total.toLocaleString('ar-EG', { 
+                minimumFractionDigits: 2, 
+                maximumFractionDigits: 2 
+            })
+        );
+    }
+
+    // Fetch Material Data for Existing Selections
+    function fetchMaterialData(selectElement, materialId) {
+        if (!materialId) return;
+        $.ajax({
+            url: CONFIG.urls.searchMaterials,
+            data: { term: materialId },
+            method: 'GET',
+            success: function(response) {
+                const materialData = response.results?.find(m => m.id == materialId);
+                if (materialData) {
+                    const option = new Option(materialData.text, materialData.id, true, true);
+                    selectElement.append(option).trigger('change');
+                    updateRowUI(selectElement.closest('.formset-row'), materialData);
+                }
+            },
+            error: function() {
+                console.error('Failed to fetch material data for ID:', materialId);
+            }
+        });
+    }
+
+    // Handle Product Change to update Size Group
+    function handleProductChange() {
+        const productId = $(CONFIG.selectors.productSelect).val();
+        const sizeGroupSelect = $(CONFIG.selectors.sizeGroupSelect);
+
+        if (!productId) {
+            sizeGroupSelect.empty().append($('<option>', { 
+                value: '', 
+                text: '{% trans "اختر منتجاً أولاً" %}' 
+            })).prop('disabled', true).trigger('change');
+            return;
+        }
+
+        $.ajax({
+            url: CONFIG.urls.getSizeGroup,
+            data: { product_id: productId },
+            method: 'GET',
+            success: function(data) {
+                sizeGroupSelect.empty();
+                if (data.size_group) {
+                    const group = data.size_group;
+                    const displayText = `${group.name} (${group.sizes.join(', ')})`;
+                    const option = new Option(displayText, group.id, true, true);
+                    sizeGroupSelect.append(option).prop('disabled', false).trigger('change');
+                } else {
+                    sizeGroupSelect.append($('<option>', { 
+                        value: '', 
+                        text: '{% trans "لا توجد مجموعة مقاسات مرتبطة بهذا المنتج" %}' 
+                    })).prop('disabled', true).trigger('change');
+                }
+            },
+            error: function() {
+                console.error("Failed to fetch size group for product:", productId);
+                sizeGroupSelect.empty().append($('<option>', { 
+                    value: '', 
+                    text: '{% trans "خطأ في تحميل مجموعة المقاسات" %}' 
+                })).prop('disabled', true).trigger('change');
+            }
+        });
+    }
+
+    // Initialize Everything
+    function initialize() {
+        initializeMainSelects();
+        
+        $('.formset-row').each(function() {
+            const materialSelect = $(this).find('select[name$="-material"]');
+            if (materialSelect.length > 0) {
+                initializeMaterialSelect(materialSelect);
+                setupRowEventHandlers($(this));
+                const materialId = materialSelect.val();
+                if (materialId) {
+                    fetchMaterialData(materialSelect, materialId);
+                }
+            }
+        });
+
+        updateTotalCost();
+
+        if ($(CONFIG.selectors.productSelect).val()) {
+            handleProductChange();
+        } else {
+            $(CONFIG.selectors.sizeGroupSelect).prop('disabled', true);
+        }
+
+        console.log('BOM Form initialized successfully');
+    }
+
+    // Event Listeners
+    $(CONFIG.selectors.productSelect).on('change', handleProductChange);
+    $(CONFIG.selectors.addButton).on('click', addFormsetRow);
+
+    initialize();
+});
+</script>
+{% endblock %}

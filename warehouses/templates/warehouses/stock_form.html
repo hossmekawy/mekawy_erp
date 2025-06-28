@@ -1,0 +1,346 @@
+{% extends 'warehouses/base.html' %}
+{% load static %}
+
+{% block title %}
+    {% if object %}تعديل المخزون{% else %}إضافة مخزون جديد{% endif %} - المخازن
+{% endblock %}
+
+{% block warehouse_content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            {% if object %}
+                <i class="fas fa-edit text-primary"></i> تعديل المخزون
+            {% else %}
+                <i class="fas fa-plus text-success"></i> إضافة مخزون جديد
+            {% endif %}
+        </h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'warehouses:stock_list' %}">المخزون</a></li>
+                <li class="breadcrumb-item active" aria-current="page">
+                    {% if object %}تعديل{% else %}إضافة جديد{% endif %}
+                </li>
+            </ol>
+        </nav>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-xl-8 col-lg-10">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-gradient-primary text-white">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h5 class="mb-0">
+                            <i class="fas fa-clipboard-list me-2"></i>
+                            {% if object %}
+                                تعديل المخزون: <span class="fw-bold">{{ object.product.name }}</span>
+                            {% else %}
+                                بيانات المخزون الجديد
+                            {% endif %}
+                        </h5>
+                        <a href="{% url 'warehouses:stock_list' %}" 
+                           class="btn btn-light btn-sm" 
+                           data-bs-toggle="tooltip" 
+                           title="العودة للقائمة">
+                            <i class="fas fa-arrow-left"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="card-body p-4">
+                    <form method="post" id="stockForm" novalidate>
+                        {% csrf_token %}
+                        
+                        <!-- Form Progress Indicator -->
+                        <div class="progress mb-4" style="height: 4px;">
+                            <div class="progress-bar bg-primary" role="progressbar" style="width: 0%" id="formProgress"></div>
+                        </div>
+                        
+                        <!-- Basic Information Section -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary border-bottom pb-2 mb-3">
+                                    <i class="fas fa-info-circle me-2"></i>المعلومات الأساسية
+                                </h6>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.warehouse.id_for_label }}" class="form-label fw-bold">
+                                    <i class="fas fa-warehouse text-primary me-1"></i>
+                                    المخزن 
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light">
+                                        <i class="fas fa-building text-muted"></i>
+                                    </span>
+                                    {{ form.warehouse }}
+                                </div>
+                                <div class="invalid-feedback" id="warehouse-error">
+                                    {% for error in form.warehouse.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.product.id_for_label }}" class="form-label fw-bold">
+                                    <i class="fas fa-box text-primary me-1"></i>
+                                    المنتج 
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light">
+                                        <i class="fas fa-boxes text-muted"></i>
+                                    </span>
+                                    {{ form.product }}
+                                </div>
+                                <div class="invalid-feedback" id="product-error">
+                                    {% for error in form.product.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Quantity Section -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary border-bottom pb-2 mb-3">
+                                    <i class="fas fa-calculator me-2"></i>الكميات
+                                </h6>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.quantity.id_for_label }}" class="form-label fw-bold">
+                                    <i class="fas fa-sort-numeric-up text-primary me-1"></i>
+                                    الكمية
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light">
+                                        <i class="fas fa-hashtag text-muted"></i>
+                                    </span>
+                                    {{ form.quantity }}
+                                    <span class="input-group-text bg-light" id="quantity-unit">وحدة</span>
+                                </div>
+                                <div class="invalid-feedback" id="quantity-error">
+                                    {% for error in form.quantity.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.location.id_for_label }}" class="form-label fw-bold">
+                                    <i class="fas fa-location-arrow text-primary me-1"></i>
+                                    موقع المنتج في المخزن
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light">
+                                        <i class="fas fa-map-pin text-muted"></i>
+                                    </span>
+                                    {{ form.location }}
+                                </div>
+                                <small class="text-muted">مثال: الرف A - المستوى 2 - الصندوق 15</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Product Info Display -->
+                        <div id="product-info" class="alert alert-info d-none">
+                            <h6><i class="fas fa-info-circle me-2"></i>معلومات المنتج</h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <strong>الوحدة:</strong> <span id="product-unit">-</span>
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>الحد الأدنى:</strong> <span id="product-min-stock">-</span>
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>المخزون الحالي:</strong> <span id="current-stock">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Form Actions -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                                    <div>
+                                        <button type="submit" class="btn btn-primary btn-lg me-2" id="submitBtn">
+                                            <i class="fas fa-save me-2"></i>
+                                            <span class="btn-text">
+                                                {% if object %}تحديث المخزون{% else %}إضافة المخزون{% endif %}
+                                            </span>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary btn-lg" id="resetBtn">
+                                            <i class="fas fa-undo me-2"></i>إعادة تعيين
+                                        </button>
+                                    </div>
+                                    <a href="{% url 'warehouses:stock_list' %}" class="btn btn-light btn-lg">
+                                        <i class="fas fa-times me-2"></i>إلغاء
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .bg-gradient-primary {
+        background: linear-gradient(135deg, var(--bs-primary) 0%, #224abe 100%);
+    }
+    
+    .form-control, .form-select {
+        border-radius: 0.5rem;
+        border: 2px solid #e3e6f0;
+        padding: 0.75rem 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: var(--bs-primary);
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+        transform: translateY(-1px);
+    }
+    
+    .input-group-text {
+        border: 2px solid #e3e6f0;
+        border-left: none;
+        background-color: #f8f9fc;
+    }
+    
+    .btn-lg {
+        padding: 0.75rem 2rem;
+        font-size: 1.1rem;
+        border-radius: 0.5rem;
+    }
+    
+    .card {
+        border-radius: 1rem;
+        overflow: hidden;
+    }
+    
+    .progress {
+        border-radius: 1rem;
+    }
+    
+    .breadcrumb {
+        background: none;
+        padding: 0;
+    }
+    
+    .breadcrumb-item + .breadcrumb-item::before {
+        content: "←";
+    }
+    
+    .invalid-feedback {
+        display: block;
+    }
+    
+    .form-control.is-invalid, .form-select.is-invalid {
+        border-color: var(--bs-danger);
+        animation: shake 0.5s ease-in-out;
+    }
+    
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+    }
+    
+    .btn {
+        transition: all 0.3s ease;
+    }
+    
+    .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Add form classes
+        $('input[type="text"], input[type="number"], textarea, select').addClass('form-control');
+        $('select').addClass('form-select');
+        
+        // Get form elements
+        const form = document.getElementById('stockForm');
+        const warehouseField = document.getElementById('id_warehouse');
+        const productField = document.getElementById('id_product');
+        const quantityField = document.getElementById('id_quantity');
+        const submitBtn = document.getElementById('submitBtn');
+        const progressBar = document.getElementById('formProgress');
+        
+        if (!form || !warehouseField || !productField || !quantityField || !submitBtn || !progressBar) {
+            console.error('Required form elements not found');
+            return;
+        }
+        
+        let isSubmitting = false; // Prevent double submission
+        
+        // Update progress bar
+        function updateProgress() {
+            const fields = [warehouseField, productField, quantityField];
+            const filledFields = fields.filter(field => field && field.value && field.value.trim() !== '').length;
+            const progress = (filledFields / fields.length) * 100;
+            progressBar.style.width = progress + '%';
+        }
+        
+        // Event listeners for progress
+        [warehouseField, productField, quantityField].forEach(field => {
+            if (field) {
+                field.addEventListener('input', updateProgress);
+                field.addEventListener('change', updateProgress);
+            }
+        });
+        
+        // Form submission - SINGLE EVENT LISTENER
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Prevent double submission
+            if (isSubmitting) {
+                console.log('Form already submitting, ignoring...');
+                return false;
+            }
+            
+            // Basic validation
+            if (!warehouseField.value || !productField.value || !quantityField.value || parseFloat(quantityField.value) <= 0) {
+                alert('يرجى ملء جميع الحقول المطلوبة');
+                return false;
+            }
+            
+            // Set submitting flag
+            isSubmitting = true;
+            
+            // Disable submit button
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>جاري الحفظ...';
+            
+            // Submit form after short delay
+            setTimeout(() => {
+                form.submit();
+            }, 100);
+        });
+        
+        // Initialize
+        updateProgress();
+    });
+    </script>
+    
+{% endblock %}

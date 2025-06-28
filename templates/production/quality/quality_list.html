@@ -1,0 +1,106 @@
+{% extends 'production/production_base.html' %}
+{% load i18n %}
+
+{% block production_title %}فحوصات مراقبة الجودة{% endblock %}
+
+{% block production_breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'production:dashboard' %}" class="text-black-50">الرئيسية</a></li>
+<li class="breadcrumb-item active" aria-current="page">مراقبة الجودة</li>
+{% endblock %}
+
+{% block production_header_actions %}
+<a href="{% url 'production:quality:quality_create' %}" class="btn btn-production">
+    <i class="fas fa-plus me-2"></i> إضافة فحص جودة جديد
+</a>
+{% endblock %}
+
+{% block production_content %}
+<div class="production-card">
+    <div class="production-card-header">
+        <i class="fas fa-check-double me-2"></i>
+        قائمة فحوصات الجودة ({{ page_obj.paginator.count }})
+    </div>
+    <div class="card-body border-bottom">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label for="check_type" class="form-label">نوع الفحص</label>
+                <select name="check_type" id="check_type" class="form-select">
+                    <option value="">كل الأنواع</option>
+                    {% for value, display in check_types %}
+                    <option value="{{ value }}" {% if check_type_filter == value %}selected{% endif %}>{{ display }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="grade" class="form-label">التقييم</label>
+                <select name="grade" id="grade" class="form-select">
+                    <option value="">كل التقييمات</option>
+                    {% for value, display in quality_grades %}
+                    <option value="{{ value }}" {% if grade_filter == value %}selected{% endif %}>{{ display }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="approved" class="form-label">حالة الموافقة</label>
+                <select name="approved" id="approved" class="form-select">
+                    <option value="">الكل</option>
+                    <option value="true" {% if approved_filter == 'true' %}selected{% endif %}>معتمد</option>
+                    <option value="false" {% if approved_filter == 'false' %}selected{% endif %}>معلق</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-production w-100">تصفية</button>
+            </div>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table production-table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>رقم الأمر</th>
+                    <th>نوع الفحص</th>
+                    <th>المفتش</th>
+                    <th>التاريخ</th>
+                    <th>التقييم</th>
+                    <th>الحالة</th>
+                    <th>الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for check in quality_checks %}
+                <tr>
+                    <td><a href="{% url 'production:order_detail' check.production_order.pk %}"><strong>{{ check.production_order.order_number }}</strong></a></td>
+                    <td>{{ check.get_check_type_display }}</td>
+                    <td>{{ check.inspector.username|default:"--" }}</td>
+                    <td>{{ check.check_date|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        <span class="badge 
+                            {% if check.overall_grade == 'A' %} bg-success
+                            {% elif check.overall_grade == 'B' %} bg-primary
+                            {% elif check.overall_grade == 'C' %} bg-warning text-dark
+                            {% else %} bg-danger {% endif %}">
+                            {{ check.get_overall_grade_display }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if check.approved %}
+                            <span class="badge bg-success-subtle text-success-emphasis">معتمد</span>
+                        {% else %}
+                            <span class="badge bg-warning-subtle text-warning-emphasis">معلق</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ check.get_absolute_url }}" class="btn btn-sm btn-secondary"><i class="fas fa-eye"></i></a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center p-5">لا توجد فحوصات جودة.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include 'partials/pagination.html' with page_obj=page_obj %}
+</div>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends "pdf/base_pdf.html" %}
+{% load production_extras %}
+
+{% block pdf_title %}أمر إنتاج رقم {{ order.order_number }}{% endblock %}
+
+{% block pdf_header %}
+    <h1>أمر إنتاج</h1>
+    <div class="meta-info">
+        <strong>رقم الأمر:</strong> {{ order.order_number }} | 
+        <strong>رقم الباتش:</strong> {{ order.batch_number }} |
+        <strong>تاريخ الطباعة:</strong> {% now "Y-m-d" %}
+    </div>
+{% endblock %}
+
+{% block pdf_content %}
+    <h2 style="border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 15px;">المعلومات الأساسية</h2>
+    <table>
+        <tr>
+            <td><strong>المنتج:</strong></td>
+            <td>{{ order.product.name }} ({{ order.product.code }})</td>
+            <td><strong>الكمية المطلوبة:</strong></td>
+            <td>{{ order.quantity_ordered }} قطعة</td>
+        </tr>
+        <tr>
+            <td><strong>الأولوية:</strong></td>
+            <td>{{ order.get_priority_display }}</td>
+            <td><strong>الحالة الحالية:</strong></td>
+            <td>{{ order.get_status_display }}</td>
+        </tr>
+        <tr>
+            <td><strong>تاريخ البدء:</strong></td>
+            <td>{{ order.start_date|date:"Y-m-d" }}</td>
+            <td><strong>تاريخ الإنجاز المتوقع:</strong></td>
+            <td>{{ order.expected_completion_date|date:"Y-m-d" }}</td>
+        </tr>
+    </table>
+
+    {% if order.bom_version %}
+        <h2 style="border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 30px; margin-bottom: 15px;">
+            قائمة المواد المطلوبة (BOM v{{ order.bom_version.version }})
+        </h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>المادة الخام</th>
+                    <th>الكمية للقطعة</th>
+                    <th>الإجمالي المطلوب</th>
+                    <th>الوحدة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in order.bom_version.items.all %}
+                <tr>
+                    <td>{{ item.material.name }}</td>
+                    <td>{{ item.quantity|floatformat:2 }}</td>
+                    <td>{{ item.quantity|multiply:order.quantity_ordered|floatformat:2 }}</td>
+                    <td>{{ item.material.unit_new.name|default:'قطعة' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    <h2 style="border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 30px; margin-bottom: 15px;">الموافقات</h2>
+    <table>
+        <tr>
+            <td style="width: 50%;"><strong>تم الإنشاء بواسطة:</strong> {{ order.created_by.username }}</td>
+            <td><strong>تاريخ الإنشاء:</strong> {{ order.created_at|date:"Y-m-d H:i" }}</td>
+        </tr>
+        {% if order.approved_by %}
+        <tr>
+            <td><strong>تم الاعتماد بواسطة:</strong> {{ order.approved_by.username }}</td>
+            <td><strong>تاريخ الاعتماد:</strong> {{ order.approved_at|date:"Y-m-d H:i" }}</td>
+        </tr>
+        {% endif %}
+    </table>
+     {% if order.notes %}
+        <div style="margin-top: 20px; padding: 10px; border: 1px solid #eee; border-radius: 5px;">
+            <strong>ملاحظات:</strong>
+            <p style="margin: 0;">{{ order.notes }}</p>
+        </div>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,162 @@
+/* Warehouses Styles */
+
+.warehouse-content {
+    padding: 20px;
+}
+
+.sidebar {
+    background-color: #f8f9fa;
+    min-height: 100vh;
+    padding: 20px 0;
+}
+
+.sidebar-header {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid #dee2e6;
+    margin-bottom: 20px;
+}
+
+.sidebar .nav-link {
+    color: #495057;
+    padding: 10px 20px;
+    border-radius: 0;
+    margin-bottom: 2px;
+}
+
+.sidebar .nav-link:hover {
+    background-color: #e9ecef;
+    color: #007bff;
+}
+
+.sidebar .nav-link.active {
+    background-color: #007bff;
+    color: white;
+}
+
+.sidebar .nav-link i {
+    width: 20px;
+    margin-left: 10px;
+}
+
+
+/* Cards */
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+
+/* Tables */
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    background-color: #f8f9fa;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.075);
+}
+
+
+/* Badges */
+
+.badge {
+    font-size: 0.75em;
+}
+
+
+/* Buttons */
+
+.btn-group-sm>.btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+
+/* Search and Filters */
+
+.search-filters {
+    background-color: #f8f9fa;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+
+/* Stock Status Colors */
+
+.stock-good {
+    color: #198754;
+}
+
+.stock-low {
+    color: #fd7e14;
+}
+
+.stock-out {
+    color: #dc3545;
+}
+
+
+/* Movement Types */
+
+.movement-in {
+    color: #198754;
+}
+
+.movement-out {
+    color: #dc3545;
+}
+
+.movement-transfer {
+    color: #0d6efd;
+}
+
+.movement-adjustment {
+    color: #6f42c1;
+}
+
+.movement-return {
+    color: #20c997;
+}
+
+
+/* Responsive */
+
+@media (max-width: 768px) {
+    .warehouse-content {
+        padding: 10px;
+    }
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    .btn-group-sm>.btn {
+        padding: 0.125rem 0.25rem;
+        font-size: 0.75rem;
+    }
+}
+
+
+/* Print Styles */
+
+@media print {
+    .sidebar,
+    .btn,
+    .pagination {
+        display: none !important;
+    }
+    .warehouse-content {
+        padding: 0;
+    }
+    .card {
+        border: none;
+        box-shadow: none;
+    }
+}

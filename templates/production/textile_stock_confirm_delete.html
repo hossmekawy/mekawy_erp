@@ -1,0 +1,92 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+
+{% block production_title %}حذف مخزون القماش{% endblock %}
+
+{% block production_breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item">
+            <a href="{% url 'production:dashboard' %}">
+                <i class="fas fa-home"></i> الرئيسية
+            </a>
+        </li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'production:textile_stock_list' %}">
+                <i class="fas fa-cut"></i> مخزون الأقمشة
+            </a>
+        </li>
+        <li class="breadcrumb-item active">حذف {{ object.name }}</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block production_content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        تأكيد الحذف
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>تحذير:</strong> هذا الإجراء لا يمكن التراجع عنه!
+                    </div>
+                    
+                    <h6 class="mb-3">هل أنت متأكد من حذف مخزون القماش التالي؟</h6>
+                    
+                    <div class="bg-light p-3 rounded mb-4">
+                        <div class="row">
+                            <div class="col-sm-4"><strong>الاسم:</strong></div>
+                            <div class="col-sm-8">{{ object.name }}</div>
+                        </div>
+                        <div class="row">
+                            <div class="col-sm-4"><strong>نوع القماش:</strong></div>
+                            <div class="col-sm-8">{{ object.get_fabric_type_display }}</div>
+                        </div>
+                        <div class="row">
+                            <div class="col-sm-4"><strong>اللون:</strong></div>
+                            <div class="col-sm-8">{{ object.color }}</div>
+                        </div>
+                        <div class="row">
+                            <div class="col-sm-4"><strong>الكمية المتاحة:</strong></div>
+                            <div class="col-sm-8">{{ object.length_available }} متر</div>
+                        </div>
+                    </div>
+                    
+                    <form method="post" class="d-inline">
+                        {% csrf_token %}
+                        <div class="d-flex gap-2 justify-content-end">
+                            <a href="{% url 'production:textile_stock_detail' object.pk %}" 
+                               class="btn btn-secondary">
+                                <i class="fas fa-times me-2"></i>إلغاء
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash me-2"></i>حذف نهائياً
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block production_extra_js %}
+<script>
+$(document).ready(function() {
+    // Add confirmation on form submit
+    $('form').on('submit', function(e) {
+        if (!confirm('هل أنت متأكد من الحذف؟ هذا الإجراء لا يمكن التراجع عنه!')) {
+            e.preventDefault();
+        }
+    });
+});
+</script>
+{% endblock %}

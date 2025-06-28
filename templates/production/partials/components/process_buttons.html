@@ -1,0 +1,46 @@
+<!-- Process Control Buttons Component -->
+<div class="flex items-center space-x-2 space-x-reverse">
+    {% for process in process_actions %}
+    {% if process.available %}
+    <button type="button" 
+            data-process-action="{{ process.action }}"
+            data-process-id="{{ object.pk }}"
+            data-process-type="{{ process.type }}"
+            class="inline-flex items-center px-4 py-2 {{ process.class }} rounded-lg font-medium transition-colors focus:ring-2 focus:ring-offset-2">
+        <i class="{{ process.icon }} mr-2"></i>
+        {{ process.label }}
+        {% if process.loading %}
+        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 hidden" data-loading="{{ process.action }}"></div>
+        {% endif %}
+    </button>
+    {% else %}
+    <button type="button" disabled
+            class="inline-flex items-center px-4 py-2 bg-gray-300 text-gray-500 rounded-lg font-medium cursor-not-allowed">
+        <i class="{{ process.icon }} mr-2"></i>
+        {{ process.label }}
+    </button>
+    {% endif %}
+    {% endfor %}
+</div>
+
+<!-- Process Status Indicator -->
+{% if current_status %}
+<div class="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+    <div class="flex items-center">
+        <div class="flex-shrink-0">
+            <i class="fas fa-info-circle text-blue-500"></i>
+        </div>
+        <div class="mr-3">
+            <p class="text-sm font-medium text-blue-800">
+                الحالة الحالية: {{ current_status.label }}
+            </p>
+            {% if current_status.next_step %}
+            <p class="text-xs text-blue-600 mt-1">
+                الخطوة التالية: {{ current_status.next_step }}
+            </p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+

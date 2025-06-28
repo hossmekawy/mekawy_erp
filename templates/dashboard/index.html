@@ -1,0 +1,608 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}لوحة التحكم - Mekawy ERP{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.css" rel="stylesheet">
+<style>
+    .stats-card {
+        transition: transform 0.2s ease-in-out;
+        border-left: 4px solid var(--primary-color);
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .stats-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        color: white;
+    }
+    
+    .chart-container {
+        position: relative;
+        height: 300px;
+    }
+    
+    .recent-activity {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .activity-item {
+        border-bottom: 1px solid #eee;
+        padding: 10px 0;
+    }
+    
+    .activity-item:last-child {
+        border-bottom: none;
+    }
+    
+    .badge-status {
+        font-size: 0.75rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">لوحة التحكم</h1>
+        <div>
+            <span class="text-muted">آخر تحديث: </span>
+            <span class="text-primary">{{ "now"|date:"Y-m-d H:i" }}</span>
+        </div>
+    </div>
+
+    <!-- Statistics Cards Row -->
+    <div class="row mb-4">
+        <!-- Users Statistics -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card stats-card h-100">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                إجمالي المستخدمين
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_users }}</div>
+                            <div class="text-xs text-success">
+                                <i class="fas fa-user-plus"></i>
+                                {{ new_users_this_month }} جديد هذا الشهر
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="stats-icon bg-primary">
+                                <i class="fas fa-users"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Users -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card stats-card h-100">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                المستخدمين النشطين
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ active_users }}</div>
+                            <div class="text-xs text-muted">
+                                من أصل {{ total_users }} مستخدم
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="stats-icon bg-success">
+                                <i class="fas fa-user-check"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Products Statistics -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card stats-card h-100">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                إجمالي المنتجات
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_products }}</div>
+                            <div class="text-xs text-warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                {{ low_stock_products }} منتج بمخزون منخفض
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="stats-icon bg-info">
+                                <i class="fas fa-boxes"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Suppliers Statistics -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card stats-card h-100">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                الموردين النشطين
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ active_suppliers }}</div>
+                            <div class="text-xs text-muted">
+                                من أصل {{ total_suppliers }} مورد
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="stats-icon bg-warning">
+                                <i class="fas fa-truck"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Purchase Orders Row -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                إجمالي أوامر الشراء
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_purchase_orders }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-shopping-cart fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                أوامر معلقة
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ pending_orders }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clock fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                أوامر مكتملة
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ completed_orders }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-danger shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                أوامر متأخرة
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ overdue_orders }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts and Tables Row -->
+    <div class="row">
+        <!-- Users by Role Chart -->
+        <div class="col-xl-4 col-lg-5">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">توزيع المستخدمين حسب الدور</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="usersRoleChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly Statistics Chart -->
+        <div class="col-xl-8 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">الإحصائيات الشهرية</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="monthlyStatsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Tables Row -->
+    <div class="row">
+        <!-- Best Products -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">أفضل المنتجات (حسب المخزون)</h6>
+                    <a href="{% url 'warehouses:product_list' %}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-eye"></i> عرض الكل
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>المنتج</th>
+                                    <th>الكود</th>
+                                    <th>الكمية</th>
+                                    <th>الوحدة</th>
+                                    <th>الحالة</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in best_products %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="me-3">
+                                                <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center" 
+                                                     style="width: 35px; height: 35px;">
+                                                    <i class="fas fa-box text-white"></i>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div class="font-weight-bold">{{ item.product.name }}</div>
+                                                <div class="text-muted small">{{ item.product.get_product_type_display }}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td><code>{{ item.product.code }}</code></td>
+                                    <td>
+                                        <span class="badge bg-info">{{ item.quantity|floatformat:0 }}</span>
+                                    </td>
+                                    <td>{{ item.product.get_unit_display }}</td>
+                                    <td>
+                                        {% if item.is_low_stock %}
+                                            <span class="badge bg-warning">مخزون منخفض</span>
+                                        {% else %}
+                                            <span class="badge bg-success">متوفر</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">لا توجد منتجات</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Purchase Orders -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">أحدث أوامر الشراء</h6>
+                    <a href="{% url 'suppliers:purchase_orders' %}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-eye"></i> عرض الكل
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>رقم الأمر</th>
+                                    <th>المورد</th>
+                                    <th>المبلغ</th>
+                                    <th>الحالة</th>
+                                    <th>التاريخ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in recent_purchase_orders %}
+                                <tr>
+                                    <td><code>{{ order.po_number }}</code></td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="me-2">
+                                                <div class="bg-warning rounded-circle d-flex align-items-center justify-content-center" 
+                                                     style="width: 30px; height: 30px;">
+                                                    <i class="fas fa-truck text-white small"></i>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div class="font-weight-bold small">{{ order.supplier.name }}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="text-success font-weight-bold">
+                                            {{ order.total_amount|floatformat:2 }} ريال
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if order.status == 'pending' %}
+                                            <span class="badge bg-warning">معلق</span>
+                                        {% elif order.status == 'approved' %}
+                                            <span class="badge bg-info">موافق عليه</span>
+                                        {% elif order.status == 'completed' %}
+                                            <span class="badge bg-success">مكتمل</span>
+                                        {% elif order.status == 'cancelled' %}
+                                            <span class="badge bg-danger">ملغي</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ order.get_status_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ order.created_at|date:"Y-m-d" }}</small>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">لا توجد أوامر شراء</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">النشاط الأخير - حركات المخزون</h6>
+                    <a href="{% url 'warehouses:inventory_count' %}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-eye"></i> عرض الكل
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="recent-activity">
+                        {% for movement in recent_movements %}
+                        <div class="activity-item">
+                            <div class="row align-items-center">
+                                <div class="col-auto">
+                                    {% if movement.movement_type == 'in' %}
+                                        <div class="bg-success rounded-circle d-flex align-items-center justify-content-center" 
+                                             style="width: 40px; height: 40px;">
+                                            <i class="fas fa-arrow-down text-white"></i>
+                                        </div>
+                                    {% elif movement.movement_type == 'out' %}
+                                        <div class="bg-danger rounded-circle d-flex align-items-center justify-content-center" 
+                                             style="width: 40px; height: 40px;">
+                                            <i class="fas fa-arrow-up text-white"></i>
+                                        </div>
+                                    {% elif movement.movement_type == 'transfer' %}
+                                        <div class="bg-info rounded-circle d-flex align-items-center justify-content-center" 
+                                             style="width: 40px; height: 40px;">
+                                            <i class="fas fa-exchange-alt text-white"></i>
+                                        </div>
+                                    {% else %}
+                                        <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center" 
+                                             style="width: 40px; height: 40px;">
+                                            <i class="fas fa-edit text-white"></i>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col">
+                                    <div class="font-weight-bold">{{ movement.get_movement_type_display }}</div>
+                                    <div class="text-muted small">
+                                        {{ movement.stock_item.product.name }} - 
+                                        <span class="badge badge-status bg-primary">{{ movement.quantity|floatformat:0 }} {{ movement.stock_item.product.get_unit_display }}</span>
+                                    </div>
+                                    {% if movement.notes %}
+                                        <div class="text-muted small">{{ movement.notes|truncatechars:50 }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-auto text-end">
+                                    <div class="text-muted small">{{ movement.created_at|date:"Y-m-d H:i" }}</div>
+                                    {% if movement.created_by %}
+                                        <div class="text-muted small">{{ movement.created_by.full_name }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-inbox fa-3x mb-3"></i>
+                            <p>لا توجد حركات مخزون حديثة</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Users by Role Pie Chart
+    const usersRoleCtx = document.getElementById('usersRoleChart').getContext('2d');
+    const usersRoleData = [
+        {% for role in users_by_role %}
+        {
+            label: '{{ role.role }}',
+            count: {{ role.count }}
+        },
+        {% endfor %}
+    ];
+    
+    new Chart(usersRoleCtx, {
+        type: 'doughnut',
+        data: {
+            labels: usersRoleData.map(item => {
+                const roleNames = {
+                    'admin': 'مدير النظام',
+                    'manager': 'مدير',
+                    'warehouse_manager': 'مدير المخازن',
+                    'warehouse_employee': 'موظف مخازن',
+                    'production_manager': 'مدير الإنتاج',
+                    'accountant': 'محاسب',
+                    'employee': 'موظف',
+                    'viewer': 'مشاهد فقط'
+                };
+                return roleNames[item.label] || item.label;
+            }),
+            datasets: [{
+                data: usersRoleData.map(item => item.count),
+                backgroundColor: [
+                    '#4e73df',
+                    '#1cc88a',
+                    '#36b9cc',
+                    '#f6c23e',
+                    '#e74a3b',
+                    '#858796',
+                    '#5a5c69',
+                    '#6f42c1'
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 20,
+                        usePointStyle: true
+                    }
+                }
+            }
+        }
+    });
+
+    // Monthly Statistics Line Chart
+    const monthlyStatsCtx = document.getElementById('monthlyStatsChart').getContext('2d');
+    const monthlyUsersData = {{ monthly_users|safe }};
+    const monthlyOrdersData = {{ monthly_orders|safe }};
+    
+    new Chart(monthlyStatsCtx, {
+        type: 'line',
+        data: {
+            labels: monthlyUsersData.map(item => item.month),
+            datasets: [{
+                label: 'المستخدمين الجدد',
+                data: monthlyUsersData.map(item => item.count),
+                borderColor: '#4e73df',
+                backgroundColor: 'rgba(78, 115, 223, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4
+            }, {
+                label: 'أوامر الشراء',
+                data: monthlyOrdersData.map(item => item.count),
+                borderColor: '#1cc88a',
+                backgroundColor: 'rgba(28, 200, 138, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        padding: 20,
+                        usePointStyle: true
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(0,0,0,0.1)'
+                    }
+                },
+                x: {
+                    grid: {
+                        color: 'rgba(0,0,0,0.1)'
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            }
+        }
+    });
+
+    // Auto refresh data every 5 minutes
+    setInterval(function() {
+        location.reload();
+    }, 300000); // 5 minutes
+});
+</script>
+{% endblock %}

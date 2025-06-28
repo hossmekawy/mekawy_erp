@@ -1,0 +1,73 @@
+{% extends 'pdf/base_pdf.html' %}
+
+{% block pdf_title %}تصريح خروج - {{ permit.permit_number }}{% endblock %}
+
+{% block pdf_header %}
+    <h1>تصريح خروج بضاعة</h1>
+    <div class="meta-info">
+        <strong>رقم التصريح:</strong> {{ permit.permit_number }} | 
+        <strong>تاريخ الطباعة:</strong> {{ timestamp|date:"Y-m-d H:i" }}
+    </div>
+{% endblock %}
+
+{% block pdf_content %}
+    <h2>بيانات التصريح</h2>
+    <table class="info-table">
+        <tr>
+            <td style="width: 20%;"><strong>رقم التصريح:</strong></td>
+            <td style="width: 30%;"><strong>{{ permit.permit_number }}</strong></td>
+            <td style="width: 20%;"><strong>الحالة:</strong></td>
+            <td style="width: 30%;">{{ permit.get_status_display }}</td>
+        </tr>
+        <tr>
+            <td><strong>أمر الإنتاج:</strong></td>
+            <td>{{ permit.production_order.order_number|default:"N/A" }}</td>
+            <td><strong>الكمية:</strong></td>
+            <td>{{ permit.quantity }}</td>
+        </tr>
+        <tr>
+            <td><strong>الوجهة:</strong></td>
+            <td colspan="3">{{ permit.destination }}</td>
+        </tr>
+        <tr>
+            <td><strong>الغرض:</strong></td>
+            <td colspan="3">{{ permit.purpose }}</td>
+        </tr>
+        <tr>
+            <td><strong>وصف المواد:</strong></td>
+            <td colspan="3">{{ permit.items_description|linebreaksbr }}</td>
+        </tr>
+    </table>
+
+    <hr style="margin: 30px 0;">
+
+    <h2>الموافقات والتواريخ</h2>
+    <table class="info-table">
+        <tr>
+            <td><strong>طلب بواسطة:</strong></td>
+            <td>{{ permit.requested_by.username }}</td>
+            <td><strong>تاريخ الطلب:</strong></td>
+            <td>{{ permit.requested_at|date:"Y-m-d H:i" }}</td>
+        </tr>
+        <tr>
+            <td><strong>تمت الموافقة بواسطة:</strong></td>
+            <td>{{ permit.approved_by.username|default:"-- لم تتم الموافقة --" }}</td>
+            <td><strong>تاريخ الموافقة:</strong></td>
+            <td>{{ permit.approved_at|date:"Y-m-d H:i"|default:"--" }}</td>
+        </tr>
+        <tr>
+            <td><strong>صالح حتى:</strong></td>
+            <td colspan="3">{{ permit.valid_until|date:"Y-m-d H:i" }}</td>
+        </tr>
+    </table>
+
+    <div style="margin-top: 60px; text-align: center;">
+        <table style="border: none;">
+            <tr style="border: none;">
+                <td style="border: none; width: 33%;"><strong>توقيع مسؤول المخزن:</strong><br><br>...........................</td>
+                <td style="border: none; width: 33%;"><strong>توقيع السائق/المستلم:</strong><br><br>...........................</td>
+                <td style="border: none; width: 33%;"><strong>توقيع الأمن:</strong><br><br>...........................</td>
+            </tr>
+        </table>
+    </div>
+{% endblock %}

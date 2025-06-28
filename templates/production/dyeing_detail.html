@@ -1,0 +1,312 @@
+{% extends 'production/production_base.html' %}
+{% load static i18n widget_tweaks %}
+
+{% block production_title %}
+    تفاصيل عملية الصباغة - {{ dyeing_process.assembly_process.production_order.order_number }}
+{% endblock %}
+
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item"><a href="{% url 'production:dyeing_list' %}" class="text-black-50">عمليات الصباغة</a></li>
+    <li class="breadcrumb-item active" aria-current="page">تفاصيل العملية</li>
+{% endblock %}
+
+{% block production_header_actions %}
+    <div class="d-flex flex-wrap justify-content-end gap-2">
+        <a href="{% url 'production:dyeing_print_pdf' dyeing_process.pk %}" class="btn btn-secondary" target="_blank">
+            <i class="fas fa-print me-2"></i> طباعة
+        </a>
+        {% if not dyeing_process.is_completed %}
+            <a href="{% url 'production:dyeing_update' dyeing_process.pk %}" class="btn btn-production-outline">
+                <i class="fas fa-edit me-2"></i>تعديل بيانات الإرسال
+            </a>
+            <button type="button" class="btn btn-production" data-bs-toggle="modal" data-bs-target="#receiveDyeingModal">
+                <i class="fas fa-clipboard-check me-2"></i>استلام وتوثيق
+            </button>
+        {% else %}
+            {% if not finishing_process_exists %}
+                 <a href="{% url 'production:finishing_create' %}?dyeing_id={{ dyeing_process.pk }}" class="btn btn-production">
+                    <i class="fas fa-magic me-2"></i>بدء التشطيب
+                </a>
+            {% endif %}
+            <a href="{% url 'production:dyeing_list' %}" class="btn btn-production-outline">
+                <i class="fas fa-arrow-left me-2"></i>العودة للقائمة
+            </a>
+        {% endif %}
+    </div>
+{% endblock %}
+
+
+{% block production_content %}
+<div class="row">
+    <!-- Main Details Column -->
+    <div class="col-lg-8 mb-4">
+        <div class="production-card h-100">
+            <div class="production-card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-tint me-2"></i>معلومات عملية الصباغة</span>
+                <span class="production-status {% if dyeing_process.is_completed %}completed{% else %}in-progress{% endif %}">
+                    {% if dyeing_process.is_completed %}
+                        <i class="fas fa-check-circle me-1"></i> مكتمل
+                    {% else %}
+                        <i class="fas fa-spinner fa-spin me-1"></i> قيد التنفيذ
+                    {% endif %}
+                </span>
+            </div>
+            <div class="production-card-body">
+                <div class="list-group list-group-flush">
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <strong class="text-secondary">أمر الإنتاج:</strong>
+                        <a href="{% url 'production:order_detail' dyeing_process.assembly_process.production_order.pk %}" class="fw-bold">{{ dyeing_process.assembly_process.production_order.order_number }}</a>
+                    </div>
+                     <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <strong class="text-secondary">المنتج:</strong>
+                        <span>{{ dyeing_process.assembly_process.production_order.product.name }}</span>
+                    </div>
+                    {% with size_group=dyeing_process.assembly_process.production_order.product.size_group %}
+                    {% if size_group %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <strong class="text-secondary">مجموعة المقاسات:</strong>
+                        <span class="fw-bold">{{ size_group.name }}</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <strong class="text-secondary">المقاسات:</strong>
+                        <div class="d-flex flex-wrap gap-2 justify-content-end">
+                            {% for size in size_group.sizes %}
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis rounded-pill px-2 py-1">{{ size }}</span>
+                            {% empty %}
+                                <span class="text-muted">لا توجد مقاسات</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endwith %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <strong class="text-secondary">مصنع الصباغة:</strong>
+                        <a href="{% url 'production:manufacturers:manufacturer_detail' dyeing_process.dyeing_facility.pk %}">{{ dyeing_process.dyeing_facility.name }}</a>
+                    </div>
+                     <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <strong class="text-secondary">مواصفات اللون:</strong>
+                        <span class="fw-bold">{{ dyeing_process.color_specification }}</span>
+                    </div>
+                    <div class="list-group-item px-0">
+                        <div class="d-flex justify-content-between align-items-center">
+                             <strong class="text-secondary"><i class="fas fa-file-export me-2"></i>تصريح الخروج:</strong>
+                             {% if exit_permit %}
+                                <div>
+                                    <a href="{{ exit_permit.get_absolute_url }}" class="fw-bold me-2">{{ exit_permit.permit_number }}</a>
+                                    <span class="badge 
+                                        {% if exit_permit.status == 'approved' %}bg-success-subtle text-success-emphasis{% elif exit_permit.status == 'pending' %}bg-warning-subtle text-warning-emphasis{% elif exit_permit.status == 'used' %}bg-secondary-subtle text-secondary-emphasis{% elif exit_permit.status == 'rejected' %}bg-danger-subtle text-danger-emphasis{% endif %}
+                                    ">{{ exit_permit.get_status_display }}</span>
+                                </div>
+                             {% else %}
+                                <div>
+                                     <span class="text-danger me-2">مطلوب</span>
+                                     <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#createExitPermitModal">
+                                        <i class="fas fa-plus me-1"></i>إنشاء تصريح
+                                     </button>
+                                </div>
+                             {% endif %}
+                        </div>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <strong class="text-secondary">الكمية المرسلة:</strong>
+                        <span class="fw-bold">{{ dyeing_process.quantity_sent }} قطعة</span>
+                    </div>
+                     <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <strong class="text-secondary">تاريخ الإرسال:</strong>
+                        <span>{{ dyeing_process.sent_date|date:"d-m-Y H:i" }}</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <strong class="text-secondary">العودة المتوقعة:</strong>
+                        <span>{{ dyeing_process.expected_return_date|date:"d-m-Y" }}</span>
+                    </div>
+                    
+                    {% if dyeing_process.is_completed %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0 bg-light-subtle">
+                        <strong class="text-success">تاريخ العودة الفعلي:</strong>
+                        <span class="fw-bold text-success">{{ dyeing_process.actual_return_date|date:"d-m-Y H:i" }}</span>
+                    </div>
+                     <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <strong class="text-secondary">الكمية المستلمة:</strong>
+                        <span class="fw-bold text-success">{{ dyeing_process.quantity_received }} قطعة</span>
+                    </div>
+                     <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <strong class="text-secondary">الفاقد:</strong>
+                        <span class="fw-bold text-danger">{{ dyeing_process.losses_count }} قطعة</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                 {% if dyeing_process.notes %}
+                    <div class="mt-4">
+                        <strong class="d-block mb-2 text-secondary"><i class="fas fa-sticky-note me-2"></i>ملاحظات:</strong>
+                        <p class="mb-0 p-3 bg-light rounded">{{ dyeing_process.notes }}</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Metrics Column -->
+    <div class="col-lg-4">
+        <div class="production-card">
+            <div class="production-card-header">
+                <i class="fas fa-dollar-sign me-2"></i>التكاليف
+            </div>
+            <div class="production-card-body">
+                 <div class="list-group list-group-flush">
+                     <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <strong class="text-secondary">تكلفة القطعة:</strong>
+                        <span class="fw-bold">{{ dyeing_process.dyeing_cost_per_piece|floatformat:2 }} جنيه</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <strong class="text-secondary">إجمالي التكلفة:</strong>
+                        <span class="fw-bold text-production">{{ dyeing_process.total_dyeing_cost|floatformat:2 }} جنيه</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block production_modals %}
+{{ block.super }}
+
+<!-- Create Exit Permit Modal -->
+{% if not exit_permit %}
+<div class="modal fade" id="createExitPermitModal" tabindex="-1" aria-labelledby="createExitPermitModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form id="createExitPermitForm" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="dyeing_id" value="{{ dyeing_process.pk }}">
+                
+                <!-- FIX: Add the missing hidden field for permit_type -->
+                {{ exit_permit_form.permit_type.as_hidden }}
+
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="createExitPermitModalLabel"><i class="fas fa-file-signature me-2"></i>إنشاء تصريح خروج للصباغة</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-4">إنشاء تصريح خروج لإرسال <strong>{{ dyeing_process.quantity_sent }} قطعة</strong> للصباغة.</p>
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label for="{{ exit_permit_form.items_description.id_for_label }}" class="form-label fw-bold">وصف المواد</label>
+                            {% render_field exit_permit_form.items_description class="form-control" rows="4" readonly=True %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="{{ exit_permit_form.quantity.id_for_label }}" class="form-label fw-bold">الكمية</label>
+                            {% render_field exit_permit_form.quantity class="form-control" readonly=True %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="{{ exit_permit_form.destination.id_for_label }}" class="form-label fw-bold">الوجهة</label>
+                            {% render_field exit_permit_form.destination class="form-control" readonly=True %}
+                        </div>
+                        <div class="col-12">
+                            <label for="{{ exit_permit_form.purpose.id_for_label }}" class="form-label fw-bold">الغرض</label>
+                            {% render_field exit_permit_form.purpose class="form-control" readonly=True %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="{{ exit_permit_form.valid_until.id_for_label }}" class="form-label fw-bold">صالح حتى</label>
+                             {% render_field exit_permit_form.valid_until class="form-control" type="datetime-local" %}
+                        </div>
+                        <div class="col-12">
+                             <label for="{{ exit_permit_form.notes.id_for_label }}" class="form-label fw-bold">ملاحظات</label>
+                             {% render_field exit_permit_form.notes class="form-control" rows="2" placeholder="أضف ملاحظات إضافية..." %}
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>إلغاء</button>
+                    <button type="submit" id="submitExitPermitBtn" class="btn btn-success"><i class="fas fa-paper-plane me-1"></i>إصدار التصريح</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Receive Items Modal -->
+{% if not dyeing_process.is_completed %}
+<div class="modal fade" id="receiveDyeingModal" tabindex="-1" aria-labelledby="receiveDyeingModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{% url 'production:dyeing_receive' dyeing_process.pk %}" method="post">
+                {% csrf_token %}
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="receiveDyeingModalLabel"><i class="fas fa-clipboard-check me-2"></i>استلام وتوثيق عملية الصباغة</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-4">أدخل الكميات المستلمة بعد عودتها من الصباغة. الكمية المرسلة: <strong>{{ dyeing_process.quantity_sent }} قطعة</strong>.</p>
+                    
+                    <div class="mb-3">
+                        <label for="{{ receive_form.quantity_received.id_for_label }}" class="form-label fw-bold">{{ receive_form.quantity_received.label }}</label>
+                        {% render_field receive_form.quantity_received class+="form-control" placeholder="0" %}
+                        {% for error in receive_form.quantity_received.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="mb-3">
+                        <label for="{{ receive_form.losses_count.id_for_label }}" class="form-label fw-bold">{{ receive_form.losses_count.label }}</label>
+                        {% render_field receive_form.losses_count class+="form-control" placeholder="0" %}
+                         {% for error in receive_form.losses_count.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>إلغاء</button>
+                    <button type="submit" class="btn btn-production"><i class="fas fa-save me-1"></i>حفظ وإنهاء العملية</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+
+{% block production_extra_js %}
+{{ block.super }}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const permitForm = document.getElementById('createExitPermitForm');
+    if (permitForm) {
+        permitForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const submitBtn = document.getElementById('submitExitPermitBtn');
+            const originalBtnHtml = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> جاري الإصدار...`;
+
+            const formData = new FormData(permitForm);
+            const url = "{% url 'production:ajax_create_exit_permit' %}";
+
+            fetch(url, {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': formData.get('csrfmiddlewaretoken') }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showSuccessToast(data.message || 'تم إنشاء التصريح بنجاح.');
+                    setTimeout(() => { window.location.reload(); }, 1500);
+                } else {
+                    const errorMessage = data.error || Object.values(data.errors).flat().join('\\n');
+                    showErrorToast('فشل الإنشاء: ' + errorMessage);
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnHtml;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showErrorToast('حدث خطأ غير متوقع في الشبكة.');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

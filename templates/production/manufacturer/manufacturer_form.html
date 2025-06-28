@@ -1,0 +1,69 @@
+{% extends 'production/production_base.html' %}
+{% load widget_tweaks %}
+
+{% block production_title %}
+{% if object %}
+تعديل مصنع: {{ object.name }}
+{% else %}
+إضافة مصنع خارجي جديد
+{% endif %}
+{% endblock %}
+
+{% block production_breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'production:manufacturers:manufacturer_list' %}">المصانع الخارجية</a></li>
+<li class="breadcrumb-item active" aria-current="page">{% if object %}تعديل{% else %}إضافة{% endif %}</li>
+{% endblock %}
+
+{% block production_content %}
+<div class="production-card">
+    <div class="production-card-header">
+        <i class="fas fa-industry me-2"></i>
+        بيانات المصنع
+    </div>
+    <div class="card-body">
+        <form method="post" class="needs-validation" novalidate>
+            {% csrf_token %}
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="{{ form.name.id_for_label }}" class="form-label">اسم المصنع</label>
+                    {% render_field form.name class="form-control" required=True %}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.contact_person.id_for_label }}" class="form-label">الشخص المسؤول</label>
+                    {% render_field form.contact_person class="form-control" required=True %}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.phone.id_for_label }}" class="form-label">الهاتف</label>
+                    {% render_field form.phone class="form-control" %}
+                </div>
+                 <div class="col-md-6">
+                    <label for="{{ form.address.id_for_label }}" class="form-label">العنوان</label>
+                    {% render_field form.address class="form-control" %}
+                </div>
+                <div class="col-md-4">
+                    <label for="{{ form.price_per_piece.id_for_label }}" class="form-label">السعر للقطعة</label>
+                    {% render_field form.price_per_piece class="form-control" %}
+                </div>
+                <div class="col-md-4">
+                    <label for="{{ form.payment_terms_days.id_for_label }}" class="form-label">مدة السداد (أيام)</label>
+                    {% render_field form.payment_terms_days class="form-control" %}
+                </div>
+                <div class="col-md-4">
+                    <label for="{{ form.quality_rating.id_for_label }}" class="form-label">تقييم الجودة (من 5)</label>
+                    {% render_field form.quality_rating class="form-control" %}
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        {% render_field form.is_active class="form-check-input" %}
+                        <label for="{{ form.is_active.id_for_label }}" class="form-check-label">نشط</label>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4">
+                <button type="submit" class="btn btn-production">حفظ</button>
+                <a href="{% if object %}{% url 'production:manufacturers:manufacturer_detail' object.pk %}{% else %}{% url 'production:manufacturers:manufacturer_list' %}{% endif %}" class="btn btn-secondary">إلغاء</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

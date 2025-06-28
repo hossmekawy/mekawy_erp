@@ -1,0 +1,1118 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}قائمة الموردين - Mekawy ERP{% endblock %}
+
+{% block extra_css %}
+<style>
+    .supplier-card {
+        transition: transform 0.2s ease-in-out;
+        border: none;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+    
+    .supplier-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+    
+    .supplier-type-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .rating-stars {
+        color: #ffc107;
+    }
+    
+    .search-filters {
+        background: #f8f9fc;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .table-actions {
+        white-space: nowrap;
+    }
+    
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">
+                <i class="fas fa-truck text-primary"></i>
+                قائمة الموردين
+            </h1>
+            <p class="text-muted mb-0">إدارة وعرض جميع الموردين في النظام</p>
+        </div>
+        <div>
+            {% if user.role != 'viewer' %}
+            <a href="{% url 'suppliers:create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i>
+                إضافة مورد جديد
+            </a>
+            {% endif %}
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="fas fa-download"></i>
+                    تصدير
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{% url 'suppliers:export_suppliers' %}">
+                        <i class="fas fa-file-csv"></i> تصدير CSV
+                    </a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                إجمالي الموردين
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ suppliers.count }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-truck fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                الموردين النشطين
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ suppliers|length }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                أنواع الموردين
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ supplier_types|length }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-tags fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                البحث المتقدم
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                <a href="{% url 'suppliers:advanced_search' %}" class="btn btn-sm btn-warning">
+                                    <i class="fas fa-search"></i>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-search fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="search-filters">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label for="search" class="form-label">البحث</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="search" name="search" 
+                           value="{{ search }}" placeholder="البحث في الاسم، الكود، أو الشخص المسؤول...">
+                    <button class="btn btn-outline-secondary" type="submit">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="col-md-3">
+                <label for="type" class="form-label">نوع المورد</label>
+                <select class="form-select" id="type" name="type">
+                    <option value="">جميع الأنواع</option>
+                    {% for value, label in supplier_types %}
+                        <option value="{{ value }}" {% if selected_type == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-md-3">
+                <label for="active" class="form-label">الحالة</label>
+                <select class="form-select" id="active" name="active">
+                    <option value="">جميع الحالات</option>
+                    <option value="true" {% if selected_active == 'true' %}selected{% endif %}>نشط</option>
+                    <option value="false" {% if selected_active == 'false' %}selected{% endif %}>غير نشط</option>
+                </select>
+            </div>
+            
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="fas fa-filter"></i>
+                    فلترة
+                </button>
+                <a href="{% url 'suppliers:list' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-times"></i>
+                    إلغاء
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Suppliers Table -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-list"></i>
+                قائمة الموردين
+                {% if suppliers %}
+                    <span class="badge bg-primary">{{ suppliers|length }}</span>
+                {% endif %}
+            </h6>
+            
+            {% if user.role != 'viewer' %}
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="toggleBulkActions()">
+                    <i class="fas fa-check-square"></i>
+                    تحديد متعدد
+                </button>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="card-body">
+            {% if suppliers %}
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover" id="suppliersTable">
+                        <thead class="table-light">
+                            <tr>
+                                {% if user.role != 'viewer' %}
+                                <th width="40">
+                                    <input type="checkbox" id="selectAll" class="form-check-input">
+                                </th>
+                                {% endif %}
+                                <th>كود المورد</th>
+                                <th>اسم المورد</th>
+                                <th>نوع المورد</th>
+                                <th>الشخص المسؤول</th>
+                                <th>رقم الهاتف</th>
+                                <th>التقييم</th>
+                                <th>الحالة</th>
+                                <th>الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for supplier in suppliers %}
+                            <tr>
+                                {% if user.role != 'viewer' %}
+                                <td>
+                                    <input type="checkbox" class="form-check-input supplier-checkbox" 
+                                           value="{{ supplier.id }}">
+                                </td>
+                                {% endif %}
+                                <td>
+                                    <strong class="text-primary">{{ supplier.code }}</strong>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-sm bg-primary rounded-circle d-flex align-items-center justify-content-center me-2">
+                                            <i class="fas fa-truck text-white"></i>
+                                        </div>
+                                        <div>
+                                            <strong>{{ supplier.name }}</strong>
+                                            {% if supplier.email %}
+                                                <br><small class="text-muted">{{ supplier.email }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge supplier-type-badge 
+                                        {% if supplier.supplier_type == 'fabric' %}bg-info
+                                        {% elif supplier.supplier_type == 'thread' %}bg-success
+                                        {% elif supplier.supplier_type == 'accessories' %}bg-warning
+                                        {% else %}bg-secondary{% endif %}">
+                                        {{ supplier.get_supplier_type_display }}
+                                    </span>
+                                </td>
+                                <td>{{ supplier.contact_person }}</td>
+                                <td>
+                                    <a href="tel:{{ supplier.phone }}" class="text-decoration-none">
+                                        <i class="fas fa-phone text-success"></i>
+                                        {{ supplier.phone }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="rating-stars me-1">
+                                            {% for i in "12345" %}
+                                                {% if forloop.counter <= supplier.current_rating %}
+                                                    <i class="fas fa-star"></i>
+                                                {% else %}
+                                                    <i class="far fa-star"></i>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                        <small class="text-muted">({{ supplier.current_rating|floatformat:1 }})</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if supplier.is_active %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check"></i>
+                                            نشط
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-times"></i>
+                                            غير نشط
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td class="table-actions">
+                                    <div class="btn-group" role="group">
+                                        <a href="{% url 'suppliers:detail' supplier.pk %}" 
+                                           class="btn btn-sm btn-outline-info" 
+                                           data-bs-toggle="tooltip" title="عرض التفاصيل">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        
+                                        {% if user.role != 'viewer' %}
+                                        <a href="{% url 'suppliers:edit' supplier.pk %}" 
+                                           class="btn btn-sm btn-outline-primary"
+                                           data-bs-toggle="tooltip" title="تعديل">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        {% endif %}
+                                        
+                                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                onclick="loadSupplierStats({{ supplier.id }})"
+                                                data-bs-toggle="tooltip"
+                                                title="عرض الإحصائيات">
+                                            <i class="fas fa-chart-bar"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Bulk Actions -->
+                {% if user.role != 'viewer' %}
+                <div id="bulkActions" class="mt-3" style="display: none;">
+                    <div class="alert alert-info">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>الإجراءات المجمعة:</strong>
+                                <span id="selectedCount">0</span> مورد محدد
+                            </div>
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-sm btn-success" onclick="bulkAction('activate')">
+                                    <i class="fas fa-check"></i>
+                                    تفعيل
+                                </button>
+                                <button type="button" class="btn btn-sm btn-warning" onclick="bulkAction('deactivate')">
+                                    <i class="fas fa-times"></i>
+                                    إلغاء تفعيل
+                                </button>
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="toggleBulkActions()">
+                                    <i class="fas fa-times"></i>
+                                    إلغاء
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Pagination -->
+                {% include 'partials/pagination.html' %}
+                
+            {% else %}
+                <div class="text-center py-5">
+                    <div class="mb-4">
+                        <i class="fas fa-truck fa-4x text-muted"></i>
+                    </div>
+                    <h4 class="text-muted">لا توجد موردين</h4>
+                    <p class="text-muted">
+                        {% if search or selected_type or selected_active %}
+                            لم يتم العثور على موردين يطابقون معايير البحث المحددة.
+                            <br>
+                            <a href="{% url 'suppliers:list' %}" class="btn btn-outline-primary mt-2">
+                                <i class="fas fa-refresh"></i>
+                                عرض جميع الموردين
+                            </a>
+                        {% else %}
+                            لم يتم إضافة أي موردين بعد.
+                            {% if user.role != 'viewer' %}
+                                <br>
+                                <a href="{% url 'suppliers:create' %}" class="btn btn-primary mt-2">
+                                    <i class="fas fa-plus"></i>
+                                    إضافة أول مورد
+                                </a>
+                            {% endif %}
+                        {% endif %}
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Supplier Stats Modal -->
+<div class="modal fade" id="supplierStatsModal" tabindex="-1" aria-labelledby="supplierStatsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="supplierStatsModalLabel">
+                    <i class="fas fa-chart-bar"></i>
+                    إحصائيات المورد
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="supplierStatsContent">
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">جاري التحميل...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmModalLabel">تأكيد العملية</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="confirmModalBody">
+                هل أنت متأكد من تنفيذ هذه العملية؟
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" id="confirmButton">تأكيد</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    // Auto-submit form on filter change
+    $('#type, #active').change(function() {
+        $(this).closest('form').submit();
+    });
+
+    // Select all functionality
+    $('#selectAll').change(function() {
+        $('.supplier-checkbox').prop('checked', this.checked);
+        updateBulkActionsVisibility();
+    });
+
+    // Individual checkbox change
+    $(document).on('change', '.supplier-checkbox', function() {
+        updateSelectAllState();
+        updateBulkActionsVisibility();
+    });
+
+    // Update select all state
+    function updateSelectAllState() {
+        const total = $('.supplier-checkbox').length;
+        const checked = $('.supplier-checkbox:checked').length;
+        
+        $('#selectAll').prop('indeterminate', checked > 0 && checked < total);
+        $('#selectAll').prop('checked', checked === total);
+    }
+
+    // Update bulk actions visibility
+    function updateBulkActionsVisibility() {
+        const selectedCount = $('.supplier-checkbox:checked').length;
+        $('#selectedCount').text(selectedCount);
+        
+        if (selectedCount > 0) {
+            $('#bulkActions').show();
+        } else {
+            $('#bulkActions').hide();
+        }
+    }
+});
+
+// Toggle bulk actions mode
+function toggleBulkActions() {
+    const bulkActions = document.getElementById('bulkActions');
+    const checkboxes = document.querySelectorAll('.supplier-checkbox, #selectAll');
+    
+    if (!bulkActions) return; // Add this null check
+    
+    if (bulkActions.style.display === 'none' || !bulkActions.style.display) {
+        // Show bulk actions
+        checkboxes.forEach(cb => {
+            if (cb && cb.style) cb.style.display = 'block'; // Add null check
+        });
+        bulkActions.style.display = 'block';
+    } else {
+        // Hide bulk actions
+        checkboxes.forEach(cb => {
+            if (cb && cb.style) { // Add null check
+                cb.style.display = 'none';
+                cb.checked = false;
+            }
+        });
+        bulkActions.style.display = 'none';
+    }
+}
+
+
+// Load supplier statistics
+function loadSupplierStats(supplierId) {
+    const modal = new bootstrap.Modal(document.getElementById('supplierStatsModal'));
+    const content = document.getElementById('supplierStatsContent');
+    
+    // Show loading
+    content.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">جاري التحميل...</span>
+            </div>
+        </div>
+    `;
+    
+    modal.show();
+    
+    // Load stats via AJAX
+    fetch(`/suppliers/api/${supplierId}/stats/`)
+        .then(response => response.json())
+        .then(data => {
+            content.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="card bg-primary text-white">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <h6 class="card-title">إجمالي الأوامر</h6>
+                                        <h3 class="mb-0">${data.total_orders}</h3>
+                                    </div>
+                                    <div class="align-self-center">
+                                        <i class="fas fa-shopping-cart fa-2x"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <div class="card bg-success text-white">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <h6 class="card-title">الأوامر المكتملة</h6>
+                                        <h3 class="mb-0">${data.completed_orders}</h3>
+                                    </div>
+                                    <div class="align-self-center">
+                                        <i class="fas fa-check-circle fa-2x"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <div class="card bg-info text-white">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <h6 class="card-title">إجمالي المبلغ</h6>
+                                        <h3 class="mb-0">${data.total_amount.toLocaleString()} جنيه</h3>
+                                    </div>
+                                    <div class="align-self-center">
+                                        <i class="fas fa-dollar-sign fa-2x"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <div class="card bg-warning text-white">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <h6 class="card-title">المبلغ المعلق</h6>
+                                        <h3 class="mb-0">${data.pending_amount.toLocaleString()} جنيه</h3>
+                                    </div>
+                                    <div class="align-self-center">
+                                        <i class="fas fa-clock fa-2x"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">معدل الإكمال</h6>
+                                <div class="progress mb-2" style="height: 20px;">
+                                    <div class="progress-bar bg-success" role="progressbar" 
+                                         style="width: ${data.completion_rate}%" 
+                                         aria-valuenow="${data.completion_rate}" 
+                                         aria-valuemin="0" aria-valuemax="100">
+                                        ${data.completion_rate.toFixed(1)}%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">متوسط التقييم</h6>
+                                <div class="rating-display">
+                                    <span class="h4 text-warning">${data.average_rating.toFixed(1)}</span>
+                                    <div class="rating-stars text-warning">
+                                        ${generateStars(data.average_rating)}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        })
+        .catch(error => {
+            content.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    حدث خطأ في تحميل الإحصائيات
+                </div>
+            `;
+        });
+}
+
+// Generate star rating HTML
+function generateStars(rating) {
+    let stars = '';
+    for (let i = 1; i <= 5; i++) {
+        if (i <= rating) {
+            stars += '<i class="fas fa-star"></i>';
+        } else {
+            stars += '<i class="far fa-star"></i>';
+        }
+    }
+    return stars;
+}
+
+// Bulk actions
+function bulkAction(action) {
+    const selectedIds = Array.from(document.querySelectorAll('.supplier-checkbox:checked'))
+                            .map(cb => cb.value);
+    
+    if (selectedIds.length === 0) {
+        showErrorToast('يرجى تحديد موردين على الأقل');
+        return;
+    }
+    
+    let message = '';
+    if (action === 'activate') {
+        message = `هل أنت متأكد من تفعيل ${selectedIds.length} مورد؟`;
+    } else if (action === 'deactivate') {
+        message = `هل أنت متأكد من إلغاء تفعيل ${selectedIds.length} مورد؟`;
+    }
+    
+    // Show confirmation modal
+    document.getElementById('confirmModalBody').textContent = message;
+    const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    
+    document.getElementById('confirmButton').onclick = function() {
+        performBulkAction(action, selectedIds);
+        confirmModal.hide();
+    };
+    
+    confirmModal.show();
+}
+
+// Perform bulk action
+function performBulkAction(action, supplierIds) {
+    const formData = new FormData();
+    formData.append('action', action);
+    supplierIds.forEach(id => formData.append('supplier_ids', id));
+    
+    // Add CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (csrfToken) {
+        formData.append('csrfmiddlewaretoken', csrfToken.value);
+    }
+    
+    fetch('{% url "suppliers:api_bulk_update" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSuccessToast(data.message);
+            // Reload page after 1 second
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            showErrorToast(data.error || 'حدث خطأ في تنفيذ العملية');
+        }
+    })
+    .catch(error => {
+        showErrorToast('حدث خطأ في الاتصال بالخادم');
+    });
+}
+
+// Get CSRF token from cookies
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Search functionality
+$(document).ready(function() {
+    // Live search with debounce
+    let searchTimeout;
+    $('#search').on('input', function() {
+        clearTimeout(searchTimeout);
+        const searchTerm = $(this).val();
+        
+        searchTimeout = setTimeout(function() {
+            if (searchTerm.length >= 2 || searchTerm.length === 0) {
+                $('#search').closest('form').submit();
+            }
+        }, 500);
+    });
+    
+    // Clear search
+    $('.btn-outline-secondary').click(function(e) {
+        if ($(this).find('.fa-times').length > 0) {
+            e.preventDefault();
+            $('#search').val('');
+            $('#type').val('');
+            $('#active').val('');
+            $(this).closest('form').submit();
+        }
+    });
+});
+
+// Table sorting
+function sortTable(column) {
+    const table = document.getElementById('suppliersTable');
+    const tbody = table.getElementsByTagName('tbody')[0];
+    const rows = Array.from(tbody.getElementsByTagName('tr'));
+    
+    // Get current sort direction
+    const currentSort = table.getAttribute('data-sort-column');
+    const currentDirection = table.getAttribute('data-sort-direction') || 'asc';
+    const newDirection = (currentSort === column && currentDirection === 'asc') ? 'desc' : 'asc';
+    
+    // Sort rows
+    rows.sort((a, b) => {
+        let aVal, bVal;
+        
+        switch(column) {
+            case 'code':
+                aVal = a.cells[1].textContent.trim();
+                bVal = b.cells[1].textContent.trim();
+                break;
+            case 'name':
+                aVal = a.cells[2].textContent.trim();
+                bVal = b.cells[2].textContent.trim();
+                break;
+            case 'type':
+                aVal = a.cells[3].textContent.trim();
+                bVal = b.cells[3].textContent.trim();
+                break;
+            case 'contact':
+                aVal = a.cells[4].textContent.trim();
+                bVal = b.cells[4].textContent.trim();
+                break;
+            case 'rating':
+                aVal = parseFloat(a.cells[6].querySelector('.text-muted').textContent.replace(/[()]/g, ''));
+                bVal = parseFloat(b.cells[6].querySelector('.text-muted').textContent.replace(/[()]/g, ''));
+                break;
+            default:
+                return 0;
+        }
+        
+        if (typeof aVal === 'string') {
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
+        }
+        
+        if (newDirection === 'asc') {
+            return aVal > bVal ? 1 : -1;
+        } else {
+            return aVal < bVal ? 1 : -1;
+        }
+    });
+    
+    // Update table
+    rows.forEach(row => tbody.appendChild(row));
+    
+    // Update sort indicators
+    table.setAttribute('data-sort-column', column);
+    table.setAttribute('data-sort-direction', newDirection);
+    
+    // Update header indicators
+    const headers = table.querySelectorAll('th[onclick]');
+    headers.forEach(header => {
+        header.classList.remove('sort-asc', 'sort-desc');
+    });
+    
+    const currentHeader = table.querySelector(`th[onclick*="${column}"]`);
+    if (currentHeader) {
+        currentHeader.classList.add(`sort-${newDirection}`);
+    }
+}
+
+// Export functionality
+function exportSuppliers(format) {
+    const params = new URLSearchParams(window.location.search);
+    params.set('format', format);
+    
+    const exportUrl = '{% url "suppliers:export_suppliers" %}?' + params.toString();
+    
+    // Show loading
+    showInfoToast('جاري تحضير الملف للتصدير...');
+    
+    // Create temporary link and click it
+    const link = document.createElement('a');
+    link.href = exportUrl;
+    link.download = `suppliers_${new Date().toISOString().split('T')[0]}.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Show success message
+    setTimeout(() => {
+        showSuccessToast('تم تصدير الملف بنجاح');
+    }, 1000);
+}
+// Print functionality
+function printSuppliers() {
+    const printContent = document.getElementById('suppliersTable').outerHTML;
+    const printWindow = window.open('', '_blank');
+    
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html dir="rtl" lang="ar">
+        <head>
+            <meta charset="utf-8">
+            <title>قائمة الموردين - Mekawy ERP</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+            <style>
+                body { font-family: 'Arial', sans-serif; }
+                .table { font-size: 12px; }
+                .btn-group { display: none; }
+                @media print {
+                    .btn-group { display: none !important; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container-fluid">
+                <div class="text-center mb-4">
+                    <h2>قائمة الموردين</h2>
+                    <p>تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG')}</p>
+                </div>
+                ${printContent}
+            </div>
+            <script>
+                window.onload = function() {
+                    window.print();
+                    window.onafterprint = function() {
+                        window.close();
+                    }
+                }
+            <\/script>
+        </body>
+        </html>
+    `);
+    
+    printWindow.document.close();
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    // Ctrl + F for search
+    if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        document.getElementById('search').focus();
+    }
+    
+    // Ctrl + N for new supplier (if allowed)
+    if (e.ctrlKey && e.key === 'n' && '{{ user.role }}' !== 'viewer') {
+        e.preventDefault();
+        window.location.href = '{% url "suppliers:create" %}';
+    }
+    
+    // Escape to clear search
+    if (e.key === 'Escape') {
+        const searchInput = document.getElementById('search');
+        if (searchInput === document.activeElement) {
+            searchInput.value = '';
+            searchInput.blur();
+        }
+    }
+});
+
+// Auto-refresh functionality
+let autoRefreshInterval;
+function toggleAutoRefresh() {
+    const button = document.getElementById('autoRefreshBtn');
+    
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+        button.innerHTML = '<i class="fas fa-play"></i> تفعيل التحديث التلقائي';
+        button.classList.remove('btn-success');
+        button.classList.add('btn-outline-secondary');
+        showInfoToast('تم إيقاف التحديث التلقائي');
+    } else {
+        autoRefreshInterval = setInterval(() => {
+            window.location.reload();
+        }, 30000); // Refresh every 30 seconds
+        
+        button.innerHTML = '<i class="fas fa-pause"></i> إيقاف التحديث التلقائي';
+        button.classList.remove('btn-outline-secondary');
+        button.classList.add('btn-success');
+        showSuccessToast('تم تفعيل التحديث التلقائي (كل 30 ثانية)');
+    }
+}
+
+// Initialize page
+$(document).ready(function() {
+    // Add sorting indicators to table headers
+    const style = document.createElement('style');
+    style.textContent = `
+        th[onclick] {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+        th[onclick]:hover {
+            background-color: #f8f9fa;
+        }
+        th.sort-asc::after {
+            content: ' ↑';
+            color: #007bff;
+        }
+        th.sort-desc::after {
+            content: ' ↓';
+            color: #007bff;
+        }
+        .avatar-sm {
+            width: 32px;
+            height: 32px;
+            font-size: 14px;
+        }
+        .border-left-primary {
+            border-left: 4px solid #4e73df !important;
+        }
+        .border-left-success {
+            border-left: 4px solid #1cc88a !important;
+        }
+        .border-left-info {
+            border-left: 4px solid #36b9cc !important;
+        }
+        .border-left-warning {
+            border-left: 4px solid #f6c23e !important;
+        }
+        .text-gray-800 {
+            color: #5a5c69 !important;
+        }
+        .text-gray-300 {
+            color: #dddfeb !important;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Initialize table features
+    initializeTableFeatures();
+});
+
+function initializeTableFeatures() {
+    // Add click handlers for sortable columns by index instead of text content
+    const table = document.getElementById('suppliersTable');
+    if (table) {
+        const headers = table.querySelectorAll('th');
+        const sortableIndexes = [1, 2, 3, 4, 6]; // code, name, type, contact, rating columns
+        const sortableColumns = ['code', 'name', 'type', 'contact', 'rating'];
+        
+        sortableIndexes.forEach((index, i) => {
+            if (headers[index]) {
+                headers[index].setAttribute('onclick', `sortTable('${sortableColumns[i]}')`);
+                headers[index].style.cursor = 'pointer';
+            }
+        });
+    }
+}
+
+
+function getColumnTitle(column) {
+    const titles = {
+        'code': 'كود المورد',
+        'name': 'اسم المورد',
+        'type': 'نوع المورد',
+        'contact': 'الشخص المسؤول',
+        'rating': 'التقييم'
+    };
+    return titles[column] || column;
+}
+
+// Add custom CSS for better UX
+const customCSS = `
+    <style>
+        .table-hover tbody tr:hover {
+            background-color: rgba(0,123,255,.075);
+        }
+        
+        .supplier-checkbox:checked {
+            background-color: #007bff;
+            border-color: #007bff;
+        }
+        
+        .btn-group .btn {
+            margin-left: 2px;
+        }
+        
+        .search-filters {
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        
+        .card {
+            transition: box-shadow 0.15s ease-in-out;
+        }
+        
+        .card:hover {
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+        
+        .badge {
+            font-weight: 500;
+        }
+        
+        .rating-stars i {
+            margin-left: 1px;
+        }
+        
+        .table-actions .btn {
+            margin-left: 2px;
+        }
+        
+        .alert {
+            border: none;
+            border-radius: 0.5rem;
+        }
+        
+        .modal-content {
+            border: none;
+            border-radius: 0.5rem;
+            box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+        }
+        
+        .progress {
+            border-radius: 0.5rem;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: #80bdff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+    </style>
+`;
+
+document.head.insertAdjacentHTML('beforeend', customCSS);
+</script>
+{% endblock %}

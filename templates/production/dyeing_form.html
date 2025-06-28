@@ -1,0 +1,113 @@
+{% extends 'production/production_base.html' %}
+{% load static i18n widget_tweaks %}
+
+{% block production_title %}
+    {% if object %}
+        تعديل عملية صباغة
+    {% else %}
+        إنشاء عملية صباغة جديدة
+    {% endif %}
+{% endblock %}
+
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item"><a href="{% url 'production:dyeing_list' %}" class="text-black-50">عمليات الصباغة</a></li>
+    <li class="breadcrumb-item active" aria-current="page">
+        {% if object %}تعديل العملية{% else %}عملية جديدة{% endif %}
+    </li>
+{% endblock %}
+
+{% block production_content %}
+<div class="production-card">
+    <div class="production-card-header">
+        {% if object %}
+            <i class="fas fa-edit me-2"></i>تعديل عملية الصباغة لأمر: {{ object.assembly_process.production_order.order_number }}
+        {% else %}
+            <i class="fas fa-plus-circle me-2"></i>إرسال ملابس للصباغة
+        {% endif %}
+    </div>
+    <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="production-card-body">
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                        <p class="mb-0">{{ error }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="{{ form.assembly_process.id_for_label }}" class="form-label fw-bold">عملية التجميع المكتملة</label>
+                    {% render_field form.assembly_process class+="form-select" data-control="select2" %}
+                    <div class="form-text">اختر عملية التجميع التي تم استلامها وجاهزة للإرسال للصباغة.</div>
+                    {% for error in form.assembly_process.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.dyeing_facility.id_for_label }}" class="form-label fw-bold">مصنع الصباغة</label>
+                    {% render_field form.dyeing_facility class+="form-select" data-control="select2" %}
+                    {% if form.dyeing_facility.help_text %}
+                        <div class="form-text text-info">{{ form.dyeing_facility.help_text|safe }}</div>
+                    {% endif %}
+                    {% for error in form.dyeing_facility.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-12">
+                    <label for="{{ form.color_specification.id_for_label }}" class="form-label fw-bold">مواصفات اللون</label>
+                    {% render_field form.color_specification class+="form-control" placeholder="مثال: أزرق دينم درجة 5" %}
+                    {% for error in form.color_specification.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                
+                <!-- The cost field has been removed from the form -->
+
+                <div class="col-md-6">
+                    <label for="{{ form.sent_date.id_for_label }}" class="form-label fw-bold">تاريخ ووقت الإرسال</label>
+                    {% render_field form.sent_date class+="form-control" %}
+                    {% for error in form.sent_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.expected_return_date.id_for_label }}" class="form-label fw-bold">تاريخ العودة المتوقع</label>
+                    {% render_field form.expected_return_date class+="form-control" %}
+                    {% for error in form.expected_return_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                 <div class="col-12">
+                    <label for="{{ form.notes.id_for_label }}" class="form-label fw-bold">ملاحظات</label>
+                    {% render_field form.notes class+="form-control" placeholder="أضف أي ملاحظات أو تعليمات خاصة لعملية الصباغة" %}
+                    {% for error in form.notes.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="production-card-footer text-end">
+            <a href="{% if object %}{{ object.get_absolute_url }}{% else %}{% url 'production:dyeing_list' %}{% endif %}" class="btn btn-secondary">
+                <i class="fas fa-times me-2"></i>إلغاء
+            </a>
+            <button type="submit" class="btn btn-production">
+                <i class="fas fa-save me-2"></i>
+                {% if object %}حفظ التعديلات{% else %}إنشاء وإرسال{% endif %}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block production_extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize select2 for better dropdowns
+    $('[data-control="select2"]').select2({
+        theme: "bootstrap-5",
+        width: $(this).data('width') ? $(this).data('width') : $(this).hasClass('w-100') ? '100%' : 'style',
+        placeholder: $(this).data('placeholder'),
+        language: "ar"
+    });
+
+    // When an assembly process is selected, you might want to fetch related info via AJAX
+    $('#{{ form.assembly_process.id_for_label }}').on('change', function() {
+        const assemblyId = $(this).val();
+        if (assemblyId) {
+            // Optional: AJAX call to get default data for the selected assembly
+            console.log("Selected Assembly Process ID:", assemblyId);
+        }
+    });
+});
+</script>
+{% endblock %}

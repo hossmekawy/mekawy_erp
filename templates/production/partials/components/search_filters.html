@@ -1,0 +1,64 @@
+<!-- Search & Filters Component -->
+<div class="production-filters">
+    <form method="get" class="row g-3" id="search-form">
+        <!-- Search Input -->
+        {% if search_enabled %}
+        <div class="col-lg-6">
+            <label class="form-label">البحث</label>
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fas fa-search"></i>
+                </span>
+                <input type="text" 
+                       name="search" 
+                       value="{{ request.GET.search }}" 
+                       placeholder="{{ search_placeholder|default:'البحث...' }}"
+                       class="form-control search-input">
+                {% if request.GET.search %}
+                <button type="button" class="btn btn-outline-secondary clear-search">
+                    <i class="fas fa-times"></i>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Filter Dropdowns -->
+        {% for filter in filters %}
+        <div class="col-lg-3">
+            <label class="form-label">{{ filter.label }}</label>
+            <select name="{{ filter.name }}" class="form-select">
+                <option value="">{{ filter.placeholder|default:'الكل' }}</option>
+                {% for option in filter.options %}
+                <option value="{{ option.value }}" {% if request.GET.filter.name == option.value %}selected{% endif %}>
+                    {{ option.label }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endfor %}
+
+        <!-- Action Buttons and Results Count -->
+        <div class="col-12 mt-4 border-top pt-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-production">
+                        <i class="fas fa-search me-2"></i>
+                        بحث
+                    </button>
+                    <a href="?" class="btn btn-production-outline">
+                        <i class="fas fa-times me-2"></i>
+                        مسح
+                    </a>
+                </div>
+                
+                {% if total_count %}
+                <div class="production-metric-label">
+                    إجمالي النتائج: 
+                    <span class="fw-bold text-primary">{{ total_count }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+</div>

@@ -1,0 +1,20 @@
+{% extends 'production/production_base.html' %}
+{% load i18n %}
+
+{% block production_title %}تأكيد الحذف{% endblock %}
+
+{% block production_content %}
+<div class="production-card">
+    <div class="production-card-header bg-danger text-white">تأكيد حذف عملية التشطيب</div>
+    <form method="post">
+        {% csrf_token %}
+        <div class="production-card-body">
+            <p>هل أنت متأكد أنك تريد حذف عملية التشطيب لأمر الإنتاج "{{ finishing_process.dyeing_process.assembly_process.production_order.order_number }}"؟</p>
+        </div>
+        <div class="production-card-footer text-end">
+            <a href="{{ finishing_process.get_absolute_url }}" class="btn btn-secondary">إلغاء</a>
+            <button type="submit" class="btn btn-danger">نعم، قم بالحذف</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

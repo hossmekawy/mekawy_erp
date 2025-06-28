@@ -1,0 +1,27 @@
+<!-- Status Badges Component -->
+{% load production_tags %}
+
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+    {% if status == 'pending' %}bg-yellow-100 text-yellow-800
+    {% elif status == 'approved' %}bg-green-100 text-green-800
+    {% elif status == 'in_cutting' or status == 'in_assembly' or status == 'in_dyeing' or status == 'in_finishing' %}bg-blue-100 text-blue-800
+    {% elif status == 'completed' %}bg-emerald-100 text-emerald-800
+    {% elif status == 'cancelled' %}bg-red-100 text-red-800
+    {% elif status == 'quality_check' %}bg-purple-100 text-purple-800
+    {% else %}bg-gray-100 text-gray-800{% endif %}">
+    
+    <i class="
+        {% if status == 'pending' %}fas fa-clock
+        {% elif status == 'approved' %}fas fa-check
+        {% elif status == 'in_cutting' %}fas fa-cut
+        {% elif status == 'in_assembly' %}fas fa-cogs
+        {% elif status == 'in_dyeing' %}fas fa-tint
+        {% elif status == 'in_finishing' %}fas fa-magic
+        {% elif status == 'completed' %}fas fa-check-circle
+        {% elif status == 'cancelled' %}fas fa-times-circle
+        {% elif status == 'quality_check' %}fas fa-search
+        {% else %}fas fa-question{% endif %} mr-1"></i>
+    
+    {{ status|get_status_display }}
+</span>
+

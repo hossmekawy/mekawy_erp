@@ -1,0 +1,235 @@
+{% extends 'production/production_base.html' %}
+{% load static humanize production_extras %}
+
+{% block production_title %}
+    تفاصيل تحليل التكلفة - {{ cost_analysis.production_order.order_number }}
+{% endblock %}
+
+{% block production_page_title %}
+    <i class="fas fa-file-invoice-dollar me-2"></i>
+    تفاصيل تحليل التكلفة
+{% endblock %}
+
+{% block production_header_actions %}
+    <a href="{% url 'production:cost_analysis_update' cost_analysis.pk %}" class="btn btn-production-outline">
+        <i class="fas fa-edit me-2"></i>تعديل
+    </a>
+    <div class="btn-group">
+        <button type="button" class="btn btn-production dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="fas fa-download me-2"></i>تحميل التقرير
+        </button>
+        <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{% url 'production:cost_analysis_exports:pdf' cost_analysis.pk %}"><i class="fas fa-file-pdf me-2 text-danger"></i>تصدير PDF</a></li>
+            <li><a class="dropdown-item" href="{% url 'production:cost_analysis_exports:excel' cost_analysis.pk %}"><i class="fas fa-file-excel me-2 text-success"></i>تصدير Excel</a></li>
+        </ul>
+    </div>
+{% endblock %}
+
+{% block production_content %}
+<div class="row">
+    <!-- Main Content Column -->
+    <div class="col-lg-8">
+        <!-- Cost Breakdown Card -->
+        <div class="production-card mb-4">
+            <div class="production-card-header">
+                ملخص التكاليف لأمر الإنتاج:
+                <a href="{% url 'production:order_detail' cost_analysis.production_order.pk %}">
+                    {{ cost_analysis.production_order.order_number }}
+                </a>
+            </div>
+            <div class="production-card-body">
+                <div class="row">
+                    <!-- Material Costs -->
+                    <div class="col-md-6 mb-3">
+                        <h5><i class="fas fa-boxes text-primary me-2"></i>تكاليف المواد</h5>
+                        <ul class="list-group">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">تكلفة القماش<span>{{ cost_analysis.fabric_cost|intcomma }} جنيه</span></li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">تكلفة الخيوط<span>{{ cost_analysis.thread_cost|intcomma }} جنيه</span></li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">تكلفة الإكسسوارات<span>{{ cost_analysis.accessories_cost|intcomma }} جنيه</span></li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center bg-light"><strong>الإجمالي</strong><strong>{{ cost_analysis.total_material_cost|intcomma }} جنيه</strong></li>
+                        </ul>
+                    </div>
+                    <!-- Process Costs -->
+                    <div class="col-md-6 mb-3">
+                        <h5><i class="fas fa-cogs text-primary me-2"></i>تكاليف العمليات</h5>
+                        <ul class="list-group">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">تكلفة القص<span>{{ cost_analysis.cutting_cost|intcomma }} جنيه</span></li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">تكلفة التجميع<span>{{ cost_analysis.assembly_cost|intcomma }} جنيه</span></li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">تكلفة الصباغة<span>{{ cost_analysis.dyeing_cost|intcomma }} جنيه</span></li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">تكلفة التشطيب<span>{{ cost_analysis.finishing_cost|intcomma }} جنيه</span></li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center bg-light"><strong>الإجمالي</strong><strong>{{ cost_analysis.total_process_cost|intcomma }} جنيه</strong></li>
+                        </ul>
+                    </div>
+                    <!-- Additional Costs -->
+                    <div class="col-md-12">
+                         <h5><i class="fas fa-plus-circle text-primary me-2"></i>تكاليف إضافية</h5>
+                        <ul class="list-group">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">تكلفة النقل<span>{{ cost_analysis.transportation_cost|intcomma }} جنيه</span></li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">تكاليف عامة<span>{{ cost_analysis.overhead_cost|intcomma }} جنيه</span></li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">مراقبة الجودة<span>{{ cost_analysis.quality_control_cost|intcomma }} جنيه</span></li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">الفاقد والعيوب<span>{{ cost_analysis.waste_cost|add:cost_analysis.defect_cost|intcomma }} جنيه</span></li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center bg-light"><strong>الإجمالي</strong><strong>{{ cost_analysis.total_additional_cost|intcomma }} جنيه</strong></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Process Timeline -->
+        <div class="production-card mb-4">
+            <div class="production-card-header">
+                <i class="fas fa-history me-2"></i>الجدول الزمني للعمليات
+            </div>
+            <div class="production-card-body">
+                <ul class="list-group list-group-flush">
+                    {% for item in timeline %}
+                        <li class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ item.stage }}</h6>
+                                <small class="text-muted">
+                                    {% if item.duration %}
+                                        {{ item.duration.days }} يوم و {{ item.duration.seconds|div:3600|floatformat:0 }} ساعة
+                                    {% else %}
+                                        --
+                                    {% endif %}
+                                </small>
+                            </div>
+                            <p class="mb-1 small text-muted">
+                                الجهة: {{ item.handler|default:'--' }}
+                                {% if item.cost_per_piece %}
+                                    | تكلفة القطعة: {{ item.cost_per_piece|floatformat:2 }} جنيه
+                                {% endif %}
+                            </p>
+                        </li>
+                    {% empty %}
+                        <li class="list-group-item text-muted">لا توجد بيانات للجدول الزمني.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- BOM vs Actual Usage -->
+        <div class="production-card">
+            <div class="production-card-header">
+                <i class="fas fa-exchange-alt me-2"></i>مقارنة استهلاك الخامات (BOM مقابل الفعلي)
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>المادة الخام</th>
+                            <th>الكمية حسب BOM</th>
+                            <th>الكمية الفعلية</th>
+                            <th class="text-center">الفرق</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in bom_comparison %}
+                        <tr>
+                            <td>{{ item.material }}</td>
+                            <td>{{ item.bom_quantity|floatformat:2 }}</td>
+                            <td>{{ item.actual_quantity|floatformat:2 }}</td>
+                            <td class="text-center {% if item.variance > 0 %}text-danger{% elif item.variance < 0 %}text-success{% endif %}">
+                                {{ item.variance|floatformat:2 }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center text-muted p-4">لا توجد بيانات للمقارنة.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar Column -->
+    <div class="col-lg-4">
+        <!-- Summary Metrics -->
+        <div class="production-card mb-4">
+            <div class="production-card-header"><i class="fas fa-calculator me-2"></i>الملخص النهائي</div>
+            <div class="production-card-body">
+                <div class="production-metric text-center mb-3">
+                    <div class="production-metric-icon danger"><i class="fas fa-dollar-sign"></i></div>
+                    <div class="production-metric-value">{{ cost_analysis.total_production_cost|intcomma }}<span class="fs-6 ms-1">جنيه</span></div>
+                    <div class="production-metric-label">إجمالي تكلفة الإنتاج</div>
+                </div>
+                <div class="production-metric text-center">
+                    <div class="production-metric-icon success"><i class="fas fa-tshirt"></i></div>
+                    <div class="production-metric-value">{{ cost_analysis.cost_per_piece|floatformat:2 }}<span class="fs-6 ms-1">جنيه</span></div>
+                    <div class="production-metric-label">تكلفة القطعة الواحدة</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Batch Data Widget -->
+        <div class="production-card mb-4">
+            <div class="production-card-header"><i class="fas fa-archive me-2"></i> بيانات الدفعة (Batch)</div>
+            <div class="production-card-body">
+                <ul class="list-group list-group-flush small">
+                    <li class="list-group-item px-0"><strong>رقم الباتش:</strong> {{ batch_data.order.batch_number }}</li>
+                    <li class="list-group-item px-0"><strong>المنتج:</strong> {{ batch_data.order.product.name }}</li>
+                    <li class="list-group-item px-0"><strong>الكمية المطلوبة:</strong> {{ batch_data.order.quantity_ordered|intcomma }} قطعة</li>
+                    <li class="list-group-item px-0"><strong>مجموعة المقاسات:</strong> {{ batch_data.order.product.size_group.name|default:'--' }}</li>
+                    <li class="list-group-item px-0"><strong>المقاسات:</strong> {{ batch_data.order.product.size_group.sizes|join:", "|default:'--' }}</li>
+                    <li class="list-group-item px-0"><strong>الألوان:</strong> {{ batch_data.colors|join:", "|default:'لا يوجد' }}</li>
+                    <li class="list-group-item px-0"><strong>مخازن المنتج النهائي:</strong> {{ batch_data.storage_locations|join:", "|default:'لم يحدد بعد' }}</li>
+                </ul>
+                <hr>
+                <h6 class="mb-2">بيانات استهلاك القماش</h6>
+                <ul class="list-group list-group-flush small">
+                    <li class="list-group-item px-0"><strong>متراج القطعة (من القص):</strong> {{ batch_data.fabric_cutting_quantity|floatformat:3|default:'--' }} متر</li>
+                    <li class="list-group-item px-0"><strong>متراج القطعة (من BOM):</strong> {{ batch_data.fabric_bom_quantity|floatformat:3|default:'--' }} متر</li>
+                    <li class="list-group-item px-0"><strong>إجمالي القماش المستخدم:</strong> {{ batch_data.cutting_process.total_fabric_used|floatformat:2|default:'--' }} متر</li>
+                </ul>
+                {% if batch_data.fabric_cutting_quantity and batch_data.fabric_bom_quantity and batch_data.fabric_cutting_quantity != batch_data.fabric_bom_quantity %}
+                <div class="mt-3 text-center">
+                    <button id="update-bom-btn" class="btn btn-sm btn-warning" data-analysis-id="{{ cost_analysis.pk }}">
+                        <i class="fas fa-sync-alt me-2"></i> تحديث BOM بمتراج القص الفعلي
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    $('#update-bom-btn').on('click', function() {
+        const button = $(this);
+        const analysisId = button.data('analysis-id');
+        const csrfToken = '{{ csrf_token }}';
+
+        if (confirm('هل أنت متأكد من أنك تريد تحديث كمية القماش في قائمة المواد (BOM) بالكمية الفعلية من عملية القص؟ لا يمكن التراجع عن هذا الإجراء.')) {
+            $.ajax({
+                url: "{% url 'production:update_bom_from_cutting_ajax' %}",
+                method: 'POST',
+                data: {
+                    'cost_analysis_id': analysisId,
+                    'csrfmiddlewaretoken': csrfToken
+                },
+                beforeSend: function() {
+                    button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>جاري التحديث...');
+                },
+                success: function(response) {
+                    if (response.success) {
+                        alert('تم تحديث قائمة المواد بنجاح!');
+                        location.reload();
+                    } else {
+                        alert('فشل التحديث: ' + response.error);
+                    }
+                },
+                error: function() {
+                    alert('حدث خطأ في الاتصال بالخادم.');
+                },
+                complete: function() {
+                    button.prop('disabled', false).html('<i class="fas fa-sync-alt me-2"></i> تحديث BOM بمتراج القص الفعلي');
+                }
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,37 @@
+<!-- Action Buttons Component -->
+<div class="flex items-center justify-between mb-6">
+    <div class="flex space-x-2 space-x-reverse">
+        {% for action in actions %}
+        {% if action.type == 'primary' %}
+        <a href="{{ action.url }}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 transition-colors">
+            <i class="{{ action.icon }} mr-2"></i>
+            {{ action.label }}
+        </a>
+        {% elif action.type == 'secondary' %}
+        <a href="{{ action.url }}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 transition-colors">
+            <i class="{{ action.icon }} mr-2"></i>
+            {{ action.label }}
+        </a>
+        {% elif action.type == 'danger' %}
+        <button type="button" data-action="{{ action.action }}" class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:ring-2 focus:ring-red-500 transition-colors">
+            <i class="{{ action.icon }} mr-2"></i>
+            {{ action.label }}
+        </button>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- Bulk Actions -->
+    {% if bulk_actions %}
+    <div class="flex items-center space-x-2 space-x-reverse" id="bulk-actions" style="display: none;">
+        <span class="text-sm text-gray-600">العمليات المحددة:</span>
+        {% for bulk_action in bulk_actions %}
+        <button type="button" data-bulk-action="{{ bulk_action.action }}" 
+                class="inline-flex items-center px-3 py-1 text-sm {{ bulk_action.class|default:'bg-gray-100 text-gray-700 hover:bg-gray-200' }} rounded-md transition-colors">
+            <i class="{{ bulk_action.icon }} mr-1"></i>
+            {{ bulk_action.label }}
+        </button>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>

@@ -1,0 +1,399 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    {% if form.instance.pk %}تعديل أمر الشراء{% else %}أمر شراء جديد{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-shopping-cart me-2"></i>
+                    {% if form.instance.pk %}تعديل أمر الشراء{% else %}أمر شراء جديد{% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="purchase-order-form">
+                    {% csrf_token %}
+                    
+                    <!-- Order Header -->
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">المورد *</label>
+                            {{ form.supplier }}
+                            {% if form.supplier.errors %}
+                                <div class="text-danger small">{{ form.supplier.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">تاريخ التسليم المتوقع *</label>
+                            {{ form.expected_delivery_date }}
+                            {% if form.expected_delivery_date.errors %}
+                                <div class="text-danger small">{{ form.expected_delivery_date.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">الأولوية</label>
+                            {{ form.priority }}
+                        </div>
+                    </div>
+                    
+                    <!-- Order Items -->
+                    <div class="card mt-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">عناصر الأمر</h6>
+                            <button type="button" class="btn btn-sm btn-primary" id="add-item-btn">
+                                <i class="fas fa-plus me-1"></i> إضافة عنصر
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            {{ formset.management_form }}
+                            <div id="items-container">
+                                {% for form in formset %}
+                                <div class="item-row border rounded p-3 mb-3" data-form-index="{{ forloop.counter0 }}">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <label class="form-label">المنتج</label>
+                                            {{ form.product }}
+                                            {% if form.product.errors %}
+                                                <div class="text-danger small">{{ form.product.errors.0 }}</div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label">الكمية</label>
+                                            {{ form.quantity_ordered }}
+                                            {% if form.quantity_ordered.errors %}
+                                                <div class="text-danger small">{{ form.quantity_ordered.errors.0 }}</div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label">السعر</label>
+                                            {{ form.unit_price }}
+                                            {% if form.unit_price.errors %}
+                                                <div class="text-danger small">{{ form.unit_price.errors.0 }}</div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label">الإجمالي</label>
+                                            <input type="text" class="form-control item-total" readonly>
+                                        </div>
+                                        <div class="col-md-2 d-flex align-items-end">
+                                            <button type="button" class="btn btn-outline-danger btn-sm delete-item-btn" title="حذف العنصر">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                            {% if form.DELETE %}
+                                                {{ form.DELETE }}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+                                </div>
+                                {% empty %}
+                                <!-- Empty form template for new items -->
+                                <div class="item-row border rounded p-3 mb-3" data-form-index="0">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <label class="form-label">المنتج</label>
+                                            <select name="items-0-product" class="form-select" required>
+                                                <option value="">اختر المنتج</option>
+                                                <!-- Options will be populated via AJAX -->
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label">الكمية</label>
+                                            <input type="number" name="items-0-quantity_ordered" class="form-control" step="0.01" min="0" required>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label">السعر</label>
+                                            <input type="number" name="items-0-unit_price" class="form-control" step="0.01" min="0" required>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label">الإجمالي</label>
+                                            <input type="text" class="form-control item-total" readonly>
+                                        </div>
+                                        <div class="col-md-2 d-flex align-items-end">
+                                            <button type="button" class="btn btn-outline-danger btn-sm delete-item-btn" title="حذف العنصر">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <!-- Total Summary -->
+                            <div class="row mt-3">
+                                <div class="col-md-8"></div>
+                                <div class="col-md-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between">
+                                                <strong>المجموع الكلي:</strong>
+                                                <strong id="grand-total">0.00</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Notes -->
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <label class="form-label">ملاحظات</label>
+                            {{ form.notes }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">الشروط والأحكام</label>
+                            {{ form.terms_conditions }}
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'suppliers:purchase_orders' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-right me-1"></i>إلغاء
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>
+                            {% if form.instance.pk %}تحديث{% else %}إنشاء{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include Toast Container -->
+{% include 'partials/toast.html' %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    let formIndex = {{ formset.total_form_count|default:0 }};
+    
+    // Set default delivery date
+    if (!$('#id_expected_delivery_date').val()) {
+        const date = new Date();
+        date.setDate(date.getDate() + 7);
+        $('#id_expected_delivery_date').val(date.toISOString().split('T')[0]);
+    }
+    
+    // Calculate totals for existing items
+    calculateTotals();
+    
+    // Add new item
+    $('#add-item-btn').click(function() {
+        addNewItem();
+    });
+    
+    // Delete item
+    $(document).on('click', '.delete-item-btn', function() {
+        deleteItem($(this));
+    });
+    
+    // Calculate totals when inputs change
+    $(document).on('input', '.item-row input[type="number"]', function() {
+        const row = $(this).closest('.item-row');
+        calculateRowTotal(row);
+        calculateGrandTotal();
+    });
+    
+    // Form validation before submit
+    $('#purchase-order-form').on('submit', function(e) {
+        if (!validateForm()) {
+            e.preventDefault();
+            return false;
+        }
+    });
+    
+    function addNewItem() {
+        const newRow = `
+            <div class="item-row border rounded p-3 mb-3" data-form-index="${formIndex}">
+                <div class="row">
+                    <div class="col-md-4">
+                        <label class="form-label">المنتج</label>
+                        <select name="items-${formIndex}-product" class="form-select" required>
+                            <option value="">اختر المنتج</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">الكمية</label>
+                        <input type="number" name="items-${formIndex}-quantity_ordered" class="form-control" step="0.01" min="0" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">السعر</label>
+                        <input type="number" name="items-${formIndex}-unit_price" class="form-control" step="0.01" min="0" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">الإجمالي</label>
+                        <input type="text" class="form-control item-total" readonly>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="button" class="btn btn-outline-danger btn-sm delete-item-btn" title="حذف العنصر">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        $('#items-container').append(newRow);
+        
+        // Load products for the new select
+        loadProducts($(`select[name="items-${formIndex}-product"]`));
+        
+        // Update form count
+        formIndex++;
+        updateFormCount();
+        
+        // Show success toast
+        showSuccessToast('تم إضافة عنصر جديد بنجاح');
+    }
+    
+    function deleteItem(button) {
+        const row = button.closest('.item-row');
+        const deleteCheckbox = row.find('input[name$="-DELETE"]');
+        
+        // Confirm deletion
+        if (!confirm('هل أنت متأكد من حذف هذا العنصر؟')) {
+            return;
+        }
+        
+        if (deleteCheckbox.length > 0) {
+            // Mark for deletion if it's an existing item
+            deleteCheckbox.prop('checked', true);
+            row.hide();
+            showWarningToast('تم تحديد العنصر للحذف');
+        } else {
+            // Remove completely if it's a new item
+            row.remove();
+            showSuccessToast('تم حذف العنصر بنجاح');
+        }
+        
+        calculateGrandTotal();
+    }
+    
+    function calculateRowTotal(row) {
+        const qty = parseFloat(row.find('input[name$="-quantity_ordered"]').val()) || 0;
+        const price = parseFloat(row.find('input[name$="-unit_price"]').val()) || 0;
+        const total = (qty * price).toFixed(2);
+        row.find('.item-total').val(total);
+    }
+    
+    function calculateTotals() {
+        $('.item-row:visible').each(function() {
+            calculateRowTotal($(this));
+        });
+        calculateGrandTotal();
+    }
+    
+    function calculateGrandTotal() {
+        let grandTotal = 0;
+        $('.item-row:visible .item-total').each(function() {
+            const value = parseFloat($(this).val()) || 0;
+            grandTotal += value;
+        });
+        $('#grand-total').text(grandTotal.toFixed(2));
+    }
+    
+    function updateFormCount() {
+        $('#id_items-TOTAL_FORMS').val(formIndex);
+    }
+    
+    function loadProducts(selectElement) {
+        // Load products via AJAX - Use the correct URL
+        $.get('{% url "suppliers:api_products" %}', function(data) {
+            selectElement.empty().append('<option value="">اختر المنتج</option>');
+            if (data.products && data.products.length > 0) {
+                data.products.forEach(function(product) {
+                    selectElement.append(`<option value="${product.id}">${product.name} (${product.code})</option>`);
+                });
+                showInfoToast('تم تحميل قائمة المنتجات');
+            } else {
+                showWarningToast('لا توجد منتجات متاحة');
+            }
+        }).fail(function() {
+            // Fallback - show error
+            showErrorToast('فشل في تحميل قائمة المنتجات');
+            console.log('Failed to load products');
+        });
+    }
+    
+    function validateForm() {
+        let isValid = true;
+        let errorMessages = [];
+        
+        // Check if supplier is selected
+        if (!$('#id_supplier').val()) {
+            errorMessages.push('يرجى اختيار المورد');
+            isValid = false;
+        }
+        
+        // Check if delivery date is set
+        if (!$('#id_expected_delivery_date').val()) {
+            errorMessages.push('يرجى تحديد تاريخ التسليم المتوقع');
+            isValid = false;
+        }
+        
+        // Check if there are items
+        const visibleItems = $('.item-row:visible').length;
+        if (visibleItems === 0) {
+            errorMessages.push('يجب إضافة عنصر واحد على الأقل');
+            isValid = false;
+        }
+        
+        // Check each item
+        $('.item-row:visible').each(function() {
+            const row = $(this);
+            const product = row.find('select[name$="-product"]').val();
+            const quantity = row.find('input[name$="-quantity_ordered"]').val();
+            const price = row.find('input[name$="-unit_price"]').val();
+            
+            if (!product) {
+                errorMessages.push('يرجى اختيار المنتج لجميع العناصر');
+                isValid = false;
+            }
+            
+            if (!quantity || parseFloat(quantity) <= 0) {
+                errorMessages.push('يرجى إدخال كمية صحيحة لجميع العناصر');
+                isValid = false;
+            }
+            
+            if (!price || parseFloat(price) <= 0) {
+                errorMessages.push('يرجى إدخال سعر صحيح لجميع العناصر');
+                isValid = false;
+            }
+        });
+        
+        // Show validation errors
+        if (!isValid) {
+            errorMessages.forEach(function(message) {
+                showErrorToast(message);
+            });
+        }
+        
+        return isValid;
+    }
+    
+    // Load products for existing selects
+    $('select[name$="-product"]').each(function() {
+        if (!$(this).val()) {
+            loadProducts($(this));
+        }
+    });
+    
+    // Show initial info
+    showInfoToast('يمكنك إضافة عناصر جديدة باستخدام زر "إضافة عنصر"');
+});
+</script>
+{% endblock %}
+

@@ -1,0 +1,258 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}تفاصيل المخزون - {{ stock_item.product.name }} - Mekawy ERP{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-clipboard-list text-primary"></i> تفاصيل المخزون
+        </h1>
+        <div class="btn-group">
+            <a href="{% url 'warehouses:stock_list' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> العودة للقائمة
+            </a>
+            {% if user.role != 'viewer' %}
+            <a href="{% url 'warehouses:stock_edit' stock_item.pk %}" class="btn btn-primary">
+                <i class="fas fa-edit"></i> تعديل
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Stock Item Details -->
+        <div class="col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">معلومات المخزون</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5 class="text-primary">{{ stock_item.product.name }}</h5>
+                            <p class="text-muted mb-1">كود المنتج: {{ stock_item.product.code }}</p>
+                            <p class="text-muted mb-3">المخزن: {{ stock_item.warehouse.name }}</p>
+                            
+                            <div class="row">
+                                <div class="col-sm-6">
+                                    <strong>الكمية الإجمالية:</strong>
+                                    <h4 class="text-primary">{{ stock_item.quantity }} {{ stock_item.product.get_unit_display }}</h4>
+                                </div>
+                                <div class="col-sm-6">
+                                    <strong>الكمية المتاحة:</strong>
+                                    <h4 class="text-success">{{ stock_item.available_quantity }} {{ stock_item.product.get_unit_display }}</h4>
+                                </div>
+                            </div>
+                            
+                            {% if stock_item.reserved_quantity > 0 %}
+                            <div class="mt-2">
+                                <strong>الكمية المحجوزة:</strong>
+                                <span class="text-warning">{{ stock_item.reserved_quantity }} {{ stock_item.product.get_unit_display }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="table-responsive">
+                                <table class="table table-borderless">
+                                    <tr>
+                                        <td><strong>الموقع:</strong></td>
+                                        <td>{{ stock_item.location|default:"غير محدد" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>آخر تحديث:</strong></td>
+                                        <td>{{ stock_item.last_updated|date:"Y/m/d H:i" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>الحالة:</strong></td>
+                                        <td>
+                                            {% if stock_item.quantity == 0 %}
+                                                <span class="badge bg-danger">نافد</span>
+                                            {% elif stock_item.is_low_stock %}
+                                                <span class="badge bg-warning">منخفض</span>
+                                            {% else %}
+                                                <span class="badge bg-success">طبيعي</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>القيمة الإجمالية:</strong></td>
+                                        <td><strong>{{ stock_item.total_value|floatformat:2 }} ج.م</strong></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Product Info -->
+        <div class="col-lg-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">معلومات المنتج</h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <i class="fas fa-box fa-3x text-muted"></i>
+                    </div>
+                    
+                    <table class="table table-borderless table-sm">
+                        <tr>
+                            <td><strong>النوع:</strong></td>
+                            <td>{{ stock_item.product.get_product_type_display }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>التصنيف:</strong></td>
+                            <td>{{ stock_item.product.category.name|default:"غير محدد" }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>الوحدة:</strong></td>
+                            <td>{{ stock_item.product.get_unit_display }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>سعر التكلفة:</strong></td>
+                            <td>{{ stock_item.product.cost_price }} ج.م</td>
+                        </tr>
+                        <tr>
+                            <td><strong>سعر البيع:</strong></td>
+                            <td>{{ stock_item.product.selling_price }} ج.م</td>
+                        </tr>
+                        <tr>
+                            <td><strong>الحد الأدنى:</strong></td>
+                            <td>{{ stock_item.product.min_stock_level }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Movements -->
+    <div class="card shadow">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">الحركات الأخيرة</h6>
+        </div>
+        <div class="card-body">
+            {% if recent_movements %}
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>التاريخ</th>
+                            <th>نوع الحركة</th>
+                            <th>الكمية</th>
+                            <th>رقم المرجع</th>
+                            <th>المستخدم</th>
+                            <th>ملاحظات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for movement in recent_movements %}
+                        <tr>
+                            <td>{{ movement.created_at|date:"Y/m/d H:i" }}</td>
+                            <td>
+                                {% if movement.movement_type == 'in' %}
+                                    <span class="badge bg-success">{{ movement.get_movement_type_display }}</span>
+                                {% elif movement.movement_type == 'out' %}
+                                    <span class="badge bg-danger">{{ movement.get_movement_type_display }}</span>
+                                {% elif movement.movement_type == 'transfer' %}
+                                    <span class="badge bg-info">{{ movement.get_movement_type_display }}</span>
+                                {% elif movement.movement_type == 'adjustment' %}
+                                    <span class="badge bg-warning">{{ movement.get_movement_type_display }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ movement.get_movement_type_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if movement.quantity > 0 %}
+                                    <span class="text-success">+{{ movement.quantity }}</span>
+                                {% else %}
+                                    <span class="text-danger">{{ movement.quantity }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ movement.reference_number|default:"-" }}</td>
+                            <td>{{ movement.created_by.get_full_name|default:movement.created_by.username }}</td>
+                            <td>{{ movement.notes|default:"-" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="text-center mt-3">
+                <a href="{% url 'warehouses:movement_list' %}?stock_item={{ stock_item.id }}" class="btn btn-outline-primary">
+                    <i class="fas fa-history"></i> عرض جميع الحركات
+                </a>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">لا توجد حركات</h5>
+                <p class="text-muted">لم يتم تسجيل أي حركات لهذا العنصر بعد.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.table th {
+    font-weight: 600;
+    background-color: #f8f9fc;
+    border-bottom: 2px solid #e3e6f0;
+}
+
+.badge {
+    font-size: 0.75rem;
+    padding: 0.375rem 0.75rem;
+}
+
+.text-primary {
+    color: var(--primary-color) !important;
+}
+
+.text-success {
+    color: var(--success-color) !important;
+}
+
+.text-warning {
+    color: var(--warning-color) !important;
+}
+
+.text-danger {
+    color: var(--danger-color) !important;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize tooltips
+    $('[data-bs-toggle="tooltip"]').tooltip();
+    
+    // Auto-refresh every 2 minutes
+    setInterval(function() {
+        if (document.visibilityState === 'visible') {
+            location.reload();
+        }
+    }, 120000);
+});
+</script>
+{% endblock %}
+                    

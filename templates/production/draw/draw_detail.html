@@ -1,0 +1,134 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+
+{% block production_title %}تفاصيل رسمة القص{% endblock %}
+
+{% block production_breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'production:draws:draw_list' %}">رسومات القص</a></li>
+<li class="breadcrumb-item active" aria-current="page">تفاصيل الرسمة</li>
+{% endblock %}
+
+{% block production_header_actions %}
+<div class="d-flex justify-content-end align-items-center gap-2">
+    <a href="{% url 'production:draws:draw_print_pdf' draw.pk %}" class="btn btn-secondary" target="_blank">
+        <i class="fas fa-print me-2"></i> طباعة PDF
+    </a>
+    <a href="{% url 'production:draws:draw_update' draw.pk %}" class="btn btn-production-outline">
+        <i class="fas fa-edit me-2"></i> تعديل
+    </a>
+    <a href="{% url 'production:draws:draw_delete' draw.pk %}" class="btn btn-danger">
+        <i class="fas fa-trash me-2"></i> حذف
+    </a>
+</div>
+{% endblock %}
+
+{% block production_extra_css %}
+<style>
+    .tree-view-card {
+        border-left: 3px solid var(--production-primary);
+    }
+    .tree-branch {
+        padding-left: 2rem;
+        border-left: 2px dotted #ccc;
+        margin-left: 0.75rem;
+    }
+    .piece-item {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        border-radius: 0.375rem;
+        background-color: #f8f9fa;
+        margin-bottom: 0.5rem;
+        transition: background-color 0.2s ease-in-out;
+    }
+    .piece-item:hover {
+        background-color: #e9ecef;
+    }
+    .piece-icon {
+        color: var(--production-primary);
+        margin-right: 1rem;
+    }
+    .piece-name {
+        flex-grow: 1;
+        font-weight: 500;
+    }
+    .piece-quantity {
+        font-weight: 700;
+        font-size: 1.1rem;
+        color: var(--production-dark);
+    }
+</style>
+{% endblock %}
+
+{% block production_content %}
+<div class="production-card tree-view-card">
+    <div class="production-card-header d-flex justify-content-between">
+        <span>
+            <i class="fas fa-sitemap me-2"></i>
+            رسمة قص للمنتج: <strong>{{ draw.bom.product.name }}</strong>
+        </span>
+        <span class="badge bg-primary rounded-pill fs-6">مقاس: {{ draw.size }}</span>
+    </div>
+    <div class="production-card-body">
+        
+        <!-- BOM Details (The Branch) -->
+        <div class="production-card mb-4">
+            <div class="production-card-header bg-light">
+                <i class="fas fa-list-alt me-2"></i>
+                مرتبطة بقائمة المواد (BOM)
+            </div>
+            <div class="production-card-body">
+                <p>
+                    <a href="{% url 'production:bom_detail' draw.bom.pk %}" class="fw-bold">
+                        BOM v{{ draw.bom.version }} - {{ draw.bom.product.name }}
+                    </a>
+                </p>
+                <div class="d-flex justify-content-between text-muted small">
+                    <span>مجموعة المقاسات: {{ draw.bom.size_group.name|default:'N/A' }}</span>
+                    <span>تم الإنشاء: {{ draw.bom.created_at|date:"Y-m-d" }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pieces List (The Leaves) -->
+        <div class="tree-branch">
+            <h5 class="mb-3">
+                <i class="fas fa-puzzle-piece me-2 text-muted"></i>
+                مكونات الرسمة ({{ draw.pieces.count }})
+            </h5>
+            
+            {% for piece in draw.pieces.all %}
+            <div class="piece-item">
+                <div class="piece-icon">
+                    <i class="fas fa-th"></i>
+                </div>
+                <div class="piece-name">
+                    {{ piece.name }}
+                </div>
+                <div class="piece-quantity">
+                    x {{ piece.quantity }}
+                </div>
+            </div>
+            {% empty %}
+            <div class="alert alert-warning">
+                لم يتم إضافة أي قطع لهذه الرسمة بعد.
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if draw.notes %}
+        <hr class="my-4">
+        <div>
+            <h6><i class="fas fa-sticky-note me-2"></i>ملاحظات إضافية</h6>
+            <p class="text-muted p-3 bg-light rounded">{{ draw.notes|linebreaksbr }}</p>
+        </div>
+        {% endif %}
+
+    </div>
+    <div class="production-card-footer">
+        <small class="text-muted">
+            تم إنشاء هذه الرسمة بواسطة: {{ draw.created_by.username|default:'-' }} في {{ draw.created_at|date:"Y-m-d H:i" }}
+        </small>
+    </div>
+</div>
+{% endblock %}

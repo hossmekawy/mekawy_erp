@@ -1,0 +1,42 @@
+{% extends 'production/production_base.html' %}
+{% load i18n %}
+
+{% block production_title %}{% trans "تأكيد الحذف" %}{% endblock %}
+
+{% block production_breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'production:bom_list' %}">{% trans "قائمة المواد" %}</a></li>
+<li class="breadcrumb-item"><a href="{% url 'production:bom_detail' object.pk %}">{{ object }}</a></li>
+<li class="breadcrumb-item active" aria-current="page">{% trans "حذف" %}</li>
+{% endblock %}
+
+{% block production_content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="production-card text-center">
+            <div class="production-card-header bg-danger text-white">
+                <h4 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i> {% trans "تأكيد الحذف" %}</h4>
+            </div>
+            <div class="production-card-body">
+                <p class="fs-5">
+                    {% blocktrans with product_name=object.product.name size=object.size %}
+                    هل أنت متأكد أنك تريد حذف قائمة المواد للمنتج <strong>{{ product_name }} (مقاس: {{ size }})</strong>؟
+                    {% endblocktrans %}
+                </p>
+                <p class="text-danger"><strong>{% trans "لا يمكن التراجع عن هذا الإجراء." %}</strong></p>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-center mt-4">
+                        <a href="{% url 'production:bom_detail' object.pk %}" class="btn btn-secondary me-3">
+                            <i class="fas fa-times me-2"></i> {% trans "إلغاء" %}
+                        </a>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash-alt me-2"></i> {% trans "نعم، احذف" %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

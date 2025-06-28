@@ -1,0 +1,72 @@
+{% extends 'production/production_base.html' %}
+
+{% block production_title %}تصاريح الخروج{% endblock %}
+
+{% block production_breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">تصاريح الخروج</li>
+{% endblock %}
+
+{% block production_header_actions %}
+<a href="{% url 'production:exit_permits:exit_permit_create' %}" class="btn btn-production">
+    <i class="fas fa-plus me-2"></i> إصدار تصريح جديد
+</a>
+{% endblock %}
+
+{% block production_content %}
+<div class="production-card">
+    <div class="production-card-header">
+        <i class="fas fa-file-alt me-2"></i>
+        قائمة تصاريح الخروج ({{ permits.count }})
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-8">
+                <select name="status" class="form-select">
+                    <option value="">كل الحالات</option>
+                    {% for value, display in status_choices %}
+                    <option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>{{ display }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-production w-100">تصفية</button>
+            </div>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table production-table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>رقم التصريح</th>
+                    <th>أمر الإنتاج</th>
+                    <th>النوع</th>
+                    <th>الوجهة</th>
+                    <th>الحالة</th>
+                    <th>تاريخ الطلب</th>
+                    <th>الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for permit in permits %}
+                <tr>
+                    <td><a href="{% url 'production:exit_permits:exit_permit_detail' permit.pk %}"><strong>{{ permit.permit_number }}</strong></a></td>
+                    <td>{{ permit.production_order.order_number|default:"--" }}</td>
+                    <td>{{ permit.get_permit_type_display }}</td>
+                    <td>{{ permit.destination }}</td>
+                    <td><span class="badge bg-info">{{ permit.get_status_display }}</span></td>
+                    <td>{{ permit.requested_at|date:"Y-m-d" }}</td>
+                    <td>
+                        <a href="{% url 'production:exit_permits:exit_permit_detail' permit.pk %}" class="btn btn-sm btn-secondary"><i class="fas fa-eye"></i></a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center p-5">لا توجد تصاريح خروج.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include 'partials/pagination.html' with page_obj=page_obj %}
+</div>
+{% endblock %}

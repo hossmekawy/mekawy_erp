@@ -1,0 +1,74 @@
+{% extends 'pdf/base_pdf.html' %}
+
+{% block pdf_title %}إيصال استلام - {{ receipt.exit_permit.permit_number }}{% endblock %}
+
+{% block pdf_header %}
+    <h1>إيصال استلام بضاعة</h1>
+    <div class="meta-info">
+        <strong>رقم تصريح الخروج:</strong> {{ receipt.exit_permit.permit_number }} | 
+        <strong>تاريخ الطباعة:</strong> {{ timestamp|date:"Y-m-d H:i" }}
+    </div>
+{% endblock %}
+
+{% block pdf_content %}
+    <style>
+        .info-table td {
+            vertical-align: top;
+        }
+        .signature-box {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 15px;
+            text-align: center;
+            background-color: #f9f9f9;
+        }
+        .signature-box img {
+            max-width: 250px;
+            max-height: 120px;
+        }
+    </style>
+
+    <h2>بيانات الاستلام</h2>
+    <table class="info-table">
+        <tr>
+            <td style="width: 25%;"><strong>تاريخ الاستلام:</strong></td>
+            <td style="width: 75%;">{{ receipt.received_at|date:"Y-m-d H:i" }}</td>
+        </tr>
+        <tr>
+            <td><strong>اسم المستلم:</strong></td>
+            <td>{{ receipt.received_by_name }}</td>
+        </tr>
+        <tr>
+            <td><strong>ممثل الشركة:</strong></td>
+            <td>{{ receipt.company_representative|default:"--" }}</td>
+        </tr>
+        <tr>
+            <td><strong>الكمية المستلمة:</strong></td>
+            <td>{{ receipt.quantity_received }} (الكمية المرسلة: {{ receipt.exit_permit.quantity }})</td>
+        </tr>
+        <tr>
+            <td><strong>فحص الجودة:</strong></td>
+            <td>{% if receipt.quality_check_passed %}اجتاز الفحص{% else %}لم يجتز الفحص{% endif %}</td>
+        </tr>
+        <tr>
+            <td><strong>ملاحظات الحالة:</strong></td>
+            <td>{{ receipt.condition_notes|default:"لا يوجد"|linebreaksbr }}</td>
+        </tr>
+    </table>
+
+    <hr style="margin: 30px 0;">
+
+    <h2>التوقيع والإقرار</h2>
+    <div class="signature-box">
+        <strong>توقيع المستلم:</strong><br>
+        {% if receipt.received_by_signature %}
+            <img src="{{ receipt.received_by_signature }}" alt="توقيع المستلم">
+        {% else %}
+            <p style="color: #888;">-- لا يوجد توقيع إلكتروني --</p>
+        {% endif %}
+    </div>
+
+    <div style="margin-top: 40px;">
+        <p>أقر أنا، <strong>{{ receipt.received_by_name }}</strong>، باستلام المواد المذكورة أعلاه بالحالة والكمية الموضحة.</p>
+    </div>
+{% endblock %}

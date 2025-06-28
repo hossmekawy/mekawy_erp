@@ -1,0 +1,22 @@
+{% extends 'production/production_base.html' %}
+
+{% block production_title %}تأكيد حذف رسمة القص{% endblock %}
+
+{% block production_content %}
+<div class="production-card">
+    <div class="production-card-header bg-danger text-white">
+        <i class="fas fa-exclamation-triangle me-2"></i> تأكيد الحذف
+    </div>
+    <div class="production-card-body">
+        <form method="post">
+            {% csrf_token %}
+            <p>هل أنت متأكد من أنك تريد حذف رسمة القص للمنتج <strong>"{{ object.bom.product.name }}"</strong> بمقاس <strong>"{{ object.size }}"</strong>؟</p>
+            <p class="text-muted">لا يمكن التراجع عن هذا الإجراء.</p>
+            <div class="mt-4">
+                <button type="submit" class="btn btn-danger">نعم، قم بالحذف</button>
+                <a href="{{ object.get_absolute_url }}" class="btn btn-secondary">إلغاء</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

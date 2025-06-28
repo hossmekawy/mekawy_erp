@@ -1,0 +1,187 @@
+{% extends "pdf/base_pdf.html" %}
+{% load static humanize production_extras %}
+
+{% block pdf_title %}تقرير تحليل تكلفة - {{ order.order_number }}{% endblock %}
+
+{% block pdf_header %}
+    <h1>تقرير تحليل تكلفة</h1>
+    <div class="meta-info">
+        أمر إنتاج: {{ order.order_number }} | المنتج: {{ order.product.name }} | تاريخ التقرير: {% now "d M Y" %}
+    </div>
+{% endblock %}
+
+{% block pdf_content %}
+    <h2 style="color: #333; border-bottom: 1px solid #ccc; padding-bottom: 5px;">ملخص التكلفة الإجمالية</h2>
+    <table>
+        <tr>
+            <td><strong>إجمالي تكلفة الإنتاج:</strong></td>
+            <td>{{ analysis.total_production_cost|intcomma }} جنيه</td>
+            <td><strong>تكلفة القطعة الواحدة:</strong></td>
+            <td>{{ analysis.cost_per_piece|floatformat:2 }} جنيه</td>
+        </tr>
+    </table>
+
+    <h2 style="color: #333; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 20px;">تفاصيل التكلفة الإجمالية</h2>
+    <table style="width: 100%; border-collapse: collapse;">
+        <!-- Material Costs -->
+        <tr style="background-color: #e9ecef;">
+            <th colspan="2" style="padding: 8px; border: 1px solid #ddd;">تكاليف المواد</th>
+        </tr>
+        <tr>
+            <td style="width: 70%; padding: 8px; border: 1px solid #ddd;">تكلفة القماش</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">{{ analysis.fabric_cost|intcomma }} جنيه</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #ddd;">تكلفة الخيوط</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">{{ analysis.thread_cost|intcomma }} جنيه</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #ddd;">تكلفة الإكسسوارات</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">{{ analysis.accessories_cost|intcomma }} جنيه</td>
+        </tr>
+        <tr style="font-weight: bold; background-color: #f8f9fa;">
+            <td style="padding: 8px; border: 1px solid #ddd;">إجمالي تكاليف المواد</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">{{ analysis.total_material_cost|intcomma }} جنيه</td>
+        </tr>
+
+        <!-- Process Costs -->
+        <tr style="background-color: #e9ecef;">
+            <th colspan="2" style="padding: 8px; border: 1px solid #ddd; margin-top: 15px;">تكاليف العمليات</th>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #ddd;">تكلفة القص</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">{{ analysis.cutting_cost|intcomma }} جنيه</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #ddd;">تكلفة التجميع</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">{{ analysis.assembly_cost|intcomma }} جنيه</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #ddd;">تكلفة الصباغة</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">{{ analysis.dyeing_cost|intcomma }} جنيه</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #ddd;">تكلفة التشطيب</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">{{ analysis.finishing_cost|intcomma }} جنيه</td>
+        </tr>
+        <tr style="font-weight: bold; background-color: #f8f9fa;">
+            <td style="padding: 8px; border: 1px solid #ddd;">إجمالي تكاليف العمليات</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">{{ analysis.total_process_cost|intcomma }} جنيه</td>
+        </tr>
+
+        <!-- Additional Costs -->
+        <tr style="background-color: #e9ecef;">
+            <th colspan="2" style="padding: 8px; border: 1px solid #ddd; margin-top: 15px;">تكاليف إضافية</th>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #ddd;">تكلفة النقل</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">{{ analysis.transportation_cost|intcomma }} جنيه</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #ddd;">تكاليف عامة</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">{{ analysis.overhead_cost|intcomma }} جنيه</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #ddd;">مراقبة الجودة</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">{{ analysis.quality_control_cost|intcomma }} جنيه</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #ddd;">الفاقد والعيوب</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">{{ analysis.waste_cost|add:analysis.defect_cost|intcomma }} جنيه</td>
+        </tr>
+        <tr style="font-weight: bold; background-color: #f8f9fa;">
+            <td style="padding: 8px; border: 1px solid #ddd;">إجمالي التكاليف الإضافية</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">{{ analysis.total_additional_cost|intcomma }} جنيه</td>
+        </tr>
+    </table>
+
+    <h2 style="color: #333; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 20px;">بيانات الدفعة (Batch)</h2>
+    <table>
+        <tr>
+            <td><strong>رقم الباتش:</strong></td>
+            <td>{{ order.batch_number }}</td>
+            <td><strong>الكمية:</strong></td>
+            <td>{{ order.quantity_ordered|intcomma }} قطعة</td>
+        </tr>
+        <tr>
+            <td><strong>مجموعة المقاسات:</strong></td>
+            <td>{{ order.product.size_group.name|default:'--' }}</td>
+            <td><strong>المقاسات:</strong></td>
+            <td>{{ order.product.size_group.sizes|join:", "|default:'--' }}</td>
+        </tr>
+        <tr>
+            <td><strong>الألوان:</strong></td>
+            <td colspan="3">{{ batch_data.colors|join:", "|default:'لا يوجد' }}</td>
+        </tr>
+        <tr>
+            <td><strong>مخازن المنتج النهائي:</strong></td>
+            <td colspan="3">{{ batch_data.storage_locations|join:", "|default:'لم يحدد بعد' }}</td>
+        </tr>
+    </table>
+
+    <h3 style="color: #444; margin-top: 15px; margin-bottom: 5px;">بيانات استهلاك القماش</h3>
+    <table>
+        <tr>
+            <td style="width: 50%;"><strong>متراج القطعة (من القص):</strong></td>
+            <td>{{ batch_data.fabric_cutting_quantity|floatformat:3|default:'--' }} متر</td>
+        </tr>
+        <tr>
+            <td><strong>متراج القطعة (من BOM):</strong></td>
+            <td>{{ batch_data.fabric_bom_quantity|floatformat:3|default:'--' }} متر</td>
+        </tr>
+        <tr>
+            <td><strong>إجمالي القماش المستخدم:</strong></td>
+            <td>{{ batch_data.cutting_process.total_fabric_used|floatformat:2|default:'--' }} متر</td>
+        </tr>
+    </table>
+
+    <h2 style="color: #333; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 20px;">الجدول الزمني للعمليات</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>المرحلة</th>
+                <th>الجهة المنفذة</th>
+                <th>تكلفة القطعة</th>
+                <th>المدة</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in timeline %}
+            <tr>
+                <td>{{ item.stage }}</td>
+                <td>{{ item.handler|default:'--' }}</td>
+                <td>{% if item.cost_per_piece %}{{ item.cost_per_piece|floatformat:2 }} جنيه{% else %}--{% endif %}</td>
+                <td>{% if item.duration %}{{ item.duration.days }} يوم و {{ item.duration.seconds|div:3600|floatformat:0 }} ساعة{% else %}--{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" style="text-align: center;">لا توجد بيانات للجدول الزمني.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2 style="color: #333; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 20px;">مقارنة استهلاك الخامات (BOM مقابل الفعلي)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>المادة الخام</th>
+                <th>الكمية حسب BOM</th>
+                <th>الكمية الفعلية</th>
+                <th>الفرق</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in bom_comparison %}
+            <tr>
+                <td>{{ item.material }}</td>
+                <td>{{ item.bom_quantity|floatformat:2 }}</td>
+                <td>{{ item.actual_quantity|floatformat:2 }}</td>
+                <td style="color: {% if item.variance > 0 %}red{% elif item.variance < 0 %}green{% else %}black{% endif %};">
+                    {{ item.variance|floatformat:2 }}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" style="text-align: center;">لا توجد بيانات للمقارنة.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

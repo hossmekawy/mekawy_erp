@@ -1,0 +1,56 @@
+{% extends 'production/production_base.html' %}
+{% load widget_tweaks %}
+
+{% block production_title %}إصدار تصريح خروج جديد{% endblock %}
+
+{% block production_content %}
+<div class="production-card">
+    <div class="production-card-header">
+        <i class="fas fa-file-signature me-2"></i>
+        بيانات تصريح الخروج
+    </div>
+    <div class="card-body">
+        <form method="post" class="needs-validation" novalidate>
+            {% csrf_token %}
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="{{ form.production_order.id_for_label }}" class="form-label">أمر الإنتاج (اختياري)</label>
+                    {% render_field form.production_order class="form-select" %}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.permit_type.id_for_label }}" class="form-label">نوع التصريح</label>
+                    {% render_field form.permit_type class="form-select" required=True %}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.destination.id_for_label }}" class="form-label">الوجهة</label>
+                    {% render_field form.destination class="form-control" required=True %}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.quantity.id_for_label }}" class="form-label">الكمية</label>
+                    {% render_field form.quantity class="form-control" required=True %}
+                </div>
+                <div class="col-12">
+                    <label for="{{ form.items_description.id_for_label }}" class="form-label">وصف المواد</label>
+                    {% render_field form.items_description class="form-control" required=True %}
+                </div>
+                <div class="col-12">
+                    <label for="{{ form.purpose.id_for_label }}" class="form-label">الغرض</label>
+                    {% render_field form.purpose class="form-control" required=True %}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.valid_until.id_for_label }}" class="form-label">صالح حتى</label>
+                    {% render_field form.valid_until class="form-control" required=True %}
+                </div>
+                 <div class="col-12">
+                    <label for="{{ form.notes.id_for_label }}" class="form-label">ملاحظات</label>
+                    {% render_field form.notes class="form-control" %}
+                </div>
+            </div>
+            <div class="mt-4">
+                <button type="submit" class="btn btn-production">إصدار التصريح</button>
+                <a href="{% url 'production:exit_permits:exit_permit_list' %}" class="btn btn-secondary">إلغاء</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,843 @@
+{% extends 'base.html' %}
+
+{% block title %}استلام أمر الشراء - {{ purchase_order.po_number }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2>استلام أمر الشراء</h2>
+                <p class="text-muted mb-0">{{ purchase_order.po_number }} - {{ purchase_order.supplier.name }}</p>
+            </div>
+            <div>
+                <span class="badge bg-{% if purchase_order.status == 'approved' %}success{% else %}info{% endif %} fs-6">
+                    {{ purchase_order.get_status_display }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Order Summary -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>ملخص الأمر</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <p><strong>رقم الأمر:</strong><br>{{ purchase_order.po_number }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p><strong>المورد:</strong><br>{{ purchase_order.supplier.name }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p><strong>تاريخ الأمر:</strong><br>{{ purchase_order.order_date|date:"Y-m-d" }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p><strong>التسليم المتوقع:</strong><br>{{ purchase_order.expected_delivery_date|date:"Y-m-d" }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Receive Form -->
+        <form method="post" id="receiveForm">
+            {% csrf_token %}
+            
+            <!-- Delivery Information -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-truck me-2"></i>معلومات الاستلام</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">تاريخ الاستلام *</label>
+                            <input type="date" name="received_date" class="form-control" value="{{ today }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">المخزن *</label>
+                            <select name="warehouse" class="form-select" required>
+                                <option value="">اختر المخزن</option>
+                                {% for warehouse in warehouses %}
+                                <option value="{{ warehouse.id }}">{{ warehouse.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12 mb-3">
+                            <label class="form-label">ملاحظات التسليم</label>
+                            <textarea name="delivery_notes" class="form-control" rows="3" placeholder="أدخل أي ملاحظات حول التسليم..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Items to Receive -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-boxes me-2"></i>العناصر المطلوب استلامها</h5>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="fillAllQuantities()">
+                            <i class="fas fa-fill me-1"></i>ملء جميع الكميات
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearAllQuantities()">
+                            <i class="fas fa-eraser me-1"></i>مسح الكميات
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    {% if items %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>المنتج</th>
+                                    <th>الوحدة</th>
+                                    <th>الكمية المطلوبة</th>
+                                    <th>المستلم سابقاً</th>
+                                    <th>المتبقي</th>
+                                    <th>الكمية المستلمة الآن</th>
+                                    <th>ملاحظات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in items %}
+<!-- Replace the table row content (around line 95-140) -->
+<tr data-item-id="{{ item.id }}">
+    <td>
+        <div class="d-flex align-items-center">
+            <div>
+                <strong>{{ item.product.name }}</strong>
+                {% if item.product.code %}
+                    <br><small class="text-muted">كود: {{ item.product.code }}</small>
+                {% endif %}
+            </div>
+        </div>
+    </td>
+    <td>{{ item.product.get_unit_display }}</td>
+    <td>
+        <span class="fw-bold">{{ item.quantity_ordered|floatformat:2 }}</span>
+    </td>
+    <td>
+        <span class="text-success">{{ item.quantity_received|floatformat:2 }}</span>
+    </td>
+    <td>
+        <span class="badge bg-warning text-dark pending-qty">{{ item.quantity_pending|floatformat:2 }}</span>
+    </td>
+    <td>
+        <div class="input-group input-group-sm">
+            <input type="number" 
+                   name="item_{{ item.id }}_quantity" 
+                   class="form-control receive-qty" 
+                   step="0.01" 
+                   min="0" 
+                   max="{{ item.quantity_pending|floatformat:2 }}"
+                   data-max="{{ item.quantity_pending|floatformat:2 }}"
+                   data-item-id="{{ item.id }}"
+                   placeholder="0.00"
+                   lang="en">
+            <button class="btn btn-outline-secondary" type="button" onclick="fillMaxQuantity({{ item.id }})">
+                <i class="fas fa-arrow-up"></i>
+            </button>
+        </div>
+        <small class="text-muted">الحد الأقصى: {{ item.quantity_pending|floatformat:2 }}</small>
+    </td>
+    <td>
+        <input type="text" 
+               name="item_{{ item.id }}_notes" 
+               class="form-control form-control-sm" 
+               placeholder="ملاحظات اختيارية">
+    </td>
+</tr>
+
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                        <h5>تم استلام جميع العناصر</h5>
+                        <p class="text-muted">لا توجد عناصر متبقية للاستلام في هذا الأمر</p>
+                        <a href="{% url 'suppliers:purchase_order_detail' purchase_order.pk %}" class="btn btn-primary">
+                            <i class="fas fa-arrow-left me-1"></i>العودة لتفاصيل الأمر
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if items %}
+            <!-- Summary -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-calculator me-2"></i>ملخص الاستلام</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h6 class="text-muted mb-1">إجمالي العناصر</h6>
+                                <h4 class="mb-0 text-primary">{{ items|length }}</h4>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h6 class="text-muted mb-1">العناصر المحددة</h6>
+                                <h4 class="mb-0 text-info" id="selected-items">0</h4>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h6 class="text-muted mb-1">إجمالي الكمية</h6>
+                                <h4 class="mb-0 text-success" id="total-quantity">0.00</h4>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h6 class="text-muted mb-1">نسبة الإكمال</h6>
+                                <h4 class="mb-0 text-warning" id="completion-rate">0%</h4>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <div class="progress">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: 0%" id="progress-bar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'suppliers:purchase_order_detail' purchase_order.pk %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>إلغاء
+                </a>
+                <div>
+                    <button type="button" class="btn btn-outline-primary me-2" onclick="previewReceive()">
+                        <i class="fas fa-eye me-1"></i>معاينة
+                    </button>
+                    <button type="submit" class="btn btn-success" id="submit-btn">
+                        <i class="fas fa-check me-1"></i>تأكيد الاستلام
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">معاينة الاستلام</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="preview-content">
+                    <!-- Preview content will be populated by JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                <button type="button" class="btn btn-success" onclick="confirmReceive()">
+                    <i class="fas fa-check me-1"></i>تأكيد الاستلام
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include Toast Container -->
+{% include 'partials/toast.html' %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize calculations
+    updateSummary();
+    
+    // Handle quantity input changes
+    $('.receive-qty').on('input', function() {
+        validateQuantity($(this));
+        updateSummary();
+    });
+    
+    // Handle form submission
+    $('#receiveForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        if (validateForm()) {
+            submitReceive();
+        }
+    });
+    
+    // Set default date to today
+    $('input[name="received_date"]').val(new Date().toISOString().split('T')[0]);
+});
+
+// Fix number parsing for different locales
+// Replace the parseNumber function completely (around line 185)
+function parseNumber(value) {
+    if (typeof value === 'string') {
+        // Remove any spaces first
+        value = value.trim();
+        
+        // If the string contains comma as decimal separator (like 50,00)
+        // and no dots, then it's a decimal comma
+        if (value.includes(',') && !value.includes('.')) {
+            // Replace comma with dot for decimal
+            value = value.replace(',', '.');
+        }
+        // If it contains both comma and dot, assume comma is thousands separator
+        else if (value.includes(',') && value.includes('.')) {
+            // Remove comma (thousands separator) and keep dot (decimal)
+            value = value.replace(/,/g, '');
+        }
+        
+        return parseFloat(value) || 0;
+    }
+    return parseFloat(value) || 0;
+}
+
+// Replace the formatNumber function
+function formatNumber(value) {
+    const num = parseNumber(value);
+    return num.toFixed(2);
+}
+
+function validateQuantity(input) {
+    const value = parseNumber(input.val());
+    const max = parseNumber(input.data('max'));
+    const itemId = input.data('item-id');
+    
+    // Remove previous validation classes
+    input.removeClass('is-valid is-invalid');
+
+    if (value < 0) {
+        input.addClass('is-invalid');
+        input.siblings('.invalid-feedback').remove();
+        input.after('<div class="invalid-feedback">الكمية لا يمكن أن تكون سالبة</div>');
+        return false;
+    } else if (value > max) {
+        input.addClass('is-invalid');
+        input.siblings('.invalid-feedback').remove();
+        input.after('<div class="invalid-feedback">الكمية تتجاوز الحد المسموح (' + formatNumber(max) + ')</div>');
+        return false;
+    } else if (value > 0) {
+        input.addClass('is-valid');
+        input.siblings('.invalid-feedback').remove();
+        return true;
+    } else {
+        input.siblings('.invalid-feedback').remove();
+        return true;
+    }
+}
+
+function updateSummary() {
+    let selectedItems = 0;
+    let totalQuantity = 0;
+    let totalPossible = 0;
+    
+    $('.receive-qty').each(function() {
+        const value = parseNumber($(this).val());
+        const max = parseNumber($(this).data('max'));
+        
+        totalPossible += max;
+        
+        if (value > 0) {
+            selectedItems++;
+            totalQuantity += value;
+        }
+    });
+    
+    // Update summary display
+    $('#selected-items').text(selectedItems);
+    $('#total-quantity').text(formatNumber(totalQuantity));
+    
+    // Calculate completion rate
+    const completionRate = totalPossible > 0 ? (totalQuantity / totalPossible * 100) : 0;
+    $('#completion-rate').text(Math.round(completionRate) + '%');
+    $('#progress-bar').css('width', completionRate + '%');
+    
+    // Update submit button state
+    const submitBtn = $('#submit-btn');
+    if (selectedItems > 0) {
+        submitBtn.prop('disabled', false).removeClass('btn-secondary').addClass('btn-success');
+    } else {
+        submitBtn.prop('disabled', true).removeClass('btn-success').addClass('btn-secondary');
+    }
+}
+// Replace the fillMaxQuantity function (around line 268)
+function fillMaxQuantity(itemId) {
+    const input = $(`input[name="item_${itemId}_quantity"]`);
+    const maxStr = input.attr('max'); // Get the max attribute as string
+    const max = parseNumber(maxStr);
+    input.val(max.toFixed(2)).trigger('input');
+    input.addClass('changed');
+    setTimeout(() => input.removeClass('changed'), 1000);
+}
+
+// Replace the fillAllQuantities function (around line 275)
+function fillAllQuantities() {
+    $('.receive-qty').each(function() {
+        const maxStr = $(this).attr('max'); // Get the max attribute as string
+        const max = parseNumber(maxStr);
+        $(this).val(max.toFixed(2)).trigger('input');
+        $(this).addClass('changed');
+    });
+    setTimeout(() => $('.receive-qty').removeClass('changed'), 1000);
+    showSuccessToast('تم ملء جميع الكميات بالحد الأقصى');
+}
+
+function clearAllQuantities() {
+    $('.receive-qty').val('').trigger('input');
+    showInfoToast('تم مسح جميع الكميات');
+}
+
+function validateForm() {
+    let isValid = true;
+    let hasItems = false;
+    
+    // Check if warehouse is selected
+    if (!$('select[name="warehouse"]').val()) {
+        showErrorToast('يرجى اختيار المخزن');
+        $('select[name="warehouse"]').focus();
+        return false;
+    }
+    
+    // Check if date is selected
+    if (!$('input[name="received_date"]').val()) {
+        showErrorToast('يرجى اختيار تاريخ الاستلام');
+        $('input[name="received_date"]').focus();
+        return false;
+    }
+    
+    // Validate all quantities
+    $('.receive-qty').each(function() {
+        const value = parseNumber($(this).val());
+        
+        if (value > 0) {
+            hasItems = true;
+            if (!validateQuantity($(this))) {
+                isValid = false;
+            }
+        }
+    });
+    
+    if (!hasItems) {
+        showErrorToast('يجب استلام عنصر واحد على الأقل');
+        return false;
+    }
+    
+    if (!isValid) {
+        showErrorToast('يرجى تصحيح الأخطاء في الكميات');
+        return false;
+    }
+    
+    return true;
+}
+
+function previewReceive() {
+    if (!validateForm()) {
+        return;
+    }
+    
+    generatePreview();
+    $('#previewModal').modal('show');
+}
+
+function generatePreview() {
+    const warehouse = $('select[name="warehouse"] option:selected').text();
+    const receivedDate = $('input[name="received_date"]').val();
+    const notes = $('textarea[name="delivery_notes"]').val();
+    
+    let previewHtml = `
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <p><strong>المخزن:</strong> ${warehouse}</p>
+                <p><strong>تاريخ الاستلام:</strong> ${receivedDate}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>الملاحظات:</strong> ${notes || 'لا توجد ملاحظات'}</p>
+            </div>
+        </div>
+        
+        <h6>العناصر المستلمة:</h6>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>المنتج</th>
+                        <th>الكمية المستلمة</th>
+                        <th>ملاحظات</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    let totalItems = 0;
+    $('.receive-qty').each(function() {
+        const value = parseNumber($(this).val());
+        if (value > 0) {
+            const itemId = $(this).data('item-id');
+            const productName = $(this).closest('tr').find('td:first strong').text();
+            const itemNotes = $(`input[name="item_${itemId}_notes"]`).val() || 'لا توجد ملاحظات';
+            
+            previewHtml += `
+                <tr>
+                    <td>${productName}</td>
+                    <td>${formatNumber(value)}</td>
+                    <td>${itemNotes}</td>
+                </tr>
+            `;
+            totalItems++;
+        }
+    });
+    
+    previewHtml += `
+                </tbody>
+            </table>
+        </div>
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            سيتم استلام <strong>${totalItems}</strong> عنصر وإضافتها للمخزون المحدد.
+        </div>
+    `;
+    
+    $('#preview-content').html(previewHtml);
+}
+
+function confirmReceive() {
+    $('#previewModal').modal('hide');
+    submitReceive();
+}
+
+function submitReceive() {
+    const submitBtn = $('#submit-btn');
+    const originalText = submitBtn.html();
+    
+    // Show loading state
+    submitBtn.prop('disabled', true)
+             .html('<i class="fas fa-spinner fa-spin me-1"></i>جاري الاستلام...')
+             .addClass('loading');
+    
+    // Prepare form data - normalize numbers
+    const formData = new FormData();
+    
+    // Add CSRF token
+    formData.append('csrfmiddlewaretoken', $('[name=csrfmiddlewaretoken]').val());
+    
+    // Add basic fields
+    formData.append('received_date', $('input[name="received_date"]').val());
+    formData.append('warehouse', $('select[name="warehouse"]').val());
+    formData.append('delivery_notes', $('textarea[name="delivery_notes"]').val());
+    
+    // Add item quantities with proper number formatting
+    $('.receive-qty').each(function() {
+        const value = parseNumber($(this).val());
+        if (value > 0) {
+            const itemId = $(this).data('item-id');
+            // Convert to string with dot as decimal separator
+            formData.append(`item_${itemId}_quantity`, value.toFixed(2));
+            
+            const notes = $(`input[name="item_${itemId}_notes"]`).val();
+            if (notes) {
+                formData.append(`item_${itemId}_notes`, notes);
+            }
+        }
+    });
+    
+    // Rest of the function remains the same...
+    $.ajax({
+        url: window.location.href,
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            if (response.success) {
+                showSuccessToast('تم استلام الأمر بنجاح وإضافته للمخزون');
+                setTimeout(function() {
+                    window.location.href = response.redirect_url || 
+                        `/suppliers/purchase-orders/{{ purchase_order.pk }}/`;
+                }, 2000);
+            } else {
+                showErrorToast(response.error || 'حدث خطأ أثناء الاستلام');
+                resetSubmitButton();
+            }
+        },
+        error: function(xhr) {
+            let errorMessage = 'حدث خطأ في الاتصال';
+            
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                errorMessage = xhr.responseJSON.error;
+            } else if (xhr.status === 400) {
+                errorMessage = 'بيانات غير صحيحة';
+            } else if (xhr.status === 403) {
+                errorMessage = 'غير مصرح لك بهذا الإجراء';
+            } else if (xhr.status === 404) {
+                errorMessage = 'الأمر غير موجود';
+            }
+            
+            showErrorToast(errorMessage);
+            resetSubmitButton();
+        }
+    });
+    
+    function resetSubmitButton() {
+        submitBtn.prop('disabled', false)
+                 .html(originalText)
+                 .removeClass('loading');
+    }
+}
+// Keyboard shortcuts
+$(document).keydown(function(e) {
+    // Ctrl + Enter to submit
+    if (e.ctrlKey && e.keyCode === 13) {
+        e.preventDefault();
+        if (validateForm()) {
+            submitReceive();
+        }
+    }
+    
+    // Escape to cancel
+    if (e.keyCode === 27) {
+        if ($('#previewModal').hasClass('show')) {
+            $('#previewModal').modal('hide');
+        } else {
+            window.location.href = `/suppliers/purchase-orders/{{ purchase_order.pk }}/`;
+        }
+    }
+});
+
+// Auto-save draft (optional feature)
+let autoSaveTimer;
+$('.receive-qty, textarea[name="delivery_notes"]').on('input', function() {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(function() {
+        // Auto-save functionality can be implemented here
+        console.log('Auto-saving draft...');
+    }, 5000);
+});
+
+// Warn before leaving if there are unsaved changes
+let hasUnsavedChanges = false;
+$('.receive-qty, textarea[name="delivery_notes"], select[name="warehouse"]').on('change', function() {
+    hasUnsavedChanges = true;
+});
+
+$(window).on('beforeunload', function(e) {
+    if (hasUnsavedChanges) {
+        const message = 'لديك تغييرات غير محفوظة. هل أنت متأكد من المغادرة؟';
+        e.returnValue = message;
+        return message;
+    }
+});
+
+// Remove warning when form is submitted
+$('#receiveForm').on('submit', function() {
+    hasUnsavedChanges = false;
+});
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Form styling */
+.form-control:focus, .form-select:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.form-control.is-valid {
+    border-color: #198754;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='m2.3 6.73.94-.94 1.44 1.44L7.4 4.5l-.94-.94L4.88 5.12z'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right calc(0.375em + 0.1875rem) center;
+    background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+}
+
+.form-control.is-invalid {
+    border-color: #dc3545;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath d='m5.8 4.6 1.4 1.4M7.2 4.6l-1.4 1.4'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right calc(0.375em + 0.1875rem) center;
+    background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+}
+
+/* Animation for quantity changes */
+@keyframes quantityChange {
+    0% { background-color: #d1ecf1; }
+    100% { background-color: transparent; }
+}
+
+.receive-qty.changed {
+    animation: quantityChange 1s ease-out;
+}
+
+/* Table styling */
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.075);
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    background-color: #f8f9fa;
+}
+
+/* Input group styling */
+.input-group-sm .form-control {
+    font-size: 0.875rem;
+}
+
+.input-group-sm .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+/* Progress bar */
+.progress {
+    height: 10px;
+    border-radius: 5px;
+}
+
+.progress-bar {
+    transition: width 0.6s ease;
+}
+
+/* Badge styling */
+.badge {
+    font-size: 0.75em;
+}
+
+/* Button loading state */
+.btn.loading {
+    pointer-events: none;
+    opacity: 0.8;
+}
+
+/* Modal styling */
+.modal-content {
+    border-radius: 0.5rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+    border-bottom: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+}
+
+.modal-footer {
+    border-top: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+}
+
+/* Card styling */
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    transition: box-shadow 0.3s ease;
+}
+
+/* Summary cards */
+.text-center h4 {
+    font-weight: 700;
+}
+
+.text-center h6 {
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .input-group-sm .form-control {
+        font-size: 0.8rem;
+    }
+    
+    .btn-group .btn {
+        padding: 0.375rem 0.5rem;
+        font-size: 0.875rem;
+    }
+    
+    .card-body {
+        padding: 1rem 0.75rem;
+    }
+    
+    .d-flex.justify-content-between {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .d-flex.justify-content-between > div {
+        width: 100%;
+        text-align: center;
+    }
+}
+
+/* Validation feedback */
+.invalid-feedback {
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    font-size: 0.875em;
+    color: #dc3545;
+}
+
+.valid-feedback {
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    font-size: 0.875em;
+    color: #198754;
+}
+
+/* Alert styling */
+.alert {
+    border: none;
+    border-radius: 0.5rem;
+}
+
+.alert-info {
+    background-color: #cff4fc;
+    color: #055160;
+}
+
+/* Custom scrollbar */
+.table-responsive::-webkit-scrollbar {
+    height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,460 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block production_title %}{% if form.instance.pk %}تعديل عملية قص{% else %}إضافة عملية قص جديدة{% endif %}{% endblock %}
+
+{% block production_extra_css %}
+<style>
+    /* Styles for the interactive size selector */
+    #available-sizes-container .size-selector-btn { cursor: pointer; }
+    #selected-sizes-container .size-tag {
+        display: inline-flex; align-items: center; background-color: var(--production-primary);
+        color: white; padding: 0.25rem 0.75rem; border-radius: 20px;
+        font-size: 0.9rem; margin: 2px;
+    }
+    #selected-sizes-container .remove-size-btn {
+        margin-right: 0.5rem; margin-left: -0.25rem; cursor: pointer;
+        opacity: 0.7; transition: opacity 0.2s;
+    }
+    #selected-sizes-container .remove-size-btn:hover { opacity: 1; }
+    /* Styles for the new Garment Draw preview */
+    .draw-preview-accordion .accordion-button { font-weight: 500; }
+    .draw-preview-accordion .list-group-item { border-right: 3px solid var(--production-info); }
+
+    /* Style for calculated output fields */
+    .calculated-output {
+        background-color: #e9ecef;
+        font-weight: bold;
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block production_content %}
+<form method="post" class="needs-validation" id="cutting-form" novalidate>
+    {% csrf_token %}
+    <div class="row">
+        <!-- Main Details Column -->
+        <div class="col-lg-8">
+            <div class="production-card">
+                <div class="production-card-body">
+                    <!-- Section 1: Main Process Details -->
+                    <h4 class="mb-3">البيانات الأساسية</h4>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="{{ form.production_order.id_for_label }}" class="form-label">أمر الإنتاج</label>
+                            {% if form.instance.pk %}
+                                {% render_field form.production_order class="form-select" disabled="disabled" %}
+                                <input type="hidden" name="production_order" value="{{ form.instance.production_order.pk }}">
+                            {% else %}
+                                {% render_field form.production_order class="form-select" required=True id="id_production_order" %}
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="{{ form.cutter.id_for_label }}" class="form-label">القاص</label>
+                            {% render_field form.cutter class="form-select" required=True %}
+                        </div>
+                        <div class="col-12">
+                            <label for="{{ form.cutting_date.id_for_label }}" class="form-label">تاريخ ووقت القص</label>
+                            {% render_field form.cutting_date class="form-control" required=True %}
+                        </div>
+                    </div>
+                    
+                    <!-- Section 2: Interactive Marker Details -->
+                    <hr class="my-4">
+                    <h4 class="mb-3">تفاصيل الرسمة (Marker)</h4>
+                    <div class="mb-3">
+                        <label class="form-label">المقاسات المتاحة للمنتج (انقر للإضافة):</label>
+                        <div id="available-sizes-container" class="d-flex flex-wrap gap-2">
+                            {% if available_sizes %}{% for size in available_sizes %}<button type="button" class="btn btn-sm btn-outline-primary size-selector-btn" data-size="{{ size }}">{{ size }}</button>{% endfor %}{% else %}<small class="text-muted">اختر أمر إنتاج لعرض المقاسات المتاحة.</small>{% endif %}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">مقاسات الرسمة المحددة:</label>
+                        <div id="selected-sizes-container" class="p-3 border rounded min-vh-10 d-flex flex-wrap gap-2 align-items-center bg-white"></div>
+                        <input type="hidden" id="marker_sizes" name="marker_sizes" value="{{ marker_sizes_str|default:'' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">المنتجات لكل طبقة (محسوب):</label>
+                        <input type="text" id="marker-pieces-per-layer" class="form-control-plaintext fs-5 fw-bold" readonly>
+                    </div>
+
+                    <!-- Single Layer Calculator Widget -->
+                    <hr class="my-4">
+                    <h4 class="mb-3">حساب ميتراج الطبقة الواحدة</h4>
+                     <div class="card bg-light mb-4">
+                        <div class="card-body">
+                            <div class="row g-3 align-items-center">
+                                <div class="col-md-3">
+                                    <label for="{{ form.single_layer_pieces.id_for_label }}" class="form-label">عدد القطع في الطبقة</label>
+                                    {% render_field form.single_layer_pieces class="form-control" id="single-layer-pieces-input" %}
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="{{ form.single_layer_fabric_length.id_for_label }}" class="form-label">طول الفرشة (متر)</label>
+                                    {% render_field form.single_layer_fabric_length class="form-control" step="0.01" id="single-layer-length-input" %}
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="{{ form.single_layer_width.id_for_label }}" class="form-label">عرض الفرشة (متر)</label>
+                                    {% render_field form.single_layer_width class="form-control" step="0.01" required=True %}
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="{{ form.single_layer_meterage.id_for_label }}" class="form-label">ميتراج القطعة المحسوب</label>
+                                    {% render_field form.single_layer_meterage class="form-control calculated-output" readonly=True id="single-layer-output" %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <!-- Section 3: Cutting Tables (Farshat) -->
+                    <h4 class="mb-3">جداول القص (الفرشات)</h4>
+                    {{ cutting_table_formset.management_form }}
+                    <div class="table-responsive">
+                        <table class="table production-table" id="cutting-tables-table">
+                            <thead>
+                                <tr>
+                                    <th>طول الثوب (متر)</th>
+                                    <th>عدد الطبقات</th>
+                                    <th>المنتجات لكل طبقة</th>
+                                    <th>ملاحظات</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="cutting-tables-body">
+                                {% for table_form in cutting_table_formset %}
+                                <tr class="cutting-table-form">
+                                    {{ table_form.id }}
+                                    <td>{% render_field table_form.fabric_length class+="form-control calculation-input" placeholder="e.g., 12.5" required=True %}</td>
+                                    <td>{% render_field table_form.layers_count class+="form-control calculation-input" placeholder="e.g., 150" required=True %}</td>
+                                    <td>{% render_field table_form.pieces_per_layer class+="form-control calculation-input pieces-per-layer-input calculated-output" readonly=True %}</td>
+                                    <td>{% render_field table_form.notes class+="form-control" %}</td>
+                                    <td>
+                                        {% if table_form.instance.pk %}
+                                            <label class="form-check-label small" for="{{ table_form.DELETE.id_for_label }}">حذف؟</label>
+                                            {% render_field table_form.DELETE class+="form-check-input delete-checkbox" %}
+                                        {% else %}
+                                            <button type="button" class="btn btn-sm btn-outline-danger remove-table-form"><i class="fas fa-trash"></i></button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-success mt-2" id="add-table-form"><i class="fas fa-plus me-1"></i> إضافة فرشة أخرى</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Garment Draw Reference Column -->
+        <div class="col-lg-4">
+            <div class="production-card">
+                <div class="production-card-header d-flex justify-content-between align-items-center">
+                    <span>
+                        <i class="fas fa-book-open me-2"></i>
+                        مرجع قطع الرسمة
+                    </span>
+                    <a id="add-draw-link" href="javascript:void(0);" class="btn btn-sm btn-outline-success disabled" target="_blank" title="يجب اختيار أمر إنتاج أولاً">
+                        <i class="fas fa-plus"></i> إضافة رسمة
+                    </a>
+                </div>
+                <div class="production-card-body">
+                    <div id="draw-pieces-preview" class="accordion draw-preview-accordion">
+                        <div class="text-center p-3 text-muted">
+                            <i class="fas fa-info-circle fa-2x mb-2"></i>
+                            <p>اختر أمر إنتاج لعرض تفاصيل رسومات القص المرتبطة به هنا.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Section -->
+    <div class="production-card mt-4">
+        <div class="production-card-body">
+            <!-- Totals and Notes -->
+            <h4 class="mb-3">الإجماليات والملاحظات</h4>
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3"><label class="form-label fw-bold">إجمالي القماش المستخدم (متر)</label><input type="text" id="total-fabric-used" class="form-control-plaintext fs-5" readonly></div>
+                <div class="col-md-3"><label class="form-label fw-bold">إجمالي المنتجات المقصوصة</label><input type="text" id="total-pieces-cut" class="form-control-plaintext fs-5" readonly></div>
+                <div class="col-md-3"><label for="{{ form.fabric_waste.id_for_label }}" class="form-label fw-bold">الهدر المحسوب (متر)</label>{% render_field form.fabric_waste class="form-control calculated-output" readonly=True %}</div>
+                <div class="col-md-3"><label for="{{ form.notes.id_for_label }}" class="form-label">ملاحظات عامة</label>{% render_field form.notes class="form-control" rows="1" %}</div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="mt-4 pt-3 border-top">
+                <button type="submit" class="btn btn-production"><i class="fas fa-save me-2"></i> حفظ التغييرات</button>
+                <a href="{% if form.instance.pk %}{% url 'production:cutting_detail' form.instance.pk %}{% else %}{% url 'production:cutting_list' %}{% endif %}" class="btn btn-secondary"><i class="fas fa-times me-2"></i> إلغاء</a>
+            </div>
+        </div>
+    </div>
+</form>
+
+<template id="cutting-table-template">
+    <tr class="cutting-table-form">
+        {{ cutting_table_formset.empty_form.id }}
+        <td>{% render_field cutting_table_formset.empty_form.fabric_length class+="form-control calculation-input" placeholder="e.g., 12.5" required=True %}</td>
+        <td>{% render_field cutting_table_formset.empty_form.layers_count class+="form-control calculation-input" placeholder="e.g., 150" required=True %}</td>
+        <td>{% render_field cutting_table_formset.empty_form.pieces_per_layer class+="form-control calculation-input pieces-per-layer-input calculated-output" readonly=True %}</td>
+        <td>{% render_field cutting_table_formset.empty_form.notes class+="form-control" %}</td>
+        <td><button type="button" class="btn btn-sm btn-danger remove-table-form"><i class="fas fa-trash"></i></button></td>
+    </tr>
+</template>
+{% endblock %}
+
+{% block production_extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // --- Element Selectors ---
+    const productionOrderSelect = document.getElementById('id_production_order');
+    const availableSizesContainer = document.getElementById('available-sizes-container');
+    const selectedSizesContainer = document.getElementById('selected-sizes-container');
+    const hiddenMarkerInput = document.getElementById('marker_sizes');
+    const markerPiecesDisplay = document.getElementById('marker-pieces-per-layer');
+    const tableBody = document.getElementById('cutting-tables-body');
+    const addTableButton = document.getElementById('add-table-form');
+    const tableTemplate = document.getElementById('cutting-table-template');
+    const totalTableFormsInput = document.querySelector(`input[name="tables-TOTAL_FORMS"]`);
+    const drawPiecesPreview = document.getElementById('draw-pieces-preview');
+    const addDrawLink = document.getElementById('add-draw-link');
+
+    const singleLayerPiecesInput = document.getElementById('single-layer-pieces-input');
+    const singleLayerLengthInput = document.getElementById('single-layer-length-input');
+    const singleLayerOutput = document.getElementById('single-layer-output');
+
+    // New selector for the waste field
+    const fabricWasteInput = document.getElementById('id_fabric_waste');
+
+
+    // --- Marker and Size Management ---
+    function updateHiddenInput() {
+        if (!selectedSizesContainer || !hiddenMarkerInput) return;
+        const selectedSizes = Array.from(selectedSizesContainer.querySelectorAll('.size-tag')).map(tag => tag.dataset.size);
+        hiddenMarkerInput.value = selectedSizes.join(',');
+        updateMarkerPieces();
+    }
+    
+    function addSizeToMarker(size) {
+        if (selectedSizesContainer) {
+            const tag = document.createElement('span');
+            tag.className = 'size-tag';
+            tag.dataset.size = size;
+            tag.innerHTML = `${size} <i class="fas fa-times remove-size-btn"></i>`;
+            selectedSizesContainer.appendChild(tag);
+            updateHiddenInput();
+        }
+    }
+
+    function initializeMarker() {
+        if (hiddenMarkerInput && hiddenMarkerInput.value) {
+            const initialSizes = hiddenMarkerInput.value.split(',').filter(Boolean);
+            if(selectedSizesContainer) selectedSizesContainer.innerHTML = '';
+            initialSizes.forEach(addSizeToMarker);
+        }
+    }
+    
+    // --- Calculations ---
+    function updateMarkerPieces() {
+        const piecesCount = hiddenMarkerInput ? (hiddenMarkerInput.value.split(',').filter(Boolean).length) : 0;
+        if (markerPiecesDisplay) markerPiecesDisplay.value = piecesCount;
+        document.querySelectorAll('.pieces-per-layer-input').forEach(input => {
+            if (input) input.value = piecesCount;
+        });
+        if (singleLayerPiecesInput) {
+            singleLayerPiecesInput.value = piecesCount;
+        }
+        updateAllCalculations();
+    }
+
+    function calculateSingleLayerMeterage() {
+        if (!singleLayerPiecesInput || !singleLayerLengthInput || !singleLayerOutput) return;
+        const pieces = parseFloat(singleLayerPiecesInput.value) || 0;
+        const length = parseFloat(singleLayerLengthInput.value) || 0;
+        let result = 0;
+        if (length > 0) {
+            result = pieces / length;
+        }
+        singleLayerOutput.value = result.toFixed(3);
+        updateWasteCalculation(); // Update waste whenever meterage changes
+    }
+
+    function updateWasteCalculation() {
+        if (!fabricWasteInput) return;
+        
+        const totalFabric = parseFloat(document.getElementById('total-fabric-used').value) || 0;
+        const totalPieces = parseFloat(document.getElementById('total-pieces-cut').value) || 0;
+        const meterage = parseFloat(singleLayerOutput.value) || 0;
+
+        let waste = 0;
+        if (totalFabric > 0 && totalPieces > 0 && meterage > 0) {
+            const needed = meterage * totalPieces;
+            waste = totalFabric - needed;
+        }
+        
+        fabricWasteInput.value = waste.toFixed(2);
+    }
+
+    function updateAllCalculations() {
+        let totalFabric = 0;
+        let totalPieces = 0;
+        if (!tableBody) return;
+
+        tableBody.querySelectorAll('.cutting-table-form').forEach(formRow => {
+            const delCheckbox = formRow.querySelector(`input[name$="-DELETE"]`);
+            if (delCheckbox && delCheckbox.checked) return;
+
+            const fabricLengthInput = formRow.querySelector(`[name$="-fabric_length"]`);
+            const layersCountInput = formRow.querySelector(`[name$="-layers_count"]`);
+            const piecesPerLayerInput = formRow.querySelector(`[name$="-pieces_per_layer"]`);
+            
+            if (fabricLengthInput && layersCountInput && piecesPerLayerInput) {
+                const fabricLength = parseFloat(fabricLengthInput.value) || 0;
+                const layersCount = parseInt(layersCountInput.value) || 0;
+                const piecesPerLayer = parseInt(piecesPerLayerInput.value) || 0;
+
+                totalFabric += fabricLength;
+                totalPieces += layersCount * piecesPerLayer;
+            }
+        });
+
+        document.getElementById('total-fabric-used').value = totalFabric.toFixed(2);
+        document.getElementById('total-pieces-cut').value = totalPieces;
+        
+        updateWasteCalculation(); // Update waste whenever main totals change
+    }
+
+    // --- Button State Management ---
+    function updateAddDrawLinkState(bomId) {
+        if (!addDrawLink) return;
+        if (bomId) {
+            let createUrl = "{% url 'production:draws:draw_create' %}";
+            addDrawLink.href = `${createUrl}?bom_id=${bomId}`;
+            addDrawLink.classList.remove('disabled');
+            addDrawLink.setAttribute('title', 'إضافة رسمة قص جديدة لهذا المنتج');
+        } else {
+            addDrawLink.href = 'javascript:void(0);';
+            addDrawLink.classList.add('disabled');
+            addDrawLink.setAttribute('title', 'أمر الإنتاج هذا غير مرتبط بقائمة مواد (BOM) أو لم يتم اختياره بعد');
+        }
+    }
+
+    // --- Event Listeners ---
+    if (availableSizesContainer) {
+        availableSizesContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('size-selector-btn')) addSizeToMarker(e.target.dataset.size);
+        });
+    }
+    if (selectedSizesContainer) {
+        selectedSizesContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-size-btn')) {
+                e.target.parentElement.remove();
+                updateHiddenInput();
+            }
+        });
+    }
+    
+    if (addTableButton) {
+        addTableButton.addEventListener('click', () => {
+            if (!totalTableFormsInput || !tableTemplate) return;
+            let formIndex = parseInt(totalTableFormsInput.value);
+            tableBody.insertAdjacentHTML('beforeend', tableTemplate.innerHTML.replace(/__prefix__/g, formIndex));
+            totalTableFormsInput.value = formIndex + 1;
+            updateMarkerPieces();
+        });
+    }
+    
+    if (tableBody) {
+        tableBody.addEventListener('click', (e) => {
+            if (e.target.closest('.remove-table-form')) {
+                e.target.closest('.cutting-table-form').remove();
+                updateAllCalculations();
+            } else if (e.target.matches('.delete-checkbox')) {
+                e.target.closest('.cutting-table-form').style.display = e.target.checked ? 'none' : '';
+                updateAllCalculations();
+            }
+        });
+        tableBody.addEventListener('input', (e) => {
+            if (e.target.classList.contains('calculation-input')) {
+                updateAllCalculations();
+            }
+        });
+    }
+
+    if (singleLayerPiecesInput || singleLayerLengthInput) {
+        [singleLayerPiecesInput, singleLayerLengthInput].forEach(input => {
+            if(input) input.addEventListener('input', calculateSingleLayerMeterage);
+        });
+    }
+
+    // --- AJAX and Data Fetching ---
+    function fetchAndDisplayDraws(orderId) {
+        if (!drawPiecesPreview) return;
+        fetch(`{% url 'production:ajax_get_draws_for_order' %}?order_id=${orderId}`)
+            .then(response => response.json())
+            .then(data => {
+                drawPiecesPreview.innerHTML = '';
+                if (data.draws && data.draws.length > 0) {
+                    data.draws.forEach((draw, index) => {
+                        let piecesHtml = '<ul class="list-group list-group-flush">';
+                        draw.pieces.forEach(piece => {
+                            piecesHtml += `<li class="list-group-item d-flex justify-content-between align-items-center">${piece.name} <span class="badge bg-secondary rounded-pill">${piece.quantity}</span></li>`;
+                        });
+                        piecesHtml += '</ul>';
+                        const itemHtml = `<div class="accordion-item"><h2 class="accordion-header" id="heading-${index}"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${index}">رسمة مقاس: ${draw.size}</button></h2><div id="collapse-${index}" class="accordion-collapse collapse" data-bs-parent="#draw-pieces-preview"><div class="accordion-body">${piecesHtml}</div></div></div>`;
+                        drawPiecesPreview.innerHTML += itemHtml;
+                    });
+                } else {
+                    drawPiecesPreview.innerHTML = '<div class="text-center p-3 text-muted">لا توجد رسومات قص معرفة لهذا المنتج.</div>';
+                }
+            });
+    }
+
+    function fetchOrderDetails(orderId) {
+        if (!orderId) {
+            updateAddDrawLinkState(null);
+            return;
+        }
+        fetch(`{% url 'production:get_order_details_ajax' %}?order_id=${orderId}`)
+            .then(response => response.ok ? response.json() : Promise.reject('Network error'))
+            .then(data => {
+                if (!data.error) {
+                    if (availableSizesContainer) {
+                        availableSizesContainer.innerHTML = '';
+                        if (data.size_group && data.size_group.sizes.length > 0) {
+                            data.size_group.sizes.forEach(size => {
+                                const btn = document.createElement('button');
+                                btn.type = 'button';
+                                btn.className = 'btn btn-sm btn-outline-primary size-selector-btn';
+                                btn.dataset.size = size;
+                                btn.textContent = size;
+                                availableSizesContainer.appendChild(btn);
+                            });
+                        } else {
+                            availableSizesContainer.innerHTML = '<small class="text-muted">لا توجد مقاسات محددة.</small>';
+                        }
+                    }
+                    fetchAndDisplayDraws(orderId);
+                    updateAddDrawLinkState(data.bom_version_id);
+                }
+            });
+    }
+    
+    // --- Initialization ---
+    if (productionOrderSelect) {
+        productionOrderSelect.addEventListener('change', (e) => fetchOrderDetails(e.target.value));
+        const initialOrderId = `{% if form.instance.pk %}{{ form.instance.production_order.pk }}{% endif %}`;
+        if(initialOrderId) {
+            fetchOrderDetails(initialOrderId);
+        } else if (productionOrderSelect.value) {
+            fetchOrderDetails(productionOrderSelect.value);
+        } else {
+            updateAddDrawLinkState(null);
+        }
+    }
+    initializeMarker();
+    updateAllCalculations();
+});
+</script>
+{% endblock %}

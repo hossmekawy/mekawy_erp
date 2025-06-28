@@ -1,0 +1,58 @@
+{% extends 'production/production_base.html' %}
+{% load i18n widget_tweaks %}
+
+{% block production_title %}{% block form_title %}{% endblock %}{% endblock %}
+
+{% block production_breadcrumb_items %}
+    {% block form_breadcrumb %}{% endblock %}
+{% endblock %}
+
+{% block production_page_title %}
+    {% block form_page_title %}{% endblock %}
+{% endblock %}
+
+{% block production_header_actions %}
+<div class="d-flex justify-content-end align-items-center gap-2">
+    <a href="{% block form_cancel_url %}{% endblock %}" class="btn btn-secondary">
+        <i class="fas fa-times me-2"></i> إلغاء
+    </a>
+    <button type="submit" form="main-form" class="btn btn-production">
+        <i class="fas fa-save me-2"></i> حفظ
+    </button>
+</div>
+{% endblock %}
+
+{% block production_content %}
+<form id="main-form" method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    
+    {# Display any non-field errors at the top of the form #}
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+            {% for error in form.non_field_errors %}
+                <p class="mb-0">{{ error }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="production-card">
+        <div class="production-card-header">
+             <i class="fas fa-edit me-2"></i>{% block form_card_header %}تفاصيل النموذج{% endblock %}
+        </div>
+        <div class="card-body">
+            {% block form_content %}{# Child templates will override this #}{% endblock %}
+        </div>
+        <div class="card-footer bg-light text-end">
+             <a href="{% block form_cancel_url %}{% endblock %}" class="btn btn-secondary">
+                <i class="fas fa-times me-2"></i> إلغاء
+            </a>
+            <button type="submit" form="main-form" class="btn btn-production">
+                <i class="fas fa-save me-2"></i> حفظ
+            </button>
+        </div>
+    </div>
+</form>
+
+{% block form_extra_content %}{% endblock %}
+
+{% endblock %}

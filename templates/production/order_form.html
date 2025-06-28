@@ -1,0 +1,529 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+
+{% block production_title %}
+    {% if object %}تعديل أمر الإنتاج{% else %}إنشاء أمر إنتاج جديد{% endif %}
+{% endblock %}
+
+{% block production_page_title %}
+    <i class="fas fa-plus-circle me-2"></i>
+    {% if object %}تعديل أمر الإنتاج: {{ object.order_number }}{% else %}إنشاء أمر إنتاج جديد{% endif %}
+{% endblock %}
+
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item">
+        <a href="{% url 'production:order_list' %}">أوامر الإنتاج</a>
+    </li>
+    <li class="breadcrumb-item active">
+        {% if object %}تعديل{% else %}إنشاء جديد{% endif %}
+    </li>
+{% endblock %}
+
+{% block production_extra_css %}
+<style>
+    .form-section {
+        background: white;
+        border-radius: 0.75rem;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+        margin-bottom: 2rem;
+        overflow: hidden;
+    }
+    .section-header {
+        background: #f8f9fa;
+        color: var(--production-dark);
+        padding: 1rem 1.25rem;
+        font-weight: 600;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .section-body {
+        padding: 1.5rem;
+    }
+    .form-control:disabled, .form-control[readonly] {
+        background-color: #e9ecef;
+        opacity: 1;
+        cursor: not-allowed;
+    }
+    #bom-requirements-container {
+        padding: 1.5rem;
+        background-color: #f8f9fa;
+        border-top: 1px solid #dee2e6;
+    }
+    .bom-item-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .bom-item-row:last-child {
+        border-bottom: none;
+    }
+    .bom-item-name {
+        font-weight: 500;
+    }
+    .status-badge {
+        padding: 0.3rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .status-badge.available {
+        background-color: var(--production-success-light, #d4edda);
+        color: var(--production-success-dark, #155724);
+    }
+    .status-badge.insufficient {
+        background-color: var(--production-danger-light, #f8d7da);
+        color: var(--production-danger-dark, #721c24);
+    }
+    .alert-bom {
+        background-color: #fff3cd;
+        border-color: #ffeeba;
+        color: #856404;
+    }
+    .generator-btn {
+        border-color: #ced4da;
+        transition: all 0.3s ease;
+    }
+    .generator-btn:hover {
+        background: linear-gradient(135deg, var(--production-primary), var(--production-info));
+        color: white;
+        border-color: var(--production-primary);
+        transform: scale(1.05);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+    .generator-btn i {
+        transition: transform 0.3s ease;
+    }
+    .generator-btn:hover i {
+        transform: rotate(20deg);
+    }
+    /* Checklist Widget Styles */
+    #submission-checklist {
+        list-style: none;
+        padding: 0;
+        margin-top: 1.5rem;
+        border-top: 1px solid #e9ecef;
+        padding-top: 1rem;
+    }
+    #submission-checklist li {
+        padding: 0.5rem 0;
+        font-weight: 500;
+        color: #6c757d;
+        transition: color 0.3s ease;
+    }
+    #submission-checklist li i {
+        margin-right: 0.75rem;
+        width: 20px;
+        text-align: center;
+        color: #dc3545; /* Red X by default */
+        transition: color 0.3s ease;
+    }
+    #submission-checklist li.completed {
+        color: #198754; /* Green check */
+    }
+    #submission-checklist li.completed i {
+        color: #198754;
+    }
+    /* Toast Styles */
+    .toast-container {
+        z-index: 1055;
+    }
+</style>
+{% endblock %}
+
+{% block production_content %}
+<form id="orderForm" method="post" class="needs-validation" novalidate>
+    {% csrf_token %}
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Main Order Details Section -->
+            <div class="form-section">
+                <div class="section-header">
+                    <i class="fas fa-info-circle me-2"></i>
+                    1. تحديد المنتج والكمية
+                </div>
+                <div class="section-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="id_product" class="form-label">المنتج النهائي</label>
+                            {{ form.product }}
+                            <div class="invalid-feedback">يجب اختيار منتج.</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="id_quantity_ordered" class="form-label">الكمية المطلوبة</label>
+                            {{ form.quantity_ordered }}
+                            <div class="invalid-feedback">يجب إدخال كمية صحيحة.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BOM Requirements Section -->
+            <div class="form-section">
+                <div class="section-header">
+                    <i class="fas fa-cogs me-2"></i>
+                    2. متطلبات المواد (BOM)
+                </div>
+                <div id="bom-requirements-container">
+                    <div id="bom-loader" style="display: none;" class="text-center">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                        <span class="ms-2">جاري حساب المتطلبات...</span>
+                    </div>
+                    <div id="bom-content">
+                        <div class="alert alert-info" id="bom-placeholder">
+                            <i class="fas fa-info-circle me-2"></i>
+                            الرجاء اختيار المنتج والكمية لعرض متطلبات المواد.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+             <!-- Hidden fields for automatic population -->
+             <div style="display:none;">
+                {{ form.textile_stock }}
+                {{ form.fabric_meters_allocated }}
+             </div>
+
+            <!-- Additional Info Section -->
+            <div class="form-section">
+                <div class="section-header">
+                    <i class="fas fa-file-alt me-2"></i>
+                    3. معلومات إضافية
+                </div>
+                 <div class="section-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="id_start_date" class="form-label">تاريخ البدء</label>
+                            {{ form.start_date }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="id_expected_completion_date" class="form-label">تاريخ الإنجاز المتوقع</label>
+                            {{ form.expected_completion_date }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                             <label for="id_priority" class="form-label">الأولوية</label>
+                            {{ form.priority }}
+                        </div>
+                         <div class="col-12 mb-3">
+                            <label for="id_notes" class="form-label">ملاحظات</label>
+                            {{ form.notes }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Order Summary & Actions Section -->
+            <div class="form-section">
+                <div class="section-header">
+                    <i class="fas fa-clipboard-check me-2"></i>
+                    ملخص وحفظ الأمر
+                </div>
+                <div class="section-body">
+                    <div class="mb-3">
+                        <label for="id_order_number" class="form-label">رقم الأمر</label>
+                        <div class="input-group">
+                            {{ form.order_number }}
+                            <button class="btn btn-outline-secondary generator-btn" type="button" id="generateOrderBtn" data-bs-toggle="tooltip" title="توليد رقم أمر فريد">
+                                <i class="fas fa-magic"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_batch_number" class="form-label">رقم الباتش</label>
+                         <div class="input-group">
+                            {{ form.batch_number }}
+                            <button class="btn btn-outline-secondary generator-btn" type="button" id="generateBatchBtn" data-bs-toggle="tooltip" title="توليد رقم باتش تلقائي">
+                                <i class="fas fa-wand-magic-sparkles"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Checklist Widget -->
+                    <ul id="submission-checklist">
+                        <li id="check-product"><i class="fas fa-times-circle"></i> اختيار المنتج</li>
+                        <li id="check-quantity"><i class="fas fa-times-circle"></i> إدخال الكمية</li>
+                        <li id="check-bom"><i class="fas fa-times-circle"></i> تحميل متطلبات المواد</li>
+                        <li id="check-stock"><i class="fas fa-times-circle"></i> توفر جميع المواد بالمخزون</li>
+                    </ul>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" id="submit-button" class="btn btn-production btn-lg" disabled>
+                            <i class="fas fa-save me-2"></i>
+                            {% if object %}حفظ التعديلات{% else %}إنشاء أمر الإنتاج{% endif %}
+                        </button>
+                        <a href="{% url 'production:order_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-times me-2"></i>
+                            إلغاء
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<!-- Toast Container from toast.html -->
+<div class="toast-container position-fixed top-0 end-0 p-3">
+    <!-- Success -->
+    <div id="successToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex"><div class="toast-body" id="successMessage"></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>
+    </div>
+    <!-- Error -->
+    <div id="errorToast" class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex"><div class="toast-body" id="errorMessage"></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>
+    </div>
+    <!-- Info -->
+    <div id="infoToast" class="toast align-items-center text-white bg-info border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex"><div class="toast-body" id="infoMessage"></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block production_extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+// --- Toast Notification Functions ---
+function showToast(type, message, duration = 5000) {
+    const toastElement = document.getElementById(type + 'Toast');
+    const messageElement = document.getElementById(type + 'Message');
+  
+    if (toastElement && messageElement) {
+        messageElement.textContent = message;
+        const toast = new bootstrap.Toast(toastElement, { delay: duration });
+        toast.show();
+    }
+}
+function showSuccessToast(message) { showToast('success', message); }
+function showErrorToast(message) { showToast('error', message); }
+function showInfoToast(message) { showToast('info', message); }
+
+$(document).ready(function() {
+    // --- Configuration ---
+    const productField = $('#id_product');
+    const quantityField = $('#id_quantity_ordered');
+    const bomContainer = $('#bom-content');
+    const bomLoader = $('#bom-loader');
+    const bomPlaceholder = $('#bom-placeholder');
+    const submitButton = $('#submit-button');
+    const textileStockField = $('#id_textile_stock');
+    const fabricMetersField = $('#id_fabric_meters_allocated');
+
+    // --- Initial State Setup ---
+    function initializeForm() {
+        $('#orderForm .form-control, #orderForm .form-select').each(function() {
+            if (!$(this).hasClass('form-control')) $(this).addClass('form-control');
+        });
+
+        // Use readonly instead of disabled to ensure value is submitted
+        textileStockField.prop('readonly', true).hide();
+        fabricMetersField.prop('readonly', true).hide();
+
+        if (productField.val() && quantityField.val()) {
+            fetchBOMRequirements();
+        } else {
+            updateChecklist();
+        }
+
+        if (typeof bootstrap !== 'undefined') {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl)
+            })
+        }
+    }
+
+    // --- Event Listeners ---
+    let debounceTimer;
+    productField.on('change', fetchBOMRequirements);
+    quantityField.on('input', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(fetchBOMRequirements, 500);
+    });
+    
+    $('#generateOrderBtn').on('click', generateOrderNumber);
+    $('#generateBatchBtn').on('click', generateBatchNumber);
+
+    // --- Core Logic ---
+    function fetchBOMRequirements() {
+        updateChecklist();
+        const productId = productField.val();
+        const quantity = parseInt(quantityField.val(), 10);
+
+        if (!productId || !quantity || quantity <= 0) {
+            bomContainer.html(bomPlaceholder.show());
+            bomLoader.hide();
+            resetChecklistItem('check-bom');
+            resetChecklistItem('check-stock');
+            updateSubmitButtonState();
+            return;
+        }
+
+        bomLoader.show();
+        bomContainer.empty();
+        
+        $.ajax({
+            url: "{% url 'production:calculate_fabric_requirement_ajax' %}",
+            data: { 'product_id': productId, 'quantity': quantity },
+            success: function(response) {
+                if (response.success) {
+                    renderBOMTable(response);
+                    const allAvailable = response.materials.every(m => m.is_available);
+                    updateChecklistItem('check-bom', true);
+                    updateChecklistItem('check-stock', allAvailable);
+                    if (!allAvailable) {
+                         bomContainer.append(`<div class="alert alert-danger mt-3"><i class="fas fa-exclamation-triangle me-2"></i><strong>مخزون غير كاف!</strong> لا يمكن إنشاء الأمر لأن بعض المواد المطلوبة غير متوفرة بالكميات الكافية.</div>`);
+                    }
+                } else {
+                    renderBomError(response.error);
+                    showErrorToast(response.error);
+                    resetChecklistItem('check-bom');
+                    resetChecklistItem('check-stock');
+                }
+            },
+            error: function() {
+                const errorMsg = "فشل تحميل متطلبات المواد. تحقق من الاتصال بالخادم.";
+                renderBomError(errorMsg);
+                showErrorToast(errorMsg);
+                resetChecklistItem('check-bom');
+                resetChecklistItem('check-stock');
+            },
+            complete: function() {
+                bomLoader.hide();
+                updateSubmitButtonState();
+            }
+        });
+    }
+
+    // --- UI Rendering & Helper Functions ---
+    function renderBOMTable(data) {
+        let bomHtml = `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                 <h6 class="mb-0">قائمة المواد المطلوبة (BOM v${data.bom_version})</h6>
+                 <a href="/production/bom/${data.bom_id}/" target="_blank" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-eye me-1"></i> عرض التفاصيل
+                 </a>
+            </div>
+            <div id="bom-items-list">
+        `;
+
+        data.materials.forEach(item => {
+            const statusClass = item.is_available ? 'available' : 'insufficient';
+            const statusText = item.is_available ? 'متوفر' : 'غير كاف';
+            const availableQuantityNum = parseFloat(item.available_quantity) || 0;
+            const requiredQuantityNum = parseFloat(item.required_quantity) || 0;
+            const availableText = item.is_available 
+                ? `(المتاح: ${availableQuantityNum.toFixed(2)} ${item.unit})` 
+                : `<strong class="text-danger">(المتاح: ${availableQuantityNum.toFixed(2)} ${item.unit})</strong>`;
+
+            bomHtml += `
+                <div class="bom-item-row">
+                    <div class="bom-item-name"><i class="fas fa-box-open me-2 text-muted"></i>${item.name}</div>
+                    <div class="d-flex align-items-center gap-3">
+                        <span>مطلوب: <strong>${requiredQuantityNum.toFixed(2)} ${item.unit}</strong></span>
+                        <small class="text-muted">${availableText}</small>
+                        <span class="status-badge ${statusClass}">${statusText}</span>
+                    </div>
+                </div>`;
+            
+            if (item.material_type === 'fabric' && item.textile_stock_id) {
+                fabricMetersField.val(requiredQuantityNum.toFixed(2));
+                textileStockField.val(item.textile_stock_id);
+            }
+        });
+        bomHtml += '</div>';
+        bomContainer.html(bomHtml);
+    }
+    
+    function renderBomError(errorMessage) {
+        bomContainer.html(`
+            <div class="alert alert-warning alert-bom">
+                <h5 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>خطأ في قائمة المواد</h5>
+                <p>${errorMessage}</p><hr>
+                <p class="mb-0">
+                    يرجى التأكد من وجود قائمة مواد (BOM) نشطة لهذا المنتج أو
+                    <a href="{% url 'production:bom_create' %}" class="alert-link">إنشاء واحدة جديدة</a>.
+                </p>
+            </div>`);
+    }
+
+    // --- Checklist and Validation Logic ---
+    function updateChecklist() {
+        updateChecklistItem('check-product', !!productField.val());
+        const quantity = parseInt(quantityField.val(), 10);
+        updateChecklistItem('check-quantity', quantity > 0);
+        updateSubmitButtonState();
+    }
+
+    function updateChecklistItem(id, isCompleted) {
+        const item = $(`#${id}`);
+        const icon = item.find('i');
+        if (isCompleted) {
+            item.addClass('completed');
+            icon.removeClass('fa-times-circle').addClass('fa-check-circle');
+        } else {
+            item.removeClass('completed');
+            icon.removeClass('fa-check-circle').addClass('fa-times-circle');
+        }
+    }
+
+    function resetChecklistItem(id) {
+        updateChecklistItem(id, false);
+    }
+    
+    function updateSubmitButtonState() {
+        const allCompleted = $('#submission-checklist li.completed').length === 4;
+        submitButton.prop('disabled', !allCompleted);
+    }
+
+    function generateOrderNumber() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = (now.getMonth() + 1).toString().padStart(2, '0');
+        const day = now.getDate().toString().padStart(2, '0');
+        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+        const orderNumber = `ORD-${year}${month}${day}-${randomSuffix}`;
+        const field = $('#id_order_number');
+        field.val(orderNumber).trigger('input');
+        showSuccessToast('تم توليد رقم أمر بنجاح.');
+    }
+
+    function generateBatchNumber() {
+        const productText = $('#id_product option:selected').text();
+        const productCodeMatch = productText.match(/\(([^)]+)\)/);
+        const productCode = productCodeMatch ? productCodeMatch[1] : 'PROD';
+        const now = new Date();
+        const year = now.getFullYear().toString().slice(-2);
+        const month = (now.getMonth() + 1).toString().padStart(2, '0');
+        const day = now.getDate().toString().padStart(2, '0');
+        const counter = Math.floor(1 + Math.random() * 99).toString().padStart(2, '0');
+        const batchNumber = `BATCH-${productCode.trim()}-${year}${month}${day}-${counter}`;
+        const field = $('#id_batch_number');
+        field.val(batchNumber).trigger('input');
+        showSuccessToast('تم توليد رقم باتش بنجاح.');
+    }
+    
+    (function () {
+        'use strict'
+        var forms = document.querySelectorAll('.needs-validation')
+        Array.prototype.slice.call(forms)
+            .forEach(function (form) {
+                form.addEventListener('submit', function (event) {
+                    if (!form.checkValidity()) {
+                        event.preventDefault()
+                        event.stopPropagation()
+                    }
+                    form.classList.add('was-validated')
+                }, false)
+            })
+    })()
+
+    initializeForm();
+});
+</script>
+{% endblock %}

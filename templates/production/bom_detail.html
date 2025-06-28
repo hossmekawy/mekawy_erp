@@ -1,0 +1,177 @@
+{% extends 'production/production_base.html' %}
+{% load i18n %}
+
+{% block production_title %}{% trans "تفاصيل قائمة المواد" %}{% endblock %}
+
+{% block production_breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'production:bom_list' %}">{% trans "قائمة المواد" %}</a></li>
+<li class="breadcrumb-item active" aria-current="page">
+    {{ bom.product.name }}
+    {% if bom.size_group %} - {{ bom.size_group.name }}{% endif %} (v{{ bom.version }})
+</li>
+{% endblock %}
+
+{% block production_header_actions %}
+<div class="d-flex justify-content-end align-items-center gap-2">
+    <!-- Export Dropdown -->
+    <div class="dropdown">
+        <button class="btn btn-secondary dropdown-toggle" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="fas fa-download me-2"></i> {% trans "تصدير" %}
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="exportDropdown">
+            <li><a class="dropdown-item" href="{% url 'production:bom_export_pdf' bom.id %}"><i class="fas fa-file-pdf me-2 text-danger"></i> {% trans "تصدير PDF" %}</a></li>
+            <li><a class="dropdown-item" href="{% url 'production:bom_export_excel' bom.id %}"><i class="fas fa-file-excel me-2 text-success"></i> {% trans "تصدير Excel" %}</a></li>
+            <li><a class="dropdown-item" href="{% url 'production:bom_export_csv' bom.id %}"><i class="fas fa-file-csv me-2 text-primary"></i> {% trans "تصدير CSV" %}</a></li>
+        </ul>
+    </div>
+
+    <a href="{% url 'production:bom_copy' bom.pk %}" class="btn btn-production-outline">
+        <i class="fas fa-copy me-2"></i> {% trans "نسخ إلى جديد" %}
+    </a>
+    <a href="{% url 'production:bom_update' bom.pk %}" class="btn btn-production">
+        <i class="fas fa-code-branch me-2"></i> {% trans "إنشاء إصدار جديد" %}
+    </a>
+    {% if not bom.is_active %}
+    <a href="{% url 'production:bom_delete' bom.pk %}" class="btn btn-danger">
+        <i class="fas fa-trash me-2"></i> {% trans "حذف الإصدار" %}
+    </a>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block production_content %}
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Main BOM Details Card -->
+        <div class="production-card">
+            <div class="production-card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="fas fa-receipt me-2"></i> 
+                    {% blocktrans with product_name=bom.product.name %}
+                    تفاصيل قائمة المواد لـ: <strong>{{ product_name }}</strong>
+                    {% endblocktrans %}
+                </div>
+                {% if bom.is_active %}
+                    <span class="badge bg-success"><i class="fas fa-check-circle me-1"></i> {% trans "الإصدار النشط" %}</span>
+                {% else %}
+                    <span class="badge bg-warning text-dark"><i class="fas fa-exclamation-triangle me-1"></i> {% trans "إصدار قديم" %}</span>
+                {% endif %}
+            </div>
+            <div class="production-card-body">
+                <!-- Basic Info Section -->
+                <dl class="row mb-4">
+                    <dt class="col-sm-3">{% trans "المنتج" %}</dt>
+                    <dd class="col-sm-9"><a href="{% url 'production:finished_product_detail' bom.product.pk %}">{{ bom.product.name }}</a></dd>
+
+                    <dt class="col-sm-3">{% trans "كود المنتج" %}</dt>
+                    <dd class="col-sm-9"><span class="badge bg-light text-dark">{{ bom.product.code }}</span></dd>
+
+                    <dt class="col-sm-3">{% trans "مجموعة المقاسات" %}</dt>
+                    <dd class="col-sm-9">
+                        {% if bom.size_group %}
+                            <span class="badge bg-primary">{{ bom.size_group.name }}</span>
+                        {% else %}
+                            <span class="text-muted">{% trans "غير محدد" %}</span>
+                        {% endif %}
+                    </dd>
+                    
+                    <dt class="col-sm-3">{% trans "الإصدار" %}</dt>
+                    <dd class="col-sm-9"><span class="badge bg-info">v{{ bom.version }}</span></dd>
+                </dl>
+                
+                <!-- Materials Table -->
+                <h5 class="mb-3">{% trans "عناصر المواد الخام" %}</h5>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>{% trans "المادة الخام" %}</th>
+                                <th class="text-end">{% trans "الكمية" %}</th>
+                                <th class="text-end">{% trans "تكلفة الوحدة" %}</th>
+                                <th class="text-end">{% trans "التكلفة الإجمالية" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in bom.items.all %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td>
+                                    {{ item.material.name }}
+                                    <small class="d-block text-muted">{{ item.material.code }}</small>
+                                </td>
+                                <td class="text-end">
+                                    {{ item.quantity|floatformat:3 }} 
+                                    <small class="text-muted">{% if item.material.unit_new %}{{ item.material.unit_new.symbol }}{% else %}{% trans "وحدة" %}{% endif %}</small>
+                                </td>
+                                <td class="text-end">{{ item.material.cost_price|floatformat:2 }} {% trans "جنيه" %}</td>
+                                <td class="text-end fw-bold">{{ item.cost|floatformat:2 }} {% trans "جنيه" %}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">{% trans "لا توجد مواد خام في هذه القائمة." %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-primary">
+                                <th colspan="4" class="text-start fs-5">{% trans "إجمالي تكلفة المواد" %}</th>
+                                <td class="text-end fw-bold fs-5">{{ bom.total_cost|floatformat:2 }} {% trans "جنيه" %}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- Notes Section - Redesigned -->
+                {% if bom.notes %}
+                <div class="mt-4">
+                    <h5 class="mb-3 border-bottom pb-2">
+                        <i class="fas fa-sticky-note me-2 text-primary"></i>{% trans "ملاحظات" %}
+                    </h5>
+                    <div class="bg-light p-3 rounded border">
+                        <p class="mb-0" style="white-space: pre-wrap;">{{ bom.notes }}</p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            <!-- Footer Section - Redesigned -->
+            <div class="production-card-footer text-muted d-flex justify-content-between align-items-center">
+                <small>
+                    <i class="fas fa-calendar-alt me-1"></i>
+                    {% trans "أنشئت في:" %} {{ bom.created_at|date:"d M Y, H:i" }}
+                </small>
+                <small>
+                    <i class="fas fa-user me-1"></i>
+                    {% trans "بواسطة:" %} {{ bom.created_by.username|default:'System' }}
+                </small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <!-- Version History Card -->
+        <div class="production-card">
+            <div class="production-card-header">
+                <i class="fas fa-history me-2"></i> {% trans "سجل الإصدارات" %}
+            </div>
+            <div class="list-group list-group-flush">
+                {% for version in version_history %}
+                    <a href="{% url 'production:bom_detail' version.pk %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {% if version.pk == bom.pk %}active{% endif %}">
+                        <div>
+                            <h6 class="mb-1">{% trans "الإصدار" %} {{ version.version }}</h6>
+                            <small class="{% if version.pk != bom.pk %}text-muted{% endif %}">
+                                {{ version.created_at|date:"Y-m-d" }} - {{ version.created_by.username|default:'System' }}
+                            </small>
+                        </div>
+                        {% if version.is_active %}
+                        <span class="badge bg-success rounded-pill">{% trans "نشط" %}</span>
+                        {% endif %}
+                    </a>
+                {% empty %}
+                    <div class="list-group-item">{% trans "لا يوجد سجل إصدارات." %}</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,127 @@
+{% extends 'pdf/base_pdf.html' %}
+{% load humanize %}
+
+{% block pdf_title %}
+    تفاصيل عملية التجميع - {{ assembly_process.production_order.order_number }}
+{% endblock %}
+
+{% block pdf_header %}
+    <h1>تقرير عملية التجميع</h1>
+    <div class="meta-info">
+        رقم العملية: {{ assembly_process.pk }} | تاريخ الطباعة: {{ timestamp|date:"Y-m-d H:i" }}
+    </div>
+{% endblock %}
+
+{% block pdf_content %}
+    <h2>المعلومات الأساسية</h2>
+    <table>
+        <tbody>
+            <tr>
+                <td><strong>أمر الإنتاج</strong></td>
+                <td>{{ assembly_process.production_order.order_number }}</td>
+                <td><strong>المنتج</strong></td>
+                <td>{{ assembly_process.production_order.product.name }}</td>
+            </tr>
+            <!-- MODIFICATION START -->
+            {% with size_group=assembly_process.production_order.product.size_group %}
+            {% if size_group %}
+            <tr>
+                <td><strong>مجموعة المقاسات</strong></td>
+                <td colspan="3">{{ size_group.name }} ({{ size_group.sizes|join:", " }})</td>
+            </tr>
+            {% endif %}
+            {% endwith %}
+            <!-- MODIFICATION END -->
+            <tr>
+                <td><strong>الحالة</strong></td>
+                <td>{% if assembly_process.is_completed %}مكتمل{% else %}قيد التنفيذ{% endif %}</td>
+                <td><strong>نوع التجميع</strong></td>
+                <td>{{ assembly_process.get_assembly_type_display }}</td>
+            </tr>
+            <tr>
+                {% if assembly_process.assembly_type == 'outsourced' %}
+                    <td><strong>المصنع الخارجي</strong></td>
+                    <td>{{ assembly_process.external_manufacturer.name|default:"--" }}</td>
+                {% else %}
+                    <td><strong>المسؤول الداخلي</strong></td>
+                    <td>{{ assembly_process.assembler.get_full_name|default:assembly_process.assembler.username }}</td>
+                {% endif %}
+                <td><strong>تصريح الخروج</strong></td>
+                <td>{{ exit_permit.permit_number|default:"لا يوجد" }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>تفاصيل الكميات والتكاليف</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>البيان</th>
+                <th>الكمية / السعر</th>
+                <th>التكلفة الإجمالية</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>الكمية المرسلة</td>
+                <td>{{ assembly_process.quantity_sent|intcomma }} قطعة</td>
+                <td>-</td>
+            </tr>
+             <tr>
+                <td>الكمية المستلمة</td>
+                <td>{{ assembly_process.quantity_received|intcomma }} قطعة</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td>القطع التالفة (عيوب)</td>
+                <td>{{ assembly_process.defects_count|intcomma }} قطعة</td>
+                <td>-</td>
+            </tr>
+             <tr>
+                <td>القطع المفقودة (فاقد)</td>
+                <td>{{ assembly_process.losses_count|intcomma }} قطعة</td>
+                <td>-</td>
+            </tr>
+            {% if assembly_process.assembly_type == 'outsourced' and assembly_process.external_manufacturer %}
+            <tr>
+                <td>تكلفة التصنيع الخارجي</td>
+                <td>{{ assembly_process.quantity_received|intcomma }} قطعة × {{ assembly_process.external_manufacturer.price_per_piece|intcomma }} جنيه</td>
+                <td><strong>{{ assembly_process.external_manufacturing_cost|intcomma }} جنيه</strong></td>
+            </tr>
+            {% endif %}
+            <tr>
+                <td>تكلفة استهلاك الخيوط</td>
+                <td>{{ assembly_process.thread_consumption|intcomma }} متر</td>
+                <td>{{ assembly_process.thread_cost|intcomma }} جنيه</td>
+            </tr>
+        </tbody>
+        <tfoot>
+            <tr style="background-color: #e9ecef; font-weight: bold;">
+                <td colspan="2">إجمالي تكلفة عملية التجميع</td>
+                <td>{{ assembly_process.assembly_cost|intcomma }} جنيه</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <h2>التواريخ</h2>
+     <table>
+        <tbody>
+            <tr>
+                <td><strong>تاريخ الإرسال</strong></td>
+                <td>{{ assembly_process.start_date|date:"d-m-Y H:i" }}</td>
+            </tr>
+             <tr>
+                <td><strong>الإكمال المتوقع</strong></td>
+                <td>{{ assembly_process.expected_completion_date|date:"d-m-Y" }}</td>
+            </tr>
+            {% if assembly_process.is_completed %}
+             <tr>
+                <td><strong>تاريخ الإكمال الفعلي</strong></td>
+                <td>{{ assembly_process.actual_completion_date|date:"d-m-Y H:i" }}</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+
+{% endblock %}

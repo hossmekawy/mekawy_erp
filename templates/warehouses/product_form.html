@@ -1,0 +1,400 @@
+{% extends 'warehouses/base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block title %}
+    {% if object %}تعديل المنتج: {{ object.name }}{% else %}إضافة منتج جديد{% endif %} - Mekawy ERP
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* General Styling */
+    .card {
+        border-radius: 0.75rem;
+        border: none;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+    }
+
+    .card-header {
+        background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+        color: white;
+        font-weight: bold;
+        border-bottom: none;
+        padding: 1rem 1.5rem;
+    }
+
+    /* Form Fields Styling */
+    .form-label {
+        font-weight: 600;
+        color: #5a5c69;
+        margin-bottom: 0.5rem;
+    }
+
+    .input-group .form-control {
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+    }
+    
+    .input-group .input-group-text {
+        background-color: #f8f9fc;
+        border-right: none;
+        border-color: #d1d3e2;
+        width: 42px; /* Fixed width for alignment */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .form-control, .form-select {
+        border-radius: 0.5rem;
+        border-color: #d1d3e2;
+        padding: 0.75rem 1rem;
+        height: calc(2.25rem + 2px + 1.5rem);
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #4e73df;
+        box-shadow: 0 0 0 0.25rem rgba(78, 115, 223, 0.2);
+        z-index: 3;
+    }
+
+    .invalid-feedback {
+        font-size: 0.875em;
+        font-weight: 500;
+    }
+
+    /* Custom Switch for is_active */
+    .form-switch .form-check-input {
+        width: 3em;
+        height: 1.5em;
+        cursor: pointer;
+    }
+    .form-switch .form-check-input:checked {
+        background-color: #1cc88a;
+        border-color: #1cc88a;
+    }
+    
+    .switch-container {
+        background-color: #f8f9fc;
+        height: calc(2.25rem + 2px + 1.5rem);
+    }
+
+    /* Buttons */
+    .btn-primary {
+        background-color: #4e73df;
+        border-color: #4e73df;
+    }
+    .btn-primary:hover {
+        background-color: #2e59d9;
+        border-color: #2653d4;
+    }
+    
+    /* Fieldset Styling */
+    fieldset {
+        border: 1px solid #e3e6f0;
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    legend {
+        float: none;
+        width: auto;
+        padding: 0 10px;
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #4e73df;
+    }
+
+    /* Helper Card */
+    .helper-card .list-group-item {
+        border: none;
+        padding: 0.75rem 0.25rem;
+        font-size: 0.9rem;
+    }
+
+    .helper-card .list-group-item i {
+        color: #4e73df;
+    }
+</style>
+{% endblock %}
+
+{% block warehouse_content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-box-open text-primary"></i>
+            {% if object %}
+                تعديل المنتج: <span class="text-dark">{{ object.name }}</span>
+            {% else %}
+                إضافة منتج جديد
+            {% endif %}
+        </h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb bg-transparent p-0 m-0">
+                <li class="breadcrumb-item"><a href="{% url 'warehouses:product_list' %}">المنتجات</a></li>
+                <li class="breadcrumb-item active" aria-current="page">
+                    {% if object %}تعديل{% else %}إضافة{% endif %}
+                </li>
+            </ol>
+        </nav>
+    </div>
+
+    <form method="post" id="productForm" novalidate>
+        {% csrf_token %}
+        <div class="row">
+            <!-- Main Form Column -->
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-pencil-alt me-2"></i> بيانات المنتج
+                    </div>
+                    <div class="card-body p-4">
+
+                        <!-- Basic Information Fieldset -->
+                        <fieldset>
+                            <legend>البيانات الأساسية</legend>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.name.id_for_label }}" class="form-label">{{ form.name.label }}*</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-tag"></i></span>
+                                        {% render_field form.name class+="form-control" placeholder="اسم المنتج الأساسي" %}
+                                    </div>
+                                    {% for error in form.name.errors %}
+                                        <div class="invalid-feedback d-block">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.code.id_for_label }}" class="form-label">{{ form.code.label }}*</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-barcode"></i></span>
+                                        {% render_field form.code class+="form-control" placeholder="SKU-12345" %}
+                                    </div>
+                                    {% for error in form.code.errors %}
+                                        <div class="invalid-feedback d-block">{{ error }}</div>
+                                    {% endfor %}
+                                    <small class="form-text text-muted">سيتم توليده تلقائياً إذا ترك فارغاً.</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.barcode.id_for_label }}" class="form-label">{{ form.barcode.label }}</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-qrcode"></i></span>
+                                        {% render_field form.barcode class+="form-control" placeholder="الباركود (إن وجد)" %}
+                                    </div>
+                                    {% for error in form.barcode.errors %}
+                                        <div class="invalid-feedback d-block">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                 <div class="col-md-6 mb-3">
+                                    <label for="{{ form.category.id_for_label }}" class="form-label">{{ form.category.label }}</label>
+                                    {% render_field form.category class+="form-select" %}
+                                    {% for error in form.category.errors %}
+                                        <div class="invalid-feedback d-block">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.product_type.id_for_label }}" class="form-label">{{ form.product_type.label }}</label>
+                                    {% render_field form.product_type class+="form-select" %}
+                                    {% for error in form.product_type.errors %}
+                                        <div class="invalid-feedback d-block">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.unit.id_for_label }}" class="form-label">{{ form.unit.label }}</label>
+                                    {% render_field form.unit class+="form-select" %}
+                                     {% for error in form.unit.errors %}
+                                        <div class="invalid-feedback d-block">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <!-- Pricing and Stock Fieldset -->
+                        <fieldset>
+                            <legend>التسعير والمخزون</legend>
+                             <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.cost_price.id_for_label }}" class="form-label">{{ form.cost_price.label }}</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-dollar-sign"></i></span>
+                                        {% render_field form.cost_price class+="form-control" placeholder="0.00" %}
+                                    </div>
+                                    {% for error in form.cost_price.errors %}
+                                        <div class="invalid-feedback d-block">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.selling_price.id_for_label }}" class="form-label">{{ form.selling_price.label }}</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-cash-register"></i></span>
+                                        {% render_field form.selling_price class+="form-control" placeholder="0.00" %}
+                                    </div>
+                                    {% for error in form.selling_price.errors %}
+                                        <div class="invalid-feedback d-block">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.min_stock_level.id_for_label }}" class="form-label">{{ form.min_stock_level.label }}</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-exclamation-triangle"></i></span>
+                                        {% render_field form.min_stock_level class+="form-control" placeholder="0" %}
+                                    </div>
+                                    {% for error in form.min_stock_level.errors %}
+                                        <div class="invalid-feedback d-block">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-12 mb-3">
+                                    <label class="form-label d-block">حالة المنتج</label>
+                                    <div class="form-check form-switch fs-5 p-3 border rounded-3 d-flex align-items-center switch-container">
+                                         {% render_field form.is_active class+="form-check-input m-0" %}
+                                         <label class="form-check-label ms-3" for="{{ form.is_active.id_for_label }}">
+                                             المنتج نشط
+                                         </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Side Column -->
+            <div class="col-lg-4">
+                <!-- Actions Card -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="fas fa-cogs me-2"></i> الإجراءات
+                    </div>
+                    <div class="card-body">
+                         <div class="d-grid gap-2">
+                            <button type="submit" id="submitBtn" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save me-2"></i>
+                                {% if object %}حفظ التعديلات{% else %}إضافة المنتج{% endif %}
+                            </button>
+                            <a href="{% url 'warehouses:product_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-2"></i> إلغاء
+                            </a>
+                        </div>
+                        {% if object %}
+                        <hr>
+                        <div class="d-grid">
+                            <a href="{% url 'warehouses:product_delete' object.id %}" class="btn btn-outline-danger" 
+                               onclick="return confirm('هل أنت متأكد من حذف هذا المنتج؟ سيتم حذف جميع بيانات المخزون المتعلقة به.');">
+                                <i class="fas fa-trash-alt me-2"></i> حذف المنتج
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Helper Card -->
+                <div class="card helper-card">
+                    <div class="card-header">
+                        <i class="fas fa-info-circle me-2"></i> معلومات مساعدة
+                    </div>
+                    <div class="card-body">
+                         <ul class="list-group list-group-flush">
+                            <li class="list-group-item d-flex align-items-start">
+                                <i class="fas fa-check-circle me-2 mt-1"></i> 
+                                <div><strong>كود المنتج</strong> يجب أن يكون فريداً ولا يتكرر.</div>
+                            </li>
+                            <li class="list-group-item d-flex align-items-start">
+                                <i class="fas fa-check-circle me-2 mt-1"></i>
+                                <div><strong>الحد الأدنى للمخزون</strong> يستخدم لإرسال تنبيهات عند وصول المخزون لهذا الحد.</div>
+                            </li>
+                             {% if object %}
+                            <li class="list-group-item d-flex align-items-start">
+                                <i class="fas fa-check-circle me-2 mt-1"></i>
+                                <div><strong>المخزون الكلي:</strong> <span class="fw-bold text-primary">{{ object.total_stock|default:0 }}</span> {{ object.get_unit_display }}</div>
+                            </li>
+                             <li class="list-group-item d-flex align-items-start">
+                                <i class="fas fa-check-circle me-2 mt-1"></i>
+                                <div><strong>تاريخ الإنشاء:</strong> {{ object.created_at|date:"d-m-Y" }}</div>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-generate product code if empty and creating a new product
+    const nameField = document.getElementById("{{ form.name.id_for_label }}");
+    const codeField = document.getElementById("{{ form.code.id_for_label }}");
+    const isNewObject = !"{% if object %}true{% endif %}";
+    
+    // Only add listener if it's a new product form
+    if (nameField && codeField && isNewObject) {
+        nameField.addEventListener('blur', function() {
+            if (!codeField.value && this.value) {
+                // Generate a more unique code
+                const namePart = this.value.substring(0, 3).toUpperCase();
+                const timestamp = Date.now().toString().slice(-4);
+                const randomPart = Math.floor(10 + Math.random() * 90);
+                const code = `${namePart}-${randomPart}${timestamp}`;
+                codeField.value = code;
+                
+                // You can add a toast notification here if you have a system for it
+                console.log('Generated Code:', code);
+            }
+        });
+    }
+
+    // Form submission loading state
+    const form = document.getElementById('productForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const submitBtn = document.getElementById('submitBtn');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> جاري الحفظ...`;
+            }
+        });
+        
+        // Display form errors in a more visible way (e.g., using a toast library)
+        {% if form.errors %}
+            let errorMessage = "يرجى تصحيح الأخطاء التالية:<br><ul>";
+            {% for field in form %}
+                {% if field.errors %}
+                    errorMessage += "<li><strong>{{ field.label }}:</strong> ";
+                    {% for error in field.errors %}
+                         errorMessage += "{{ error|escapejs }} ";
+                    {% endfor %}
+                    errorMessage += "</li>";
+                {% endif %}
+            {% endfor %}
+            {% for error in form.non_field_errors %}
+                errorMessage += "<li>{{ error|escapejs }}</li>";
+            {% endfor %}
+            errorMessage += "</ul>";
+            
+            // Replace this with your actual toast notification function if you have one
+            // For example: showErrorToast(errorMessage);
+            console.error("Form Errors:", errorMessage.replace(/<br>|<ul>|<\/ul>|<li>|<\/li>|<strong>|<\/strong>/g, '\n'));
+            const errorContainer = document.createElement('div');
+            errorContainer.className = 'alert alert-danger mt-3';
+            errorContainer.setAttribute('role', 'alert');
+            errorContainer.innerHTML = errorMessage;
+            // Prepend to the main card body to be more visible
+            const cardBody = form.querySelector('.card-body');
+            if (cardBody) {
+                cardBody.prepend(errorContainer);
+            }
+        {% endif %}
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,249 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ warehouse.name }} - تفاصيل المخزن{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<style>
+    .stat-card {
+        transition: all 0.3s ease;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    .tab-active {
+        border-bottom-color: #4f46e5;
+        color: #4f46e5;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+        <div class="flex items-center space-x-4 rtl:space-x-reverse">
+            <div class="w-16 h-16 rounded-full flex items-center justify-center
+                {% if warehouse.type == 'raw_materials' %} bg-yellow-100 text-yellow-600
+                {% elif warehouse.type == 'fabric' %} bg-blue-100 text-blue-600
+                {% elif warehouse.type == 'finished_product' %} bg-green-100 text-green-600
+                {% else %} bg-gray-100 text-gray-600 {% endif %}">
+                <i class="fas fa-2x 
+                    {% if warehouse.type == 'raw_materials' %} fa-cogs
+                    {% elif warehouse.type == 'fabric' %} fa-layer-group
+                    {% elif warehouse.type == 'finished_product' %} fa-box-open
+                    {% else %} fa-warehouse {% endif %}"></i>
+            </div>
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">{{ warehouse.name }}</h1>
+                <p class="mt-1 text-md text-gray-500">{{ warehouse.get_type_display }}</p>
+            </div>
+        </div>
+        <div class="mt-4 sm:mt-0 flex space-x-2 rtl:space-x-reverse">
+            <a href="{% url 'warehouses:warehouse_list' %}" class="inline-flex items-center px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none">
+                <i class="fas fa-arrow-right ml-2 rtl:mr-2"></i>
+                العودة للقائمة
+            </a>
+            <a href="{% url 'warehouses:warehouse_edit' warehouse.pk %}" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none">
+                <i class="fas fa-edit ml-2 rtl:mr-2"></i>
+                تعديل
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Left Column: Details & Stock -->
+        <div class="lg:col-span-2">
+            <!-- Details Card -->
+            <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                <h3 class="text-xl font-semibold text-gray-800 border-b pb-3 mb-4">تفاصيل المخزن</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <div class="flex items-center"><i class="fas fa-hashtag w-5 text-center mr-3 rtl:ml-3 text-gray-400"></i><strong>الكود:</strong><span class="mr-2 rtl:ml-2 bg-gray-100 text-gray-800 px-2 py-1 rounded-md">{{ warehouse.code }}</span></div>
+                    <div class="flex items-center"><i class="fas fa-user-tie w-5 text-center mr-3 rtl:ml-3 text-gray-400"></i><strong>المدير:</strong><span class="mr-2 rtl:ml-2">{{ warehouse.manager.get_full_name|default:"غير محدد" }}</span></div>
+                    <div class="flex items-center"><i class="fas fa-toggle-on w-5 text-center mr-3 rtl:ml-3 text-gray-400"></i><strong>الحالة:</strong>
+                        {% if warehouse.is_active %}
+                            <span class="mr-2 rtl:ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">نشط</span>
+                        {% else %}
+                            <span class="mr-2 rtl:ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">غير نشط</span>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center"><i class="fas fa-calendar-alt w-5 text-center mr-3 rtl:ml-3 text-gray-400"></i><strong>تاريخ الإنشاء:</strong><span class="mr-2 rtl:ml-2">{{ warehouse.created_at|date:"d M, Y" }}</span></div>
+                </div>
+                {% if warehouse.description %}
+                <div class="mt-4 pt-4 border-t">
+                    <p class="text-sm text-gray-600">{{ warehouse.description }}</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Tabs for Stock and Activity -->
+            <div>
+                <div class="border-b border-gray-200">
+                    <nav class="-mb-px flex space-x-6 rtl:space-x-reverse" aria-label="Tabs">
+                        <a href="#" class="tab-active whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm" id="stock-tab" onclick="switchTab('stock')">المخزون</a>
+                        <a href="#" class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm" id="activity-tab" onclick="switchTab('activity')">النشاط الأخير</a>
+                    </nav>
+                </div>
+
+                <!-- Stock Tab Content -->
+                <div id="stock-content" class="mt-6">
+                    <div class="bg-white rounded-lg shadow-md">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المنتج</th>
+                                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">الكمية</th>
+                                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">المتاح</th>
+                                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">الموقع</th>
+                                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">الحالة</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    {% for item in stock_items %}
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ item.product.name }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">{{ item.quantity|floatformat:2 }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-green-600 font-semibold">{{ item.available_quantity|floatformat:2 }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">{{ item.location|default:"-" }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
+                                            {% if item.is_low_stock %}<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">منخفض</span>
+                                            {% else %}<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">طبيعي</span>{% endif %}
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="5" class="text-center py-10 text-gray-500">
+                                            <i class="fas fa-box-open fa-3x"></i>
+                                            <p class="mt-2">لا يوجد مخزون في هذا المخزن.</p>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Activity Tab Content -->
+                <div id="activity-content" class="mt-6 hidden">
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <p class="text-center text-gray-500">لا يوجد نشاط مسجل.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Stats -->
+        <div class="lg:col-span-1">
+            <div class="space-y-6">
+                <div class="bg-white p-6 rounded-lg shadow-md stat-card">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 bg-indigo-500 rounded-md p-3">
+                            <i class="fas fa-boxes text-white"></i>
+                        </div>
+                        <div class="ml-5 rtl:mr-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">إجمالي الأصناف</dt>
+                                <dd class="flex items-baseline">
+                                    <p class="text-2xl font-semibold text-gray-900">{{ stock_items.count }}</p>
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md stat-card">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 bg-green-500 rounded-md p-3">
+                            <i class="fas fa-dollar-sign text-white"></i>
+                        </div>
+                        <div class="ml-5 rtl:mr-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">القيمة الإجمالية للمخزون</dt>
+                                <dd>
+                                    <p class="text-2xl font-semibold text-gray-900">{{ total_value|floatformat:2 }}</p>
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+                <!-- Stock Status Chart -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-lg font-medium text-gray-900">حالة المخزون</h3>
+                    <div class="mt-4">
+                        <!-- FIX: Pass data from view context to data attributes -->
+                        <canvas id="stockStatusChart" 
+                                data-low-stock="{{ low_stock_count|default:0 }}" 
+                                data-normal-stock="{{ normal_stock_count|default:0 }}">
+                        </canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function switchTab(tab) {
+        if (tab === 'stock') {
+            document.getElementById('stock-content').classList.remove('hidden');
+            document.getElementById('activity-content').classList.add('hidden');
+            document.getElementById('stock-tab').classList.add('tab-active');
+            document.getElementById('activity-tab').classList.remove('tab-active');
+        } else {
+            document.getElementById('stock-content').classList.add('hidden');
+            document.getElementById('activity-content').classList.remove('hidden');
+            document.getElementById('stock-tab').classList.remove('tab-active');
+            document.getElementById('activity-tab').classList.add('tab-active');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // --- FIX: Read data from the canvas element's data attributes ---
+        const chartCanvas = document.getElementById('stockStatusChart');
+        if (chartCanvas) {
+            const lowStockCount = parseInt(chartCanvas.dataset.lowStock, 10) || 0;
+            const normalStockCount = parseInt(chartCanvas.dataset.normalStock, 10) || 0;
+
+            const ctx = chartCanvas.getContext('2d');
+            const stockStatusChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['مخزون طبيعي', 'مخزون منخفض'],
+                    datasets: [{
+                        label: 'حالة المخزون',
+                        data: [normalStockCount, lowStockCount],
+                        backgroundColor: [
+                            'rgba(75, 192, 192, 0.6)',
+                            'rgba(255, 206, 86, 0.6)',
+                        ],
+                        borderColor: [
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(255, 206, 86, 1)',
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

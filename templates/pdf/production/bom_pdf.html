@@ -1,0 +1,87 @@
+{% extends "pdf/base_pdf.html" %}
+{% load i18n %}
+
+{% block pdf_title %}{% trans "تفاصيل قائمة المواد" %}{% endblock %}
+
+{% block pdf_header %}
+    <h1>{% trans "قائمة المواد (BOM)" %}</h1>
+    <div class="meta-info">
+        {% blocktrans with product_name=bom.product.name code=bom.product.code %}
+        للمنتج: <strong>{{ product_name }} ({{ code }})</strong>
+        {% endblocktrans %}
+        <br>
+        {% if bom.size_group %}
+        {% blocktrans with group_name=bom.size_group.name %}
+        مجموعة المقاسات: <strong>{{ group_name }}</strong>
+        {% endblocktrans %}
+        {% endif %}
+        -
+        {% blocktrans with version=bom.version %}
+        إصدار: <strong>v{{ version }}</strong>
+        {% endblocktrans %}
+    </div>
+{% endblock %}
+
+{% block pdf_content %}
+    <h3>{% trans "المعلومات الأساسية" %}</h3>
+    <table>
+        <tbody>
+            <tr>
+                <th style="width: 25%;">{% trans "المنتج" %}</th>
+                <td>{{ bom.product.name }}</td>
+                <th style="width: 25%;">{% trans "تاريخ الإنشاء" %}</th>
+                <td>{{ bom.created_at|date:"Y-m-d" }}</td>
+            </tr>
+            <tr>
+                <th>{% trans "الإصدار" %}</th>
+                <td>v{{ bom.version }}</td>
+                <th>{% trans "أنشئ بواسطة" %}</th>
+                <td>{{ bom.created_by.username|default:'System' }}</td>
+            </tr>
+            {% if bom.notes %}
+            <tr>
+                <th>{% trans "ملاحظات" %}</th>
+                <td colspan="3">{{ bom.notes|linebreaksbr }}</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <h3>{% trans "عناصر المواد الخام" %}</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>{% trans "المادة الخام" %}</th>
+                <th>{% trans "الكود" %}</th>
+                <th style="text-align: center;">{% trans "الكمية" %}</th>
+                <th style="text-align: center;">{% trans "الوحدة" %}</th>
+                <th style="text-align: left;">{% trans "تكلفة الوحدة" %}</th>
+                <th style="text-align: left;">{% trans "الإجمالي" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in bom.items.all %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ item.material.name }}</td>
+                <td>{{ item.material.code }}</td>
+                <td style="text-align: center;">{{ item.quantity|floatformat:3 }}</td>
+                <td style="text-align: center;">{{ item.material.unit_new.symbol|default:'وحدة' }}</td>
+                <td style="text-align: left;">{{ item.material.cost_price|floatformat:2 }} {% trans "EGP" %}</td>
+                <td style="text-align: left;">{{ item.cost|floatformat:2 }} {% trans "EGP" %}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" style="text-align: center;">{% trans "لا توجد مواد خام في هذه القائمة." %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr style="background-color: #f2f2f2; font-weight: bold;">
+                <td colspan="6">{% trans "إجمالي تكلفة المواد" %}</td>
+                <td style="text-align: left;">{{ bom.total_cost|floatformat:2 }} {% trans "EGP" %}</td>
+            </tr>
+        </tfoot>
+    </table>
+{% endblock %}

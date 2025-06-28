@@ -1,0 +1,342 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}حذف المخزن - {{ warehouse.name }} - Mekawy ERP{% endblock %}
+
+{% block content %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">
+        <i class="fas fa-exclamation-triangle text-danger"></i>
+        تأكيد حذف المخزن
+    </h1>
+    <div class="d-flex gap-2">
+        <a href="{% url 'warehouses:warehouse_detail' warehouse.pk %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-right"></i>
+            العودة للمخزن
+        </a>
+        <a href="{% url 'warehouses:warehouse_list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-list"></i>
+            قائمة المخازن
+        </a>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow border-danger">
+            <div class="card-header bg-danger text-white py-3">
+                <h6 class="m-0 font-weight-bold">
+                    <i class="fas fa-trash"></i>
+                    حذف المخزن: {{ warehouse.name }}
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-danger">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+                        <div>
+                            <h5 class="alert-heading mb-2">تحذير مهم!</h5>
+                            <p class="mb-0">
+                                أنت على وشك حذف المخزن <strong>"{{ warehouse.name }}"</strong> نهائياً.
+                                هذا الإجراء لا يمكن التراجع عنه.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Warehouse Info -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    <i class="fas fa-info-circle text-primary"></i>
+                                    معلومات المخزن
+                                </h6>
+                                <ul class="list-unstyled mb-0">
+                                    <li><strong>الاسم:</strong> {{ warehouse.name }}</li>
+                                    <li><strong>الكود:</strong> {{ warehouse.code }}</li>
+                                    <li><strong>المدير:</strong> 
+                                        {% if warehouse.manager %}
+                                            {{ warehouse.manager.get_full_name|default:warehouse.manager.username }}
+                                        {% else %}
+                                            غير محدد
+                                        {% endif %}
+                                    </li>
+                                    <li><strong>تاريخ الإنشاء:</strong> {{ warehouse.created_at|date:"Y/m/d" }}</li>
+                                    <li><strong>الحالة:</strong> 
+                                        {% if warehouse.is_active %}
+                                            <span class="badge bg-success">نشط</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">غير نشط</span>
+                                        {% endif %}
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    <i class="fas fa-chart-bar text-success"></i>
+                                    إحصائيات المخزن
+                                </h6>
+                                <ul class="list-unstyled mb-0">
+                                    <li><strong>عدد المنتجات:</strong> 
+                                        <span class="badge bg-primary">{{ stock_items.count }}</span>
+                                    </li>
+                                    <li><strong>القيمة الإجمالية:</strong> 
+                                        <span class="badge bg-success">{{ total_value|floatformat:2 }}</span>
+                                    </li>
+                                    <li><strong>حركات المخزون:</strong> 
+                                        <span class="badge bg-info">--</span>
+                                    </li>
+                                    <li><strong>التحويلات:</strong> 
+                                        <span class="badge bg-warning">--</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- What will be deleted -->
+                <div class="alert alert-warning">
+                    <h6 class="alert-heading">
+                        <i class="fas fa-list-ul"></i>
+                        سيتم حذف البيانات التالية نهائياً:
+                    </h6>
+                    <ul class="mb-0">
+                        <li>جميع عناصر المخزون ({{ stock_items.count }} عنصر)</li>
+                        <li>جميع حركات المخزون المرتبطة بهذا المخزن</li>
+                        <li>جميع التحويلات من وإلى هذا المخزن</li>
+                        <li>جميع التقارير والإحصائيات المرتبطة</li>
+                        <li>معلومات المخزن الأساسية</li>
+                    </ul>
+                </div>
+
+                <!-- Stock Items Preview -->
+                {% if stock_items %}
+                <div class="mb-4">
+                    <h6 class="text-danger">
+                        <i class="fas fa-boxes"></i>
+                        المنتجات التي سيتم حذفها ({{ stock_items.count }})
+                    </h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>المنتج</th>
+                                    <th>الكمية</th>
+                                    <th>القيمة</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in stock_items|slice:":5" %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ item.product.name }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ item.product.code }}</small>
+                                    </td>
+                                    <td>
+                                        {{ item.quantity }} {{ item.product.get_unit_display }}
+                                    </td>
+                                    <td>
+                                        {{ item.quantity|mul:item.product.cost_price|floatformat:2 }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% if stock_items.count > 5 %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted">
+                                        ... و {{ stock_items.count|add:"-5" }} منتج آخر
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Confirmation Form -->
+                <div class="border-top pt-4">
+                    <h6 class="text-danger mb-3">
+                        <i class="fas fa-key"></i>
+                        تأكيد الحذف
+                    </h6>
+                    
+                    <form method="post" id="deleteForm">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label">
+                                لتأكيد الحذف، اكتب اسم المخزن: <strong>{{ warehouse.name }}</strong>
+                            </label>
+                            <input type="text" class="form-control" id="confirmName" 
+                                   placeholder="اكتب اسم المخزن هنا..." required>
+                            <div class="form-text text-danger">
+                                يجب أن يطابق الاسم المدخل اسم المخزن تماماً
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">سبب الحذف (اختياري)</label>
+                            <textarea class="form-control" name="delete_reason" rows="3" 
+                                      placeholder="اذكر سبب حذف هذا المخزن..."></textarea>
+                        </div>
+                        
+                        <div class="form-check mb-4">
+                            <input class="form-check-input" type="checkbox" id="confirmDelete" required>
+                            <label class="form-check-label text-danger" for="confirmDelete">
+                                <strong>أؤكد أنني أفهم أن هذا الإجراء لا يمكن التراجع عنه وسيتم حذف جميع البيانات نهائياً</strong>
+                            </label>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <button type="submit" class="btn btn-danger" id="deleteBtn" disabled>
+                                    <i class="fas fa-trash"></i>
+                                    حذف المخزن نهائياً
+                                </button>
+                            </div>
+                            <div>
+                                <a href="{% url 'warehouses:warehouse_detail' warehouse.pk %}" class="btn btn-secondary me-2">
+                                    <i class="fas fa-times"></i>
+                                    إلغاء
+                                </a>
+                                <a href="{% url 'warehouses:warehouse_list' %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-list"></i>
+                                    قائمة المخازن
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.card.border-danger {
+    border-width: 2px;
+}
+
+.alert-danger {
+    border-left: 4px solid #dc3545;
+}
+
+.alert-warning {
+    border-left: 4px solid #ffc107;
+}
+
+.table-sm td, .table-sm th {
+    padding: 0.5rem;
+}
+
+.form-check-input:checked {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+.btn-danger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+    .d-flex.justify-content-between {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .d-flex.justify-content-between > div {
+        text-align: center;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const confirmNameInput = document.getElementById('confirmName');
+    const confirmCheckbox = document.getElementById('confirmDelete');
+    const deleteBtn = document.getElementById('deleteBtn');
+    const warehouseName = '{{ warehouse.name }}';
+    
+    function checkFormValidity() {
+        const nameMatches = confirmNameInput.value.trim() === warehouseName;
+        const checkboxChecked = confirmCheckbox.checked;
+        
+        deleteBtn.disabled = !(nameMatches && checkboxChecked);
+        
+        // Visual feedback
+        if (confirmNameInput.value.trim() !== '') {
+            if (nameMatches) {
+                confirmNameInput.classList.remove('is-invalid');
+                confirmNameInput.classList.add('is-valid');
+            } else {
+                confirmNameInput.classList.remove('is-valid');
+                confirmNameInput.classList.add('is-invalid');
+            }
+        } else {
+            confirmNameInput.classList.remove('is-valid', 'is-invalid');
+        }
+    }
+    
+    // Event listeners
+    confirmNameInput.addEventListener('input', checkFormValidity);
+    confirmCheckbox.addEventListener('change', checkFormValidity);
+    
+    // Form submission
+    document.getElementById('deleteForm').addEventListener('submit', function(e) {
+        if (!confirm('هل أنت متأكد تماماً من حذف هذا المخزن؟ لا يمكن التراجع عن هذا الإجراء!')) {
+            e.preventDefault();
+            return;
+        }
+        
+        // Show loading state
+        deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري الحذف...';
+        deleteBtn.disabled = true;
+        
+        // Show final warning
+        setTimeout(() => {
+            if (!confirm('تحذير أخير: سيتم حذف جميع البيانات نهائياً. هل تريد المتابعة؟')) {
+                e.preventDefault();
+                deleteBtn.innerHTML = '<i class="fas fa-trash"></i> حذف المخزن نهائياً';
+                checkFormValidity();
+            }
+        }, 100);
+    });
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Escape to cancel
+        if (e.key === 'Escape') {
+            if (confirm('هل تريد إلغاء عملية الحذف؟')) {
+                window.location.href = '{% url "warehouses:warehouse_detail" warehouse.pk %}';
+            }
+        }
+    });
+    
+    // Focus on name input
+    confirmNameInput.focus();
+});
+
+// Prevent accidental page refresh
+window.addEventListener('beforeunload', function(e) {
+    const confirmName = document.getElementById('confirmName').value.trim();
+    if (confirmName !== '') {
+        e.preventDefault();
+        e.returnValue = 'هل تريد مغادرة الصفحة؟ ستفقد البيانات المدخلة.';
+    }
+});
+</script>
+{% endblock %}

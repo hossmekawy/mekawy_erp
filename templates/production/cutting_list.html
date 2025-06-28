@@ -1,0 +1,187 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+
+{% block production_title %}متابعة عمليات القص{% endblock %}
+
+{% block production_breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">متابعة القص</li>
+{% endblock %}
+
+{% block production_header_actions %}
+<a href="{% url 'production:cutting_create' %}" class="btn btn-production">
+    <i class="fas fa-plus me-2"></i> بدء عملية قص يدوياً
+</a>
+{% endblock %}
+
+{% block production_content %}
+
+{# =================================================================== #}
+{#               START: Search and Filters Component                   #}
+{# =================================================================== #}
+<div class="production-filters mb-4">
+    <form method="get" class="row g-3 align-items-end" id="search-form">
+        <!-- Search Input -->
+        {% if search_enabled %}
+        <div class="col-lg-6">
+            <label for="search-input-field" class="form-label">البحث</label>
+            <div class="input-group">
+                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                <input type="text" id="search-input-field" name="search" value="{{ request.GET.search }}" 
+                       placeholder="{{ search_placeholder|default:'البحث...' }}" class="form-control">
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Filter Dropdowns -->
+        {% for filter in filters %}
+        <div class="col-lg-3">
+            <label for="filter-{{ filter.name }}" class="form-label">{{ filter.label }}</label>
+            <select id="filter-{{ filter.name }}" name="{{ filter.name }}" class="form-select">
+                <option value="">{{ filter.placeholder|default:'الكل' }}</option>
+                {% for option in filter.options %}
+                <option value="{{ option.value }}" {% if filter.current_value == option.value %}selected{% endif %}>
+                    {{ option.label }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endfor %}
+
+        <!-- Action Buttons -->
+        <div class="col-lg-3">
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-production flex-grow-1">
+                    <i class="fas fa-filter me-2"></i> تطبيق
+                </button>
+                <a href="{% url 'production:cutting_list' %}" class="btn btn-secondary flex-grow-1">
+                    <i class="fas fa-times me-2"></i> مسح
+                </a>
+            </div>
+        </div>
+    </form>
+</div>
+{# =================================================================== #}
+{#               END: Search and Filters Component                     #}
+{# =================================================================== #}
+
+
+<div class="production-card">
+    <div class="production-card-header">
+        <i class="fas fa-tasks me-2"></i>
+        قائمة أوامر وعمليات القص ({{ total_count }})
+    </div>
+    <div class="table-responsive">
+        <table class="table production-table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>أمر الإنتاج</th>
+                    <th>المنتج</th>
+                    <th>عرض الفرشة</th>
+                    <th>ميتراج القطعة</th>
+                    <th>تاريخ البدء/الاعتماد</th>
+                    <th>الحالة</th>
+                    <th>الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in cutting_items %}
+                <tr>
+                    <td>
+                        {% if item.type == 'process' %}
+                            <a href="{% url 'production:cutting_detail' item.obj.pk %}">
+                               <strong>#{{ item.obj.production_order.order_number }}</strong>
+                            </a>
+                        {% else %}
+                            <a href="{% url 'production:order_detail' item.obj.pk %}">
+                               <strong>#{{ item.obj.order_number }}</strong>
+                            </a>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.type == 'process' %}
+                            {{ item.obj.production_order.product.name }}
+                        {% else %}
+                            {{ item.obj.product.name }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.type == 'process' and item.obj.single_layer_width %}
+                            <span class="badge bg-info">{{ item.obj.single_layer_width|floatformat:2 }} م</span>
+                        {% else %}
+                            --
+                        {% endif %}
+                    </td>
+                    <td>
+                         {% if item.type == 'process' and item.obj.single_layer_meterage %}
+                            <strong class="text-production-primary">{{ item.obj.single_layer_meterage|floatformat:3 }}</strong>
+                        {% else %}
+                            --
+                        {% endif %}
+                    </td>
+                    <td>{{ item.date|date:"Y-m-d" }}</td>
+                    <td>
+                        {% if item.status_key == 'waiting' %}
+                            <span class="production-status pending"><i class="fas fa-hourglass-start me-1"></i> {{ item.status_display }}</span>
+                        {% elif item.status_key == 'in_progress' %}
+                            <span class="production-status in-progress"><i class="fas fa-spinner fa-spin me-1"></i> {{ item.status_display }}</span>
+                        {% elif item.status_key == 'completed' %}
+                            <span class="production-status completed"><i class="fas fa-check-circle me-1"></i> {{ item.status_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.type == 'pending_order' %}
+                            <a href="{% url 'production:cutting_create' %}?order_id={{ item.obj.pk }}" class="btn btn-sm btn-production">
+                                <i class="fas fa-play me-1"></i> بدء القص
+                            </a>
+                        {% elif item.type == 'process' %}
+                            <a href="{% url 'production:cutting_detail' item.obj.pk %}" class="btn btn-sm btn-secondary">
+                                <i class="fas fa-eye me-1"></i> عرض التفاصيل
+                            </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center p-5">
+                        <div class="production-empty">
+                            <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                            <h5>لا توجد نتائج تطابق بحثك</h5>
+                            <p class="text-muted">حاول تغيير معايير البحث أو مسح الفلاتر لعرض جميع العمليات.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if is_paginated %}
+    <div class="production-card-footer border-top">
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center mb-0">
+                 {# To preserve filter parameters during pagination #}
+                {% with request.GET.urlencode as params %}
+                    {% if page_obj.has_previous %}
+                        <li class="page-item"><a class="page-link" href="?page=1&{{ params }}">&laquo; أول صفحة</a></li>
+                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&{{ params }}">السابق</a></li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">&laquo; أول صفحة</span></li>
+                        <li class="page-item disabled"><span class="page-link">السابق</span></li>
+                    {% endif %}
+
+                    <li class="page-item active" aria-current="page"><span class="page-link">صفحة {{ page_obj.number }} من {{ page_obj.paginator.num_pages }}</span></li>
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&{{ params }}">التالي</a></li>
+                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&{{ params }}">آخر صفحة &raquo;</a></li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">التالي</span></li>
+                        <li class="page-item disabled"><span class="page-link">آخر صفحة &raquo;</span></li>
+                    {% endif %}
+                {% endwith %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

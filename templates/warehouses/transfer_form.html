@@ -1,0 +1,148 @@
+{% extends 'warehouses/base.html' %}
+{% load static %}
+
+{% block title %}طلب تحويل مخزون{% endblock %}
+
+{% block warehouse_content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h4>طلب تحويل مخزون جديد</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.from_warehouse.id_for_label }}" class="form-label">من المخزن *</label>
+                                {{ form.from_warehouse }}
+                                {% if form.from_warehouse.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.from_warehouse.errors.0 }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.to_warehouse.id_for_label }}" class="form-label">إلى المخزن *</label>
+                                {{ form.to_warehouse }}
+                                {% if form.to_warehouse.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.to_warehouse.errors.0 }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.product.id_for_label }}" class="form-label">المنتج *</label>
+                                {{ form.product }}
+                                {% if form.product.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.product.errors.0 }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.quantity.id_for_label }}" class="form-label">الكمية *</label>
+                                <div class="input-group">
+                                    {{ form.quantity }}
+                                    <span class="input-group-text" id="unit-display">-</span>
+                                </div>
+                                {% if form.quantity.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.quantity.errors.0 }}
+                                </div>
+                                {% endif %}
+                                <div class="form-text">
+                                    <span id="available-quantity">الكمية المتاحة: -</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.reason.id_for_label }}" class="form-label">سبب التحويل *</label>
+                            {{ form.reason }}
+                            {% if form.reason.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.reason.errors.0 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-paper-plane"></i> إرسال الطلب
+                            </button>
+                            <a href="{% url 'warehouses:transfer_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> رجوع
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fromWarehouseSelect = document.getElementById('{{ form.from_warehouse.id_for_label }}');
+    const productSelect = document.getElementById('{{ form.product.id_for_label }}');
+    const quantityInput = document.getElementById('{{ form.quantity.id_for_label }}');
+    const unitDisplay = document.getElementById('unit-display');
+    const availableQuantityDisplay = document.getElementById('available-quantity');
+    
+    // Update available quantity when warehouse or product changes
+    function updateAvailableQuantity() {
+        const warehouseId = fromWarehouseSelect.value;
+        const productId = productSelect.value;
+        
+        if (warehouseId && productId) {
+            fetch(`/warehouses/api/stock/check/?warehouse=${warehouseId}&product=${productId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.stock_item) {
+                        availableQuantityDisplay.textContent = `الكمية المتاحة: ${data.stock_item.available_quantity}`;
+                        unitDisplay.textContent = data.product.unit;
+                        
+                        // Set max quantity
+                        quantityInput.max = data.stock_item.available_quantity;
+                    } else {
+                        availableQuantityDisplay.textContent = 'الكمية المتاحة: 0';
+                        unitDisplay.textContent = '-';
+                        quantityInput.max = 0;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    availableQuantityDisplay.textContent = 'خطأ في جلب البيانات';
+                });
+        } else {
+            availableQuantityDisplay.textContent = 'الكمية المتاحة: -';
+            unitDisplay.textContent = '-';
+        }
+    }
+    
+    fromWarehouseSelect.addEventListener('change', updateAvailableQuantity);
+    productSelect.addEventListener('change', updateAvailableQuantity);
+    
+    // Validate quantity
+    quantityInput.addEventListener('input', function() {
+        const quantity = parseFloat(this.value);
+        const maxQuantity = parseFloat(this.max);
+        
+        if (quantity > maxQuantity) {
+            this.setCustomValidity(`الكمية المتاحة هي ${maxQuantity} فقط`);
+            this.classList.add('is-invalid');
+        } else {
+            this.setCustomValidity('');
+            this.classList.remove('is-invalid');
+        }
+    });
+});
+</script>
+{% endblock %}

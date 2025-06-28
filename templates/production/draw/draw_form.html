@@ -1,0 +1,205 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block production_title %}{% if form.instance.pk %}تعديل رسمة قص{% else %}إضافة رسمة قص{% endif %}{% endblock %}
+
+{% block production_breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'production:draws:draw_list' %}">رسومات القص</a></li>
+<li class="breadcrumb-item active" aria-current="page">{% if form.instance.pk %}تعديل{% else %}إضافة{% endif %}</li>
+{% endblock %}
+
+{% block production_extra_css %}
+<style>
+    .piece-form-row {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        background-color: #f8f9fa;
+        margin-bottom: 0.75rem;
+        border: 1px solid #dee2e6;
+    }
+    .piece-form-row .form-group {
+        flex-grow: 1;
+    }
+    .piece-form-row .form-group-sm {
+        flex-grow: 0;
+        flex-basis: 120px;
+    }
+    .piece-form-row .delete-btn-container {
+        flex-basis: 40px;
+        text-align: center;
+    }
+    .form-group label {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block production_content %}
+<form method="post" id="draw-form">
+    {% csrf_token %}
+    <div class="row">
+        <!-- Main Draw Details -->
+        <div class="col-12">
+            <div class="production-card mb-4">
+                <div class="production-card-header">
+                    <i class="fas fa-info-circle me-2"></i>
+                    1. المعلومات الأساسية للرسمة
+                </div>
+                <div class="production-card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="{{ form.bom.id_for_label }}" class="form-label">قائمة المواد (BOM)</label>
+                            {% render_field form.bom class="form-select" id="id_bom" %}
+                            <div class="form-text">اختر قائمة المواد التي تنتمي إليها هذه الرسمة.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="{{ form.size.id_for_label }}" class="form-label">المقاس</label>
+                            {% render_field form.size class="form-select" id="id_size" %}
+                            <div class="form-text">اختر المقاس المحدد لهذه الرسمة.</div>
+                        </div>
+                        <div class="col-12">
+                            <label for="{{ form.notes.id_for_label }}" class="form-label">ملاحظات</label>
+                            {% render_field form.notes class="form-control" %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Draw Pieces Formset -->
+        <div class="col-12">
+            <div class="production-card">
+                <div class="production-card-header">
+                    <i class="fas fa-puzzle-piece me-2"></i>
+                    2. قطع الرسمة (المكونات)
+                </div>
+                <div class="production-card-body">
+                    {{ formset.management_form }}
+                    <div id="pieces-formset-container">
+                        {% for piece_form in formset %}
+                        <div class="piece-form-row">
+                            {{ piece_form.id }}
+                            <div class="form-group">
+                                <label for="{{ piece_form.name.id_for_label }}">اسم القطعة</label>
+                                {% render_field piece_form.name class="form-control" required=True placeholder="مثال: رجل يمين" %}
+                            </div>
+                            <div class="form-group form-group-sm">
+                                <label for="{{ piece_form.quantity.id_for_label }}">الكمية</label>
+                                {% render_field piece_form.quantity class="form-control" required=True placeholder="1" %}
+                            </div>
+                            <div class="delete-btn-container">
+                                {% if piece_form.instance.pk %}
+                                    <label class="form-check-label small" for="{{ piece_form.DELETE.id_for_label }}">حذف؟</label>
+                                    {% render_field piece_form.DELETE class+="form-check-input" %}
+                                {% else %}
+                                    <button type="button" class="btn btn-sm btn-outline-danger remove-piece-form"><i class="fas fa-trash"></i></button>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-outline-success mt-3" id="add-piece-form">
+                        <i class="fas fa-plus me-1"></i> إضافة قطعة أخرى
+                    </button>
+                </div>
+                <div class="production-card-footer text-end">
+                    {# --- CORRECTION --- #}
+                    {# This logic safely handles both create and update views for the cancel button #}
+                    {% if form.instance.pk %}
+                        <a href="{{ form.instance.get_absolute_url }}" class="btn btn-secondary">إلغاء</a>
+                    {% else %}
+                        <a href="{% url 'production:draws:draw_list' %}" class="btn btn-secondary">إلغاء</a>
+                    {% endif %}
+                    <button type="submit" class="btn btn-production">
+                        <i class="fas fa-save me-2"></i> حفظ الرسمة
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<template id="piece-form-template">
+    <div class="piece-form-row">
+        {{ formset.empty_form.id }}
+        <div class="form-group">
+            <label for="{{ formset.empty_form.name.id_for_label }}">اسم القطعة</label>
+            {% render_field formset.empty_form.name class="form-control" required=True placeholder="مثال: رجل يمين" %}
+        </div>
+        <div class="form-group form-group-sm">
+            <label for="{{ formset.empty_form.quantity.id_for_label }}">الكمية</label>
+            {% render_field formset.empty_form.quantity class="form-control" required=True placeholder="1" %}
+        </div>
+        <div class="delete-btn-container">
+            <button type="button" class="btn btn-sm btn-outline-danger remove-piece-form"><i class="fas fa-trash"></i></button>
+        </div>
+    </div>
+</template>
+{% endblock %}
+
+{% block production_extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const bomSelect = document.getElementById('id_bom');
+    const sizeSelect = document.getElementById('id_size');
+
+    if (bomSelect) {
+        bomSelect.addEventListener('change', function() {
+            const bomId = this.value;
+            if (!sizeSelect) return;
+
+            if (!bomId) {
+                sizeSelect.innerHTML = '<option value="">---</option>';
+                return;
+            }
+
+            fetch(`{% url 'production:draws:ajax_get_sizes_for_bom' %}?bom_id=${bomId}`)
+                .then(response => response.json())
+                .then(data => {
+                    sizeSelect.innerHTML = '';
+                    if (data.sizes && data.sizes.length > 0) {
+                        data.sizes.forEach(size => {
+                            const option = new Option(size, size);
+                            sizeSelect.add(option);
+                        });
+                    } else {
+                        sizeSelect.innerHTML = '<option value="">لا توجد مقاسات متاحة</option>';
+                    }
+                });
+        });
+        if(bomSelect.value) {
+            bomSelect.dispatchEvent(new Event('change'));
+        }
+    }
+
+    // New Formset logic for Divs
+    const container = document.getElementById('pieces-formset-container');
+    const template = document.getElementById('piece-form-template');
+    const totalFormsInput = document.querySelector('input[name="pieces-TOTAL_FORMS"]');
+    const addPieceButton = document.getElementById('add-piece-form');
+
+    if (addPieceButton && container && template && totalFormsInput) {
+        addPieceButton.addEventListener('click', function() {
+            let formIndex = parseInt(totalFormsInput.value);
+            const newFormHtml = template.innerHTML.replace(/__prefix__/g, formIndex);
+            container.insertAdjacentHTML('beforeend', newFormHtml);
+            totalFormsInput.value = formIndex + 1;
+        });
+
+        container.addEventListener('click', function(e) {
+            if (e.target && e.target.closest('.remove-piece-form')) {
+                e.target.closest('.piece-form-row').remove();
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

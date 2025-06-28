@@ -1,0 +1,135 @@
+{% extends 'production/production_base.html' %}
+{% load static i18n %}
+
+{% block production_title %}
+    عمليات التجميع
+{% endblock %}
+
+{% block production_header_actions %}
+<div class="d-flex justify-content-end">
+    <a href="{% url 'production:assembly_create' %}" class="btn btn-production">
+        <i class="fas fa-plus me-2"></i>إضافة عملية تجميع
+    </a>
+</div>
+{% endblock %}
+
+{% block production_breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">عمليات التجميع</li>
+{% endblock %}
+
+
+{% block production_content %}
+<div class="production-filters mb-4">
+    <form method="get" class="row g-3 align-items-center">
+        <div class="col-md-5">
+            <input type="text" name="search" class="form-control" placeholder="ابحث برقم الأمر أو اسم المنتج..." value="{{ request.GET.search }}">
+        </div>
+        <div class="col-md-3">
+            <select name="assembly_type" class="form-select">
+                <option value="">كل الأنواع</option>
+                {% for type_val, type_display in assembly_types %}
+                    <option value="{{ type_val }}" {% if assembly_type_filter == type_val %}selected{% endif %}>{{ type_display }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select name="status" class="form-select">
+                <option value="">كل الحالات</option>
+                <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>قيد التنفيذ</option>
+                <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>مكتمل</option>
+            </select>
+        </div>
+        <div class="col-md-1">
+            <button type="submit" class="btn btn-production-outline w-100">
+                <i class="fas fa-filter"></i>
+            </button>
+        </div>
+    </form>
+</div>
+
+<div class="production-card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead style="background-color: var(--production-secondary); color: white;">
+                    <tr>
+                        <th class="p-3">أمر الإنتاج</th>
+                        <th class="p-3">نوع التجميع</th>
+                        <th class="p-3">المُجمّع / المصنع</th>
+                        <th class="p-3">الكمية المرسلة</th>
+                        <th class="p-3">الحالة</th>
+                        <th class="p-3">تاريخ البدء</th>
+                        <th class="p-3">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for process in assembly_processes %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'production:order_detail' process.production_order.pk %}">
+                                {{ process.production_order.order_number }}
+                            </a>
+                            <small class="d-block text-muted">{{ process.production_order.product.name }}</small>
+                        </td>
+                        <td>
+                            {% if process.assembly_type == 'in_house' %}
+                                <span class="badge rounded-pill text-bg-info">
+                                    <i class="fas fa-user-cog me-1"></i> {{ process.get_assembly_type_display }}
+                                </span>
+                            {% else %}
+                                <span class="badge rounded-pill text-bg-secondary">
+                                    <i class="fas fa-industry me-1"></i> {{ process.get_assembly_type_display }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if process.assembly_type == 'in_house' and process.assembler %}
+                                {{ process.assembler.get_full_name|default:process.assembler.username }}
+                            {% elif process.assembly_type == 'outsourced' and process.external_manufacturer %}
+                                <a href="{% url 'production:manufacturers:manufacturer_detail' process.external_manufacturer.pk %}">
+                                    {{ process.external_manufacturer.name }}
+                                </a>
+                            {% else %}
+                                <span class="text-muted">--</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ process.quantity_sent }} قطعة</td>
+                        <td>
+                            {% if process.is_completed %}
+                                <span class="production-status completed">مكتمل</span>
+                            {% else %}
+                                <span class="production-status in-progress">قيد التنفيذ</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ process.start_date|date:"Y-m-d" }}</td>
+                        <td>
+                            <a href="{% url 'production:assembly_detail' process.pk %}" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="عرض التفاصيل">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="{% url 'production:assembly_update' process.pk %}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="تعديل">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5">
+                            <div class="production-empty">
+                                <i class="fas fa-box-open"></i>
+                                <h5>لا توجد عمليات تجميع</h5>
+                                <p>لم يتم العثور على عمليات تجميع تطابق المعايير الحالية.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if is_paginated %}
+        <div class="card-footer bg-white">
+             {% include 'partials/pagination.html' %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

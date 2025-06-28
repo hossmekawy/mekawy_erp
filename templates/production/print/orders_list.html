@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>قائمة أوامر الإنتاج</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            direction: rtl;
+            margin: 0;
+            padding: 20px;
+            font-size: 12px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+        }
+        
+        .company-name {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .report-title {
+            font-size: 18px;
+            color: #666;
+        }
+        
+        .print-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-size: 10px;
+            color: #666;
+        }
+        
+        .filters-info {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 11px;
+        }
+        
+        .orders-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        
+        .orders-table th,
+        .orders-table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: center;
+            font-size: 10px;
+        }
+        
+        .orders-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        
+        .orders-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-name">شركة الميكاوي للملابس الجاهزة</div>
+        <div class="report-title">قائمة أوامر الإنتاج</div>
+    </div>
+    
+    <div class="print-info">
+        <div>تاريخ الطباعة: {{ print_date|date:"Y/m/d H:i" }}</div>
+        <div>عدد الأوامر: {{ total_orders }}</div>
+        <div>إجمالي الكمية: {{ total_quantity }}</div>
+    </div>
+    
+    {% if filters.search or filters.status or filters.priority %}
+    <div class="filters-info">
+        <strong>الفلاتر المطبقة:</strong>
+        {% if filters.search %}البحث: {{ filters.search }} | {% endif %}
+        {% if filters.status %}الحالة: {{ filters.status }} | {% endif %}
+        {% if filters.priority %}الأولوية: {{ filters.priority }}{% endif %}
+    </div>
+    {% endif %}
+    
+    <table class="orders-table">
+        <thead>
+            <tr>
+                <th>رقم الأمر</th>
+                <th>المنتج</th>
+                <th>الكمية</th>
+                <th>الحالة</th>
+                <th>الأولوية</th>
+                <th>تاريخ الإنشاء</th>
+                <th>تاريخ البدء</th>
+                <th>تاريخ الإنجاز المتوقع</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr>
+                <td>{{ order.order_number }}</td>
+                <td>{{ order.product.name }}</td>
+                <td>{{ order.quantity_ordered }}</td>
+                <td>{{ order.get_status_display }}</td>
+                <td>{{ order.get_priority_display }}</td>
+                <td>{{ order.created_at|date:"Y/m/d" }}</td>
+                <td>{{ order.start_date|date:"Y/m/d"|default:"-" }}</td>
+                <td>{{ order.expected_completion_date|date:"Y/m/d"|default:"-" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

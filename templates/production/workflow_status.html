@@ -1,0 +1,281 @@
+{% extends 'production/production_base.html' %}
+{% load static humanize %}
+
+{% block production_title %}
+    {{ page_title }}
+{% endblock %}
+
+{% block production_page_title %}
+    <i class="fas fa-project-diagram me-2"></i>{{ page_title }}
+{% endblock %}
+
+{% block production_extra_css %}
+<style>
+    .workflow-board {
+        display: flex;
+        overflow-x: auto;
+        padding-bottom: 1rem;
+        gap: 1rem;
+    }
+    .workflow-column {
+        flex: 0 0 320px;
+        min-width: 320px;
+        max-width: 320px;
+        background-color: #f8f9fa;
+        border-radius: 0.75rem;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        max-height: 80vh;
+    }
+    .workflow-column-header {
+        padding: 1rem;
+        font-weight: 600;
+        color: var(--production-dark);
+        border-bottom: 1px solid #dee2e6;
+        background-color: #e9ecef;
+        border-top-left-radius: 0.75rem;
+        border-top-right-radius: 0.75rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .workflow-column-header .badge {
+        font-size: 0.9rem;
+    }
+    .workflow-column-body {
+        overflow-y: auto;
+        padding: 0.75rem;
+        flex-grow: 1;
+    }
+    .workflow-card {
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        transition: box-shadow 0.2s ease;
+    }
+    .workflow-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    .workflow-card-title {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+    .workflow-card-title a {
+        text-decoration: none;
+        color: var(--production-primary);
+    }
+    .workflow-card-meta {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-bottom: 0.5rem;
+    }
+    .workflow-card-details {
+        font-size: 0.85rem;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    .workflow-card-details li {
+        margin-bottom: 0.25rem;
+    }
+    .workflow-card-actions {
+        margin-top: 0.75rem;
+        text-align: right;
+    }
+    .empty-column {
+        padding: 2rem;
+        text-align: center;
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+</style>
+{% endblock %}
+
+{% block production_content %}
+<div class="workflow-board">
+
+    <!-- Stage: Pending Approval -->
+    <div class="workflow-column">
+        <div class="workflow-column-header">
+            <span><i class="fas fa-hourglass-start me-2 text-secondary"></i>أوامر معلقة</span>
+            <span class="badge bg-secondary rounded-pill">{{ pending_orders.count }}</span>
+        </div>
+        <div class="workflow-column-body">
+            {% for order in pending_orders %}
+            <div class="workflow-card">
+                <h6 class="workflow-card-title">
+                    <a href="{% url 'production:order_detail' order.pk %}">{{ order.order_number }}</a>
+                </h6>
+                <p class="workflow-card-meta">المنتج: {{ order.product.name }}</p>
+                <ul class="workflow-card-details">
+                    <li><strong>الكمية:</strong> {{ order.quantity_ordered|intcomma }} قطعة</li>
+                    <li><strong>أنشئ في:</strong> {{ order.created_at|date:"d M Y" }}</li>
+                </ul>
+                <div class="workflow-card-actions">
+                    <a href="{% url 'production:order_approve' order.pk %}" class="btn btn-sm btn-success">اعتماد</a>
+                </div>
+            </div>
+            {% empty %}
+            <div class="empty-column">لا توجد أوامر معلقة.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Stage: Ready for Cutting -->
+    <div class="workflow-column">
+        <div class="workflow-column-header">
+            <span><i class="fas fa-cut me-2 text-info"></i>في انتظار القص</span>
+            <span class="badge bg-info rounded-pill">{{ cutting_queue.count }}</span>
+        </div>
+        <div class="workflow-column-body">
+            {% for order in cutting_queue %}
+            <div class="workflow-card">
+                <h6 class="workflow-card-title">
+                    <a href="{% url 'production:order_detail' order.pk %}">{{ order.order_number }}</a>
+                </h6>
+                <p class="workflow-card-meta">المنتج: {{ order.product.name }}</p>
+                <ul class="workflow-card-details">
+                    <li><strong>الكمية:</strong> {{ order.quantity_ordered|intcomma }} قطعة</li>
+                    <li><strong>اعتمد في:</strong> {{ order.approved_at|date:"d M Y" }}</li>
+                </ul>
+                <div class="workflow-card-actions">
+                    <a href="{% url 'production:cutting_create' %}?order_id={{ order.pk }}" class="btn btn-sm btn-primary">بدء القص</a>
+                </div>
+            </div>
+            {% empty %}
+            <div class="empty-column">لا توجد أوامر جاهزة للقص.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Stage: In Cutting -->
+    <div class="workflow-column">
+        <div class="workflow-column-header">
+            <span><i class="fas fa-sync-alt fa-spin me-2 text-primary"></i>قيد القص</span>
+            <span class="badge bg-primary rounded-pill">{{ active_cutting.count }}</span>
+        </div>
+        <div class="workflow-column-body">
+            {% for process in active_cutting %}
+            <div class="workflow-card">
+                <h6 class="workflow-card-title">
+                    <a href="{% url 'production:cutting_detail' process.pk %}">{{ process.production_order.order_number }}</a>
+                </h6>
+                <p class="workflow-card-meta">المنتج: {{ process.production_order.product.name }}</p>
+                <ul class="workflow-card-details">
+                    <li><strong>القاص:</strong> {{ process.cutter.get_full_name|default:"-" }}</li>
+                    <li><strong>تاريخ البدء:</strong> {{ process.cutting_date|date:"d M Y" }}</li>
+                </ul>
+                 <div class="workflow-card-actions">
+                    <a href="{% url 'production:cutting_complete' process.pk %}" class="btn btn-sm btn-success">إكمال</a>
+                </div>
+            </div>
+            {% empty %}
+            <div class="empty-column">لا توجد عمليات قص نشطة.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Stage: In Assembly -->
+    <div class="workflow-column">
+        <div class="workflow-column-header">
+            <span><i class="fas fa-cogs me-2 text-warning"></i>قيد التجميع</span>
+            <span class="badge bg-warning text-dark rounded-pill">{{ active_assembly.count }}</span>
+        </div>
+        <div class="workflow-column-body">
+            {% for process in active_assembly %}
+            <div class="workflow-card">
+                <h6 class="workflow-card-title">
+                    <a href="{% url 'production:assembly_detail' process.pk %}">{{ process.production_order.order_number }}</a>
+                </h6>
+                <p class="workflow-card-meta">المنتج: {{ process.production_order.product.name }}</p>
+                <ul class="workflow-card-details">
+                    <li><strong>النوع:</strong> {{ process.get_assembly_type_display }}</li>
+                    <li><strong>الجهة:</strong> {{ process.external_manufacturer.name|default:process.assembler.get_full_name }}</li>
+                    <li><strong>الكمية:</strong> {{ process.quantity_sent|intcomma }} قطعة</li>
+                </ul>
+            </div>
+            {% empty %}
+            <div class="empty-column">لا توجد عمليات تجميع نشطة.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Stage: In Dyeing -->
+    <div class="workflow-column">
+        <div class="workflow-column-header">
+            <span><i class="fas fa-tint me-2" style="color: #9b59b6;"></i>قيد الصباغة</span>
+            <span class="badge rounded-pill" style="background-color: #9b59b6;">{{ active_dyeing.count }}</span>
+        </div>
+        <div class="workflow-column-body">
+            {% for process in active_dyeing %}
+            <div class="workflow-card">
+                <h6 class="workflow-card-title">
+                    <a href="{% url 'production:dyeing_detail' process.pk %}">{{ process.assembly_process.production_order.order_number }}</a>
+                </h6>
+                <p class="workflow-card-meta">اللون: {{ process.color_specification }}</p>
+                <ul class="workflow-card-details">
+                    <li><strong>المصبغة:</strong> {{ process.dyeing_facility.name }}</li>
+                    <li><strong>الكمية:</strong> {{ process.quantity_sent|intcomma }} قطعة</li>
+                </ul>
+            </div>
+            {% empty %}
+            <div class="empty-column">لا توجد عمليات صباغة نشطة.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Stage: In Finishing -->
+    <div class="workflow-column">
+        <div class="workflow-column-header">
+            <span><i class="fas fa-magic me-2 text-success"></i>قيد التشطيب</span>
+            <span class="badge bg-success rounded-pill">{{ active_finishing.count }}</span>
+        </div>
+        <div class="workflow-column-body">
+            {% for process in active_finishing %}
+            <div class="workflow-card">
+                <h6 class="workflow-card-title">
+                    <a href="{% url 'production:finishing_detail' process.pk %}">{{ process.dyeing_process.assembly_process.production_order.order_number }}</a>
+                </h6>
+                <p class="workflow-card-meta">المنتج: {{ process.dyeing_process.assembly_process.production_order.product.name }}</p>
+                <ul class="workflow-card-details">
+                     <li><strong>النوع:</strong> {{ process.get_finishing_type_display }}</li>
+                    <li><strong>الجهة:</strong> {{ process.external_manufacturer.name|default:process.finisher.get_full_name }}</li>
+                    <li><strong>الكمية:</strong> {{ process.quantity_input|intcomma }} قطعة</li>
+                </ul>
+            </div>
+            {% empty %}
+            <div class="empty-column">لا توجد عمليات تشطيب نشطة.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Stage: Completed -->
+    <div class="workflow-column">
+        <div class="workflow-column-header">
+            <span><i class="fas fa-check-circle me-2 text-muted"></i>مكتمل حديثاً</span>
+            <span class="badge bg-light text-dark rounded-pill">{{ recently_completed.count }}</span>
+        </div>
+        <div class="workflow-column-body">
+            {% for order in recently_completed %}
+            <div class="workflow-card">
+                <h6 class="workflow-card-title">
+                    <a href="{% url 'production:order_detail' order.pk %}">{{ order.order_number }}</a>
+                </h6>
+                <p class="workflow-card-meta">المنتج: {{ order.product.name }}</p>
+                 <ul class="workflow-card-details">
+                    <li><strong>اكتمل في:</strong> {{ order.actual_completion_date|date:"d M Y" }}</li>
+                </ul>
+            </div>
+            {% empty %}
+            <div class="empty-column">لا توجد أوامر مكتملة حديثاً.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}
