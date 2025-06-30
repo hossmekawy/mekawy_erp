@@ -1,0 +1,105 @@
+{% extends 'production/production_base.html' %}
+{% load i18n %}
+
+{% block production_title %}تقرير الجودة{% endblock %}
+
+{% block production_page_title %}
+    <i class="fas fa-award me-2"></i>
+    {% trans "تقرير الجودة" %}
+{% endblock %}
+
+{% block production_content %}
+<div class="production-card mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">{% trans "تصفية حسب التاريخ" %}</h6>
+    </div>
+    <div class="card-body">
+        <form method="get">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label for="start_date" class="form-label">{% trans "من تاريخ" %}</label>
+                    <input type="date" name="start_date" id="start_date" value="{{ start_date|date:'Y-m-d' }}" class="form-control">
+                </div>
+                <div class="col-md-4">
+                    <label for="end_date" class="form-label">{% trans "إلى تاريخ" %}</label>
+                    <input type="date" name="end_date" id="end_date" value="{{ end_date|date:'Y-m-d' }}" class="form-control">
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-production w-100">{% trans "تطبيق" %}</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="production-metric">
+            <div class="production-metric-icon primary"><i class="fas fa-search"></i></div>
+            <div class="production-metric-value">{{ total_checks|default:0 }}</div>
+            <div class="production-metric-label">{% trans "إجمالي الفحوصات" %}</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="production-metric">
+            <div class="production-metric-icon success"><i class="fas fa-check"></i></div>
+            <div class="production-metric-value">{{ passed_checks|default:0 }}</div>
+            <div class="production-metric-label">{% trans "الفحوصات المقبولة" %}</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="production-metric">
+            <div class="production-metric-icon danger"><i class="fas fa-times"></i></div>
+            <div class="production-metric-value">{{ failed_checks|default:0 }}</div>
+            <div class="production-metric-label">{% trans "الفحوصات المرفوضة" %}</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="production-metric">
+            <div class="production-metric-icon warning"><i class="fas fa-percentage"></i></div>
+            <div class="production-metric-value">{{ pass_rate|default:0 }}%</div>
+            <div class="production-metric-label">{% trans "معدل النجاح" %}</div>
+        </div>
+    </div>
+</div>
+
+<div class="production-card">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">{% trans "تفاصيل فحوصات الجودة" %}</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table production-table">
+                <thead>
+                    <tr>
+                        <th>{% trans "أمر الإنتاج" %}</th>
+                        <th>{% trans "نوع الفحص" %}</th>
+                        <th>{% trans "المفتش" %}</th>
+                        <th class="text-center">{% trans "التقييم العام" %}</th>
+                        <th class="text-center">{% trans "مقبول" %}</th>
+                        <th class="text-center">{% trans "مرفوض" %}</th>
+                        <th>{% trans "تاريخ الفحص" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for check in quality_checks %}
+                    <tr>
+                        <td><a href="{% url 'production:quality:quality_detail' check.pk %}">{{ check.production_order.order_number }}</a></td>
+                        <td>{{ check.get_check_type_display }}</td>
+                        <td>{{ check.inspector.username|default:"N/A" }}</td>
+                        <td class="text-center"><span class="badge bg-primary">{{ check.get_overall_grade_display }}</span></td>
+                        <td class="text-center text-success">{{ check.items_passed }}</td>
+                        <td class="text-center text-danger">{{ check.items_failed }}</td>
+                        <td>{{ check.check_date|date:"Y-m-d H:i" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4">{% trans "لا توجد بيانات جودة للفترة المحددة." %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

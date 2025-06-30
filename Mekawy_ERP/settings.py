@@ -33,7 +33,7 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 SECRET_KEY = env('SECRET_KEY', default='django-insecure-frqrxc_5k#*_%of8!=7g0*8&v^jm@3sli1fuq)+dg-n-8pbwnh')
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False 
+DEBUG = True 
 
 ALLOWED_HOSTS = ['*']
 
@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'pwa',
     'widget_tweaks',
     # my apps
+    'core',
     'users',  # Add users app first
     'dashboard',
     'suppliers',
@@ -96,7 +97,10 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'Mekawy_ERP.context_processors.global_context',
+                'core.context_processors.global_context',
+                'core.context_processors.sidebar_context', 
+                'core.context_processors.theme_context',  
+
             ],
         },
     },
@@ -104,6 +108,10 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'Mekawy_ERP.wsgi.application'
 
+AUTHENTICATION_BACKENDS = [
+    'users.backends.EmailOrUsernameBackend',  # Your custom backend
+    'django.contrib.auth.backends.ModelBackend', # The default backend
+]
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases

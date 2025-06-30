@@ -995,99 +995,96 @@ def update_cut_piece_quantity_ajax(request):
 
 @login_required
 def complete_cutting_process(request, pk):
+    """
+    Handles the completion of a cutting process.
+    This view now explicitly contains the logic that was previously in the
+    `update_stock_and_bom_on_cutting_complete` signal.
+    """
     cutting_process = get_object_or_404(CuttingProcess, pk=pk)
-    
+    production_order = cutting_process.production_order
+
     if cutting_process.is_completed:
         messages.info(request, 'عملية القص هذه مكتملة بالفعل.')
         return redirect('production:cutting_detail', pk=pk)
-    
+
     if not cutting_process.marker_details or not cutting_process.marker_details.get('sizes'):
         messages.error(request, 'لا يمكن إكمال العملية. تفاصيل الرسمة (المقاسات) غير محددة.')
         return redirect('production:cutting_update', pk=pk)
-        
-    with transaction.atomic():
-        cutting_process.cut_pieces.all().delete()
-        
-        total_layers = cutting_process.cutting_tables.aggregate(total=Sum('layers_count'))['total'] or 0
-        if total_layers == 0:
-            messages.error(request, 'لا يمكن إكمال العملية. لم يتم تسجيل أي طبقات في جداول القص.')
-            return redirect('production:cutting_update', pk=pk)
 
-        marker_sizes = cutting_process.marker_details.get('sizes', [])
-        size_counts_in_marker = Counter(marker_sizes)
-        all_required_sizes = set(size_counts_in_marker.keys())
-        
-        product_bom = cutting_process.production_order.bom_version
-        if not product_bom:
-             messages.error(request, f"أمر الإنتاج #{cutting_process.production_order.order_number} غير مرتبط بقائمة مواد (BOM).")
-             return redirect('production:cutting_detail', pk=pk)
+    try:
+        with transaction.atomic():
+            # 1. Generate Cut Pieces (same as before)
+            cutting_process.cut_pieces.all().delete()
+            total_layers = cutting_process.cutting_tables.aggregate(total=Sum('layers_count'))['total'] or 0
+            if total_layers == 0:
+                messages.error(request, 'لا يمكن إكمال العملية. لم يتم تسجيل أي طبقات في جداول القص.')
+                raise ValueError("No layers in cutting table.") # This will roll back the transaction
 
-        # --- MODIFIED LOGIC START ---
-        # We no longer fail if draws are missing. We just fetch the ones that exist.
-        
-        # 1. Fetch all available draws for the required sizes
-        draws_for_bom = GarmentDraw.objects.filter(
-            bom=product_bom,
-            size__in=all_required_sizes
-        ).prefetch_related('pieces')
-        
-        found_draws_by_size = {draw.size: draw for draw in draws_for_bom}
-        sizes_with_draws = set(found_draws_by_size.keys())
-        sizes_without_draws = all_required_sizes - sizes_with_draws
+            marker_sizes = cutting_process.marker_details.get('sizes', [])
+            size_counts_in_marker = Counter(marker_sizes)
+            all_required_sizes = set(size_counts_in_marker.keys())
+            product_bom = production_order.bom_version
+            if not product_bom:
+                 messages.error(request, f"أمر الإنتاج #{production_order.order_number} غير مرتبط بقائمة مواد (BOM).")
+                 raise ValueError("BOM not linked to production order.")
 
-        pieces_to_create = []
-
-        # 2. Process sizes that have a detailed GarmentDraw
-        for size in sizes_with_draws:
-            draw = found_draws_by_size[size]
-            count_in_marker = size_counts_in_marker.get(size, 0)
-            
-            for draw_piece in draw.pieces.all():
-                total_quantity = total_layers * count_in_marker * draw_piece.quantity
+            draws_for_bom = GarmentDraw.objects.filter(bom=product_bom, size__in=all_required_sizes).prefetch_related('pieces')
+            found_draws_by_size = {draw.size: draw for draw in draws_for_bom}
+            sizes_with_draws = set(found_draws_by_size.keys())
+            sizes_without_draws = all_required_sizes - sizes_with_draws
+            pieces_to_create = []
+            for size in sizes_with_draws:
+                draw = found_draws_by_size[size]
+                count_in_marker = size_counts_in_marker.get(size, 0)
+                for draw_piece in draw.pieces.all():
+                    total_quantity = total_layers * count_in_marker * draw_piece.quantity
+                    if total_quantity > 0:
+                        pieces_to_create.append(CutPiece(cutting_process=cutting_process, piece_type=draw_piece.name, size=size, quantity=total_quantity))
+            for size in sizes_without_draws:
+                count_in_marker = size_counts_in_marker.get(size, 0)
+                total_quantity = total_layers * count_in_marker
                 if total_quantity > 0:
-                    pieces_to_create.append(
-                        CutPiece(
-                            cutting_process=cutting_process,
-                            piece_type=draw_piece.name, # Use detailed name from draw
-                            size=size,
-                            quantity=total_quantity
-                        )
+                    pieces_to_create.append(CutPiece(cutting_process=cutting_process, piece_type="قطعة أساسية", size=size, quantity=total_quantity))
+            if pieces_to_create:
+                CutPiece.objects.bulk_create(pieces_to_create)
+
+            # 2. **NEW**: Deduct fabric from stock (formerly a signal)
+            total_fabric_used = getattr(cutting_process, 'total_fabric_used', Decimal('0.0'))
+            if total_fabric_used > 0:
+                fabric_stock_item = production_order.textile_stock.stock_item
+                if fabric_stock_item:
+                    StockMovement.objects.create(
+                        stock_item=fabric_stock_item,
+                        movement_type='out',
+                        quantity=total_fabric_used,
+                        reference_number=f"CUT-{production_order.order_number}",
+                        notes=f"استهلاك قماش لعملية القص الخاصة بأمر الإنتاج #{production_order.order_number}",
+                        created_by=cutting_process.cutter or request.user
                     )
+                else:
+                    messages.warning(request, "لم يتم العثور على سجل مخزون للقماش المستخدم. لم يتم تحديث المخزون.")
 
-        # 3. Process sizes that DO NOT have a draw (the fallback logic)
-        for size in sizes_without_draws:
-            count_in_marker = size_counts_in_marker.get(size, 0)
-            total_quantity = total_layers * count_in_marker
-            
-            if total_quantity > 0:
-                pieces_to_create.append(
-                    CutPiece(
-                        cutting_process=cutting_process,
-                        piece_type="قطعة أساسية", # Use a generic name
-                        size=size,
-                        quantity=total_quantity
-                    )
-                )
-        
-        # --- MODIFIED LOGIC END ---
+            # 3. Finalize the process status
+            cutting_process.is_completed = True
+            cutting_process.completed_at = timezone.now()
+            cutting_process.save()
 
-        # 4. Create all generated pieces in one database call
-        if pieces_to_create:
-            CutPiece.objects.bulk_create(pieces_to_create)
+            # 4. **NEW**: Update the production order status (formerly a signal)
+            production_order.status = 'in_assembly'
+            production_order.save(update_fields=['status'])
 
-        # 5. Finalize the process
-        cutting_process.is_completed = True
-        cutting_process.completed_at = timezone.now()
-        cutting_process.save()
+            messages.success(request, f'اكتملت عملية القص! تم توليد {len(pieces_to_create)} نوع من القطع وتحديث مخزون القماش.')
 
-        # Update the production order status
-        production_order = cutting_process.production_order
-        production_order.status = 'in_assembly'
-        production_order.save(update_fields=['status'])
-        
-        messages.success(request, f'اكتملت عملية القص! تم توليد وتوثيق {len(pieces_to_create)} نوع من القطع التفصيلية.')
+    except ValueError as e:
+        # This will catch our custom errors and prevent redirection
+        # The transaction is automatically rolled back on exception
+        pass
+    except Exception as e:
+        messages.error(request, f"حدث خطأ غير متوقع: {e}")
+        # Rollback happens automatically
 
     return redirect('production:cutting_detail', pk=pk)
+
 
 class CuttingProcessDetailView(LoginRequiredMixin, DetailView):
     model = CuttingProcess
@@ -1420,33 +1417,38 @@ def get_stock_for_material_in_warehouse_ajax(request):
         return JsonResponse({'error': str(e)}, status=500)
     
 @login_required
-@require_POST # This view only accepts POST requests
+@require_POST
 def receive_assembly_process(request, pk):
     """
     Handles the submission of the 'Receive Items' modal form.
+    This view now explicitly updates the production order status.
     """
     assembly_process = get_object_or_404(AssemblyProcess, pk=pk, is_completed=False)
     form = AssemblyReceiveForm(request.POST, instance=assembly_process)
 
     if form.is_valid():
-        process = form.save(commit=False)
-        process.is_completed = True
-        process.actual_completion_date = timezone.now()
-        process.save()
-        
-        # Calculate final costs and update the production order status
-        process.calculate_assembly_cost()
-        process.production_order.status = 'in_dyeing'
-        process.production_order.save(update_fields=['status'])
-        
-        messages.success(request, f'تم استلام وتوثيق عملية التجميع لأمر الإنتاج {process.production_order.order_number}.')
+        with transaction.atomic():
+            process = form.save(commit=False)
+            process.is_completed = True
+            process.actual_completion_date = timezone.now()
+            process.save()
+
+            # Calculate final costs
+            process.calculate_assembly_cost()
+
+            # **NEW**: Update the production order status (formerly a signal)
+            process.production_order.status = 'in_dyeing'
+            process.production_order.save(update_fields=['status'])
+
+            messages.success(request, f'تم استلام وتوثيق عملية التجميع لأمر الإنتاج {process.production_order.order_number}.')
     else:
-        # If the form is invalid, add the errors to messages to be displayed by the toast notifications
         for field, errors in form.errors.items():
             for error in errors:
                 messages.error(request, f"{form.fields[field].label}: {error}")
 
     return redirect('production:assembly_detail', pk=pk)
+
+
 @login_required
 def complete_assembly_process(request, pk):
     assembly_process = get_object_or_404(AssemblyProcess, pk=pk)
@@ -1634,22 +1636,29 @@ class DyeingProcessDeleteView(LoginRequiredMixin, DeleteView):
 @login_required
 @require_POST
 def receive_dyeing_process(request, pk):
+    """
+    Handles receiving items from the dyeing process.
+    This view now explicitly updates the production order status.
+    """
     dyeing_process = get_object_or_404(DyeingProcess, pk=pk, is_completed=False)
     form = DyeingReceiveForm(request.POST, instance=dyeing_process)
 
     if form.is_valid():
-        process = form.save(commit=False)
-        process.is_completed = True
-        process.actual_return_date = timezone.now()
-        process.save()
-        
-        process.calculate_total_cost()
-        
-        production_order = process.assembly_process.production_order
-        production_order.status = 'in_finishing'
-        production_order.save(update_fields=['status'])
-        
-        messages.success(request, f'تم استلام وتوثيق عملية الصباغة لأمر {production_order.order_number}.')
+        with transaction.atomic():
+            process = form.save(commit=False)
+            process.is_completed = True
+            process.actual_return_date = timezone.now()
+            process.save()
+
+            # Calculate final costs
+            process.calculate_total_cost()
+
+            # **NEW**: Update the production order status (formerly a signal)
+            production_order = process.assembly_process.production_order
+            production_order.status = 'in_finishing'
+            production_order.save(update_fields=['status'])
+
+            messages.success(request, f'تم استلام وتوثيق عملية الصباغة لأمر {production_order.order_number}.')
     else:
         for field, errors in form.errors.items():
             for error in errors:
@@ -2026,6 +2035,12 @@ def ajax_get_finishing_bom_components_for_dyeing(request):
 @login_required
 @require_POST
 def receive_finishing_process(request, pk):
+    """
+    Handles receiving items from the finishing process.
+    This view now creates the FinalProduct instance, which in turn handles
+    all warehouse stock updates via its overridden save() method.
+    This replaces both the finishing status signal and the final product stock signal.
+    """
     process = get_object_or_404(FinishingProcess, pk=pk, is_completed=False)
     form = FinishingReceiveForm(request.POST, instance=process)
 
@@ -2037,27 +2052,54 @@ def receive_finishing_process(request, pk):
             finishing_process.save()
 
             production_order = finishing_process.dyeing_process.assembly_process.production_order
-            
-            # Create FinalProduct instance, which triggers the warehouse signal
+
+            # **NEW**: Create FinalProduct instance. Its .save() method now handles all stock logic.
             if finishing_process.quantity_output > 0:
+                # The creation of this object now triggers the logic to create
+                # a ProductBatch and a StockMovement, as defined in the model's save method.
                 FinalProduct.objects.create(
                     finishing_process=finishing_process,
                     warehouse=finishing_process.destination_warehouse,
-                    size="Mixed", # You may want a more sophisticated way to handle sizes here
+                    size="Mixed", # You might want a more sophisticated way to handle sizes here
                     quantity=finishing_process.quantity_output,
                     stored_by=request.user
                 )
 
-            # Mark the main production order as complete
+            # **NEW**: Mark the main production order as complete (formerly a signal)
             production_order.status = 'completed'
             production_order.actual_completion_date = timezone.now().date()
             production_order.save(update_fields=['status', 'actual_completion_date'])
 
             messages.success(request, f'اكتملت عملية التشطيب! تم إضافة {finishing_process.quantity_output} قطعة إلى مخزن {finishing_process.destination_warehouse.name}.')
     else:
-        messages.error(request, "يرجى تصحيح الأخطاء.")
+        error_list = []
+        for field, errors in form.errors.items():
+            error_list.extend(errors)
+        messages.error(request, "يرجى تصحيح الأخطاء: " + " ".join(error_list))
+
 
     return redirect('production:finishing_detail', pk=pk)
+
+
+@login_required
+def ajax_get_order_count_for_period(request):
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+
+    if not start_date_str or not end_date_str:
+        return JsonResponse({'error': 'Start and end dates are required.'}, status=400)
+
+    try:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+
+        count = ProductionOrder.objects.filter(
+            created_at__date__range=[start_date, end_date]
+        ).count()
+
+        return JsonResponse({'success': True, 'count': count})
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'Invalid date format.'}, status=400)
 
 @login_required
 def print_finishing_process_pdf(request, pk):

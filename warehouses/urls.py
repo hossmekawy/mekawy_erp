@@ -7,6 +7,7 @@ urlpatterns = [
     # Dashboard
     path('', views.WarehouseDashboardView.as_view(), name='dashboard'),
     
+    path('inventory/count/', views.InventoryCountView.as_view(), name='inventory_count'), # New URL
     # Categories
     path('categories/', views.CategoryListView.as_view(), name='category_list'),
     path('categories/add/', views.CategoryCreateView.as_view(), name='category_add'),
@@ -31,7 +32,8 @@ urlpatterns = [
     path('warehouse/<int:pk>/', views.WarehouseDetailView.as_view(), name='warehouse_detail'),
     path('warehouse/<int:pk>/edit/', views.WarehouseUpdateView.as_view(), name='warehouse_edit'),
     path('warehouse/<int:pk>/delete/', views.WarehouseDeleteView.as_view(), name='warehouse_delete'),
-    
+    path('warehouse/<int:pk>/export/pdf/', views.WarehouseDetailPDFView.as_view(), name='warehouse_detail_pdf'),
+
     # Products
     path('products/', views.ProductListView.as_view(), name='product_list'),
     path('products/add/', views.ProductCreateView.as_view(), name='product_add'),
@@ -46,7 +48,10 @@ urlpatterns = [
     path('stock/<int:pk>/edit/', views.StockUpdateView.as_view(), name='stock_edit'),
     path('stock/low/', views.LowStockView.as_view(), name='low_stock'),
     path('stock/out/', views.OutOfStockView.as_view(), name='out_of_stock'),
-    
+    path('stock/low/export/pdf/', views.LowStockPDFView.as_view(), name='low_stock_pdf'), # New URL
+
+    path('stock/<int:pk>/export/pdf/', views.StockItemDetailPDFView.as_view(), name='stock_detail_pdf'), # New URL
+
     # Stock Movements
     path('stock/movement/', views.StockMovementListView.as_view(), name='movement_list'),
     path('stock/movement/add/', views.StockMovementCreateView.as_view(), name='movement_add'),
@@ -60,8 +65,6 @@ urlpatterns = [
     path('transfers/pending/', views.StockTransferListView.as_view(), {'status': 'pending'}, name='pending_transfers'),
     # Stock Management
     path('stock/adjustment/', views.StockAdjustmentView.as_view(), name='stock_adjustment'),
-    path('stock/reports/', views.StockReportView.as_view(), name='stock_reports'),
-    path('inventory/count/', views.InventoryCountView.as_view(), name='inventory_count'),
     path('stock/alerts/', views.StockAlertsView.as_view(), name='stock_alerts'),
     
     # Export endpoints
@@ -81,7 +84,7 @@ urlpatterns = [
     path('api/barcode/scan/', views.BarcodeStockView.as_view(), name='barcode_scan'),
     path('api/check-existing-stock/', views.CheckExistingStockView.as_view(), name='check_existing_stock'),
     path('api/unit-conversion/', views.UnitConversionAPIView.as_view(), name='unit_conversion_api'),
-
+    
 
     # Bulk operations
     path('stock/bulk-update/', views.bulk_stock_update, name='bulk_stock_update'),

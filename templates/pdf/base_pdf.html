@@ -4,14 +4,39 @@
     <meta charset="UTF-8">
     <title>{% block pdf_title %}تقرير{% endblock %}</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
+        /* Use a clear, readable font that supports Arabic well */
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
+
+        /*
+         * This sets the page size to A5 and uses comfortable margins.
+         */
+        @page {
+            size: A5;
+            margin: 1.5cm; /* Margins for A5 paper */
+
+            /* Header and footer styling for printing */
+            @top-center {
+                content: "{% block pdf_header_title %}Mekawy Group{% endblock %}";
+                font-family: 'Tajawal', sans-serif;
+                font-size: 15pt; /* Kept header/footer font reasonable */
+                color: #666;
+            }
+
+            @bottom-right {
+                content: "صفحة " counter(page) " من " counter(pages);
+                font-family: 'Tajawal', sans-serif;
+                font-size: 9pt;
+                color: #666;
+            }
+        }
         
         body {
             font-family: 'Tajawal', sans-serif;
-            font-size: 10pt;
+            /* === MUCH LARGER FONT SIZE (FIX) === */
+            font-size: 18pt; 
             direction: rtl;
             text-align: right;
-            line-height: 1.6;
+            line-height: 1.6; /* Increased line-height for better spacing */
             color: #333;
         }
 
@@ -24,11 +49,12 @@
 
         .header h1 {
             margin: 0;
-            color: #0056b3;
+            font-size: 22pt; /* Increased heading size */
+            color: #004a99;
         }
         
         .header .meta-info {
-            font-size: 9pt;
+            font-size: 18pt; /* Increased */
             color: #777;
         }
 
@@ -36,50 +62,47 @@
             width: 100%;
         }
         
+        /* Table styles optimized for A5 */
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
+            margin-top: 15px;
+            /* === MUCH LARGER TABLE FONT SIZE (FIX) === */
+            font-size: 12pt; 
+            page-break-inside: auto;
+        }
+
+        thead tr {
+            page-break-inside: avoid;
+        }
+
+        tbody tr {
+            page-break-inside: avoid;
         }
 
         th, td {
             border: 1px solid #ddd;
-            padding: 8px;
+            padding: 8px; /* Slightly increased padding for larger font */
             text-align: right;
         }
 
         thead tr {
             background-color: #f2f2f2;
             color: #333;
-            font-weight: bold;
+            font-weight: 700;
         }
 
         tbody tr:nth-child(even) {
             background-color: #f9f9f9;
         }
         
-        .footer {
-            position: fixed;
-            bottom: -20px;
-            left: 0;
-            right: 0;
-            height: 50px;
-            font-size: 8pt;
-            text-align: center;
-            color: #777;
-            border-top: 1px solid #eee;
-            padding-top: 5px;
-        }
-        
-        .page-number:before {
-            content: "صفحة " counter(page);
-        }
     </style>
+    {% block extra_styles %}{% endblock %}
 </head>
 <body>
     <div class="header">
         {% block pdf_header %}
-        <h1>تقرير النظام</h1>
+        <h1>{% block document_main_title %}تقرير النظام{% endblock %}</h1>
         {% endblock %}
     </div>
 
@@ -88,7 +111,6 @@
         <p>لا يوجد محتوى.</p>
         {% endblock %}
     </div>
-
     
 </body>
 </html>

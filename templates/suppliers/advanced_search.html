@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}بحث متقدم - الموردين{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h2 mb-4 text-gray-800 fw-bold">بحث متقدم في الموردين</h1>
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="get">
+                <div class="accordion" id="accordionFilters">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header"><button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBasic">الفلاتر الأساسية</button></h2>
+                        <div id="collapseBasic" class="accordion-collapse collapse show" data-bs-parent="#accordionFilters">
+                            <div class="accordion-body row">
+                                <div class="col-md-12 mb-3"><input type="text" name="search" class="form-control" placeholder="بحث عام بالاسم، كود، هاتف..." value="{{ filters.search }}"></div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">نوع المورد</label>
+                                    <select name="supplier_type" class="form-select" multiple>
+                                      {% for val, display in supplier_types %}<option value="{{ val }}" {% if val in filters.supplier_type %}selected{% endif %}>{{display}}</option>{% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                <div class="mt-3 text-end">
+                    <a href="{% url 'suppliers:advanced_search' %}" class="btn btn-secondary">إعادة تعيين</a>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-search me-2"></i>بحث</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mt-4">
+        <div class="card-header"><h6 class="m-0 font-weight-bold text-primary">نتائج البحث ({{ suppliers.count }})</h6></div>
+        <div class="card-body">
+             <p>... سيتم عرض جدول النتائج هنا ...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

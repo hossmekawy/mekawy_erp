@@ -2,12 +2,11 @@ from django.shortcuts import redirect
 from django.contrib import messages
 from django.urls import reverse
 from django.utils.deprecation import MiddlewareMixin
-from django.contrib import messages
 from django.http import JsonResponse
 
 class RoleBasedAccessMiddleware(MiddlewareMixin):
     """
-    Middleware to control access based on user roles
+    Middleware to control access based on user roles.
     """
     
     # Define role-based access rules
@@ -69,43 +68,42 @@ class RoleBasedAccessMiddleware(MiddlewareMixin):
     EXEMPT_URLS = [
         'users:login', 'users:logout', 'users:password_reset',
         'users:password_reset_done', 'users:password_reset_confirm',
-        'users:password_reset_complete', 'admin'
+        'users:password_reset_complete'
     ]
     
     def process_view(self, request, view_func, view_args, view_kwargs):
-        # تجاهل المسارات العامة
         if not request.user.is_authenticated:
             return None
             
-        # تجاهل مسارات الأدمن والمسارات العامة
-        if request.path.startswith('/admin/') or request.path.startswith('/api/'):
+        if request.path.startswith('/admin/'):
             return None
             
-        # الحصول على اسم المسار
         try:
             url_name = request.resolver_match.url_name
             app_name = request.resolver_match.app_name
             full_url_name = f"{app_name}:{url_name}" if app_name else url_name
         except:
             return None
+
+        # --- FIX STARTS HERE ---
+        # Check if the URL is exempt from permission checks. This must be done
+        # before any other role checks.
+        if full_url_name in self.EXEMPT_URLS:
+            return None
+        # --- FIX ENDS HERE ---
             
-        # التحقق من دور المستخدم
         user_role = getattr(request.user, 'role', 'viewer')
         
-        # الأدمن له صلاحية على كل شيء
         if user_role == 'admin':
             return None
             
-        # التحقق من الصلاحيات
         allowed_permissions = self.ROLE_PERMISSIONS.get(user_role, [])
         
-        # التحقق من الصلاحية
         has_permission = False
         for permission in allowed_permissions:
             if permission == '*' or permission == full_url_name:
                 has_permission = True
                 break
-            # التحقق من صلاحيات التطبيق (مثل warehouses:*)
             if permission.endswith(':*') and full_url_name.startswith(permission[:-1]):
                 has_permission = True
                 break

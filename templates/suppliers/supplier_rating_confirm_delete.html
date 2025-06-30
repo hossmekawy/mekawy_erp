@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}تأكيد الحذف - Mekawy ERP{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 600px;">
+    <div class="card shadow-lg text-center p-4">
+        <div class="card-body">
+            <h1 class="h3 text-danger mb-4">تأكيد الحذف</h1>
+            <p>هل أنت متأكد أنك تريد حذف هذا التقييم؟</p>
+            
+            <div class="alert alert-warning">
+                <strong>المورد:</strong> {{ object.supplier.name }}<br>
+                <strong>أمر الشراء:</strong> {{ object.purchase_order.po_number }}<br>
+                <strong>التقييم:</strong> {{ object.overall_rating }}/5
+            </div>
+            
+            <p class="text-muted">لا يمكن التراجع عن هذا الإجراء.</p>
+
+            <form method="post">
+                {% csrf_token %}
+                <a href="{{ object.get_absolute_url }}" class="btn btn-secondary">إلغاء</a>
+                <button type="submit" class="btn btn-danger">نعم، قم بالحذف</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

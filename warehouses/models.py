@@ -227,3 +227,38 @@ class StockTransfer(models.Model):
     
     def __str__(self):
         return f"تحويل {self.transfer_number}: {self.product.name} من {self.from_warehouse.name} إلى {self.to_warehouse.name}"
+
+
+# Add this new model to your warehouses/models.py file
+
+class ProductBatch(models.Model):
+    """
+    Tracks the inventory of a specific production batch of a finished product
+    in a particular warehouse.
+    """
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='batches', verbose_name="المنتج")
+    warehouse = models.ForeignKey(Warehouse, on_delete=models.CASCADE, related_name='batches', verbose_name="المخزن")
+    batch_number = models.CharField(max_length=100, db_index=True, verbose_name="رقم الدفعة")
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="الكمية")
+    cost_per_piece = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="تكلفة القطعة")
+    
+    # This link helps trace the batch back to its production origin
+    final_product_source = models.OneToOneField(
+        'production.FinalProduct', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='warehouse_batch'
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الإنشاء")
+    
+    class Meta:
+        verbose_name = "دفعة منتج"
+        verbose_name_plural = "دفعات المنتجات"
+        # A product can have the same batch number in different warehouses
+        unique_together = ('product', 'warehouse', 'batch_number')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Batch {self.batch_number} of {self.product.name} ({self.quantity}) in {self.warehouse.name}"

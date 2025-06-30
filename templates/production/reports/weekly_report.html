@@ -1,0 +1,70 @@
+{% extends 'production/production_base.html' %}
+{% load i18n %}
+
+{% block production_title %}التقرير الأسبوعي{% endblock %}
+
+{% block production_page_title %}
+    <i class="fas fa-calendar-week me-2"></i>
+    {% trans "التقرير الأسبوعي للإنتاج" %}
+{% endblock %}
+
+{% block production_content %}
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="production-metric">
+            <div class="production-metric-icon primary"><i class="fas fa-folder-plus"></i></div>
+            <div class="production-metric-value">{{ weekly_stats.orders_created|default:0 }}</div>
+            <div class="production-metric-label">{% trans "أوامر هذا الأسبوع" %}</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="production-metric">
+            <div class="production-metric-icon success"><i class="fas fa-tasks"></i></div>
+            <div class="production-metric-value">{{ weekly_stats.orders_completed|default:0 }}</div>
+            <div class="production-metric-label">{% trans "أوامر مكتملة" %}</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="production-metric">
+            <div class="production-metric-icon warning"><i class="fas fa-box-open"></i></div>
+            <div class="production-metric-value">{{ weekly_stats.total_pieces|default:0 }}</div>
+            <div class="production-metric-label">{% trans "إجمالي القطع المنتجة" %}</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="production-metric">
+            <div class="production-metric-icon danger"><i class="fas fa-chart-line"></i></div>
+            <div class="production-metric-value">{{ weekly_stats.completion_rate|floatformat:2 }}%</div>
+            <div class="production-metric-label">{% trans "معدل الإنجاز" %}</div>
+        </div>
+    </div>
+</div>
+
+<div class="production-card">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">{% trans "الأداء اليومي خلال الأسبوع" %}</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table production-table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "التاريخ" %}</th>
+                        <th class="text-center">{% trans "أوامر تم إنشاؤها" %}</th>
+                        <th class="text-center">{% trans "أوامر مكتملة" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for day in daily_performance %}
+                    <tr>
+                        <td>{{ day.date|date:"l, Y-m-d" }}</td>
+                        <td class="text-center">{{ day.orders_created }}</td>
+                        <td class="text-center">{{ day.orders_completed }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

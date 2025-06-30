@@ -52,6 +52,10 @@
                 <i class="fas fa-edit ml-2 rtl:mr-2"></i>
                 تعديل
             </a>
+            <a href="{% url 'warehouses:warehouse_detail_pdf' warehouse.pk %}" class="inline-flex items-center px-4 py-2 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 focus:outline-none" target="_blank">
+                <i class="fas fa-file-pdf ml-2 rtl:mr-2"></i>
+                تصدير PDF
+            </a>
         </div>
     </div>
 

@@ -64,6 +64,20 @@ class User(AbstractUser):
     
     def get_role_display_ar(self):
         return self.get_role_display()
+    
+    @property
+    def initials(self):
+        """
+        Returns the user's initials.
+        For "حسام علي", it returns "ح ع".
+        """
+        if self.first_name and self.last_name:
+            return f"{self.first_name[0]} {self.last_name[0]}"
+        elif self.first_name:
+            return self.first_name[0]
+        elif self.username:
+            return self.username[0]
+        return "?"
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')

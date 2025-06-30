@@ -175,6 +175,7 @@ urlpatterns = [
     path('bom/<int:pk>/copy/', views.copy_bill_of_materials, name='bom_copy'),
 
     # AJAX Views
+    path('ajax/get-bom-components-for-order/', views.ajax_get_bom_components_for_order, name='ajax_get_bom_components_for_order'), # <-- FIX IS HERE
     path('ajax/get-size-group-for-product/', views.get_size_group_for_product_ajax, name='get_size_group_for_product_ajax'),
     path('ajax/get-fabric-stock/', views.get_fabric_stock_ajax, name='get_fabric_stock_ajax'),
     path('ajax/calculate-fabric-requirement/', views.calculate_fabric_requirement_ajax, name='calculate_fabric_requirement_ajax'),
@@ -222,5 +223,6 @@ urlpatterns = [
     path('print/bulk-orders/', views.bulk_print_orders, name='bulk_print_orders'),
     path('print/orders-list/', views.print_orders_list, name='print_orders_list'),
     path('workflow-status/', views.workflow_status_view, name='workflow_status'),
-
+# In your urls.py inside urlpatterns list
+    path('ajax/get-order-count-for-period/', views.ajax_get_order_count_for_period, name='ajax_get_order_count_for_period'),
 ]

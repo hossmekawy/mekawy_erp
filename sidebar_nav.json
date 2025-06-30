@@ -1,0 +1,363 @@
+{
+    "Dashboard": {
+        "لوحة التحكم": {
+            "url_name": "dashboard:index",
+            "icon": "fas fa-tachometer-alt",
+            "roles": ["*"]
+        }
+    },
+    "إدارة المستخدمين": {
+        "قائمة المستخدمين": {
+            "url_name": "users:manage",
+            "icon": "fas fa-list",
+            "roles": ["admin", "manager"]
+        },
+        "إضافة مستخدم": {
+            "url_name": "users:register",
+            "icon": "fas fa-user-plus",
+            "roles": ["admin"]
+        },
+        "ملفي الشخصي": {
+            "url_name": "users:profile",
+            "icon": "fas fa-user",
+            "roles": ["*"]
+        },
+        "تعديل الملف": {
+            "url_name": "users:profile_edit",
+            "icon": "fas fa-user-edit",
+            "roles": ["*"]
+        }
+    },
+    "الموردين": {
+        "title": "الموردين",
+        "icon": "fas fa-truck",
+        "roles": ["admin", "manager", "employee"],
+        "submenu": {
+            "لوحة التحكم": {
+                "url_name": "suppliers:dashboard",
+                "icon": "fas fa-tachometer-alt",
+                "roles": ["admin", "manager"]
+            },
+            "قائمة الموردين": {
+                "url_name": "suppliers:list",
+                "icon": "fas fa-list",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "إضافة مورد": {
+                "url_name": "suppliers:create",
+                "icon": "fas fa-plus",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "أداء الموردين": {
+                "url_name": "suppliers:performance",
+                "icon": "fas fa-chart-line",
+                "roles": ["admin", "manager"]
+            },
+            "تقارير الموردين": {
+                "url_name": "suppliers:reports",
+                "icon": "fas fa-file-alt",
+                "roles": ["admin", "manager"]
+            },
+            "بحث متقدم": {
+                "url_name": "suppliers:advanced_search",
+                "icon": "fas fa-search-plus",
+                "roles": ["admin", "manager", "employee"]
+            }
+        }
+    },
+    "أوامر الشراء": {
+        "title": "أوامر الشراء",
+        "icon": "fas fa-shopping-cart",
+        "roles": ["admin", "manager", "employee"],
+        "submenu": {
+            "قائمة الأوامر": {
+                "url_name": "suppliers:purchase_orders",
+                "icon": "fas fa-list-alt",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "إضافة أمر شراء": {
+                "url_name": "suppliers:purchase_order_create",
+                "icon": "fas fa-cart-plus",
+                "roles": ["admin", "manager", "employee"]
+            }
+        }
+    },
+    "الماليات والتقييم": {
+        "title": "الماليات والتقييم",
+        "icon": "fas fa-coins",
+        "roles": ["admin", "manager", "employee"],
+        "submenu": {
+            "سجل المدفوعات": {
+                "url_name": "suppliers:payments",
+                "icon": "fas fa-money-check-alt",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "قائمة التقييمات": {
+                "url_name": "suppliers:all_ratings",
+                "icon": "fas fa-star-half-alt",
+                "roles": ["admin", "manager", "employee"]
+            }
+        }
+    },
+    "المخازن": {
+        "title": "المخازن",
+        "icon": "fas fa-warehouse",
+        "roles": ["admin", "manager", "employee", "*"],
+        "submenu": {
+            "قائمة المخازن": {
+                "url_name": "warehouses:warehouse_list",
+                "icon": "fas fa-list",
+                "roles": ["*"]
+            },
+            "إضافة مخزن": {
+                "url_name": "warehouses:warehouse_add",
+                "icon": "fas fa-plus",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "قائمة التصنيفات": {
+                "url_name": "warehouses:category_list",
+                "icon": "fas fa-tags",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "إضافة تصنيف": {
+                "url_name": "warehouses:category_add",
+                "icon": "fas fa-plus",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "قائمة المنتجات": {
+                "url_name": "warehouses:product_list",
+                "icon": "fas fa-boxes",
+                "roles": ["*"]
+            },
+            "إضافة منتج": {
+                "url_name": "warehouses:product_add",
+                "icon": "fas fa-plus",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "إدارة المخزون": {
+                "url_name": "warehouses:stock_list",
+                "icon": "fas fa-clipboard-list",
+                "roles": ["*"]
+            },
+            "قائمة الوحدات": {
+                "url_name": "warehouses:unit_list",
+                "icon": "fas fa-balance-scale",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "إضافة وحدة": {
+                "url_name": "warehouses:unit_add",
+                "icon": "fas fa-plus",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "تحويلات الوحدات": {
+                "url_name": "warehouses:unit_conversion_list",
+                "icon": "fas fa-exchange-alt",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "إضافة تحويل": {
+                "url_name": "warehouses:unit_conversion_add",
+                "icon": "fas fa-plus",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "حركات المخزون": {
+                "url_name": "warehouses:movement_list",
+                "icon": "fas fa-exchange-alt",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "التحويلات": {
+                "url_name": "warehouses:transfer_list",
+                "icon": "fas fa-truck",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "مخزون منخفض": {
+                "url_name": "warehouses:low_stock",
+                "icon": "fas fa-exclamation-triangle",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "تنبيهات المخزون": {
+                "url_name": "warehouses:stock_alerts",
+                "icon": "fas fa-bell",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "جرد المخزون": {
+                "url_name": "warehouses:inventory_count",
+                "icon": "fas fa-clipboard-list",
+                "roles": ["admin", "manager", "employee"]
+            }
+        }
+    },
+    "الإنتاج": {
+        "title": "الإنتاج",
+        "icon": "fas fa-industry",
+        "roles": ["admin", "manager", "employee"],
+        "submenu": {
+            "لوحة تحكم الإنتاج": {
+                "url_name": "production:dashboard",
+                "icon": "fas fa-tachometer-alt",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "قائمة أوامر الإنتاج": {
+                "url_name": "production:order_list",
+                "icon": "fas fa-clipboard-list",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "إنشاء أمر إنتاج": {
+                "url_name": "production:order_create",
+                "icon": "fas fa-plus",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "مخزون الأقمشة": {
+                "url_name": "production:textile_stock_list",
+                "icon": "fas fa-scroll",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "إضافة مخزون قماش": {
+                "url_name": "production:textile_stock_create",
+                "icon": "fas fa-plus",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "قائمة المنتجات النهائية": {
+                "url_name": "production:finished_product_list",
+                "icon": "fas fa-tshirt",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "إضافة منتج جديد": {
+                "url_name": "production:finished_product_create",
+                "icon": "fas fa-plus",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "قوائم المواد (BOM)": {
+                "url_name": "production:bom_list",
+                "icon": "fas fa-list-alt",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "إنشاء قائمة مواد": {
+                "url_name": "production:bom_create",
+                "icon": "fas fa-plus",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "رسومات القص": {
+                "url_name": "production:draws:draw_list",
+                "icon": "fas fa-drafting-compass",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "إضافة رسمة قص": {
+                "url_name": "production:draws:draw_create",
+                "icon": "fas fa-plus",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "عمليات القص": {
+                "url_name": "production:cutting_list",
+                "icon": "fas fa-cut",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "عمليات التجميع": {
+                "url_name": "production:assembly_list",
+                "icon": "fas fa-cogs",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "عمليات الصباغة": {
+                "url_name": "production:dyeing_list",
+                "icon": "fas fa-tint",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "عمليات التشطيب": {
+                "url_name": "production:finishing_list",
+                "icon": "fas fa-magic",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "قائمة المصانع الخارجية": {
+                "url_name": "production:manufacturers:manufacturer_list",
+                "icon": "fas fa-building",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "إضافة مصنع خارجي": {
+                "url_name": "production:manufacturers:manufacturer_create",
+                "icon": "fas fa-plus",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "تصاريح الخروج": {
+                "url_name": "production:exit_permits:exit_permit_list",
+                "icon": "fas fa-file-export",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "إنشاء تصريح خروج": {
+                "url_name": "production:exit_permits:exit_permit_create",
+                "icon": "fas fa-plus",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "فحوصات الجودة": {
+                "url_name": "production:quality_list",
+                "icon": "fas fa-search",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "إنشاء فحص جودة": {
+                "url_name": "production:quality_create",
+                "icon": "fas fa-plus",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "إدارة الفئات والمقاسات": {
+                "url_name": "production:category_size_management",
+                "icon": "fas fa-cogs",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "تقارير الإنتاج": {
+                "url_name": "production:report_list",
+                "icon": "fas fa-chart-bar",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "تحليل التكاليف": {
+                "url_name": "production:cost_analysis_list",
+                "icon": "fas fa-calculator",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "التقرير اليومي": {
+                "url_name": "production:daily_report",
+                "icon": "fas fa-calendar-day",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "التقرير الأسبوعي": {
+                "url_name": "production:weekly_report",
+                "icon": "fas fa-calendar-week",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "التقرير الشهري": {
+                "url_name": "production:monthly_report",
+                "icon": "fas fa-calendar-alt",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "تقرير التكاليف": {
+                "url_name": "production:cost_analysis_report",
+                "icon": "fas fa-chart-pie",
+                "roles": ["admin", "manager", "employee"]
+            },
+            "تقرير الجودة": {
+                "url_name": "production:quality_report",
+                "icon": "fas fa-award",
+                "roles": ["admin", "manager", "employee"]
+            }
+        }
+    },
+    "الإعدادات": {
+        "الإعدادات العامة": {
+            "url_name": "settings:general",
+            "icon": "fas fa-cogs",
+            "roles": ["admin"]
+        }
+    },
+    "الملف الشخصي": {
+        "الملف الشخصي": {
+            "url_name": "users:profile",
+            "icon": "fas fa-user",
+            "roles": ["*"]
+        }
+    },
+    "تسجيل الخروج": {
+        "تسجيل الخروج": {
+            "url_name": "#logoutModal",
+            "icon": "fas fa-sign-out-alt",
+            "roles": ["*"],
+            "is_modal": true
+        }
+    }
+}

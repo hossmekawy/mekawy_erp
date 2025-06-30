@@ -274,7 +274,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const length = parseFloat(singleLayerLengthInput.value) || 0;
         let result = 0;
         if (length > 0) {
-            result = pieces / length;
+            result = length/pieces ;
         }
         singleLayerOutput.value = result.toFixed(3);
         updateWasteCalculation(); // Update waste whenever meterage changes

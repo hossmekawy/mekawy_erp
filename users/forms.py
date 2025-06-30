@@ -4,11 +4,12 @@ from django.contrib.auth import authenticate
 from .models import User, UserProfile
 
 class CustomAuthenticationForm(AuthenticationForm):
-    username = forms.EmailField(
-        label="البريد الإلكتروني",
-        widget=forms.EmailInput(attrs={
+    # Change from EmailField to CharField to accept username or email
+    username = forms.CharField(
+        label="اسم المستخدم أو البريد الإلكتروني",
+        widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'البريد الإلكتروني',
+            'placeholder': 'اسم المستخدم أو البريد الإلكتروني',
             'autofocus': True
         })
     )
@@ -16,23 +17,26 @@ class CustomAuthenticationForm(AuthenticationForm):
         label="كلمة المرور",
         widget=forms.PasswordInput(attrs={
             'class': 'form-control',
-            'placeholder': 'كلمة المرور'
+            'placeholder': 'كلمة المرور',
+            'id': 'id_password'  # Add ID for the toggle button script
         })
     )
     
     def clean(self):
-        email = self.cleaned_data.get('username')
+        username = self.cleaned_data.get('username')
         password = self.cleaned_data.get('password')
         
-        if email and password:
+        if username and password:
+            # The custom backend will handle checking both username and email.
             self.user_cache = authenticate(
                 self.request, 
-                username=email, 
+                username=username, 
                 password=password
             )
             if self.user_cache is None:
                 raise forms.ValidationError(
-                    'البريد الإلكتروني أو كلمة المرور غير صحيحة.'
+                    'اسم المستخدم/البريد الإلكتروني أو كلمة المرور غير صحيحة.',
+                    code='invalid_login'
                 )
             else:
                 self.confirm_login_allowed(self.user_cache)

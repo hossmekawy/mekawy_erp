@@ -414,10 +414,11 @@ class ExitPermitForm(forms.ModelForm):
         # The 'production_order' field is intentionally left out, as it will be set
         # automatically in the view based on the context (assembly or dyeing process).
         fields = [
-            'permit_type', 'items_description', 
+            'production_order','permit_type', 'items_description', 
             'quantity', 'destination', 'purpose', 'valid_until', 'notes'
         ]
         widgets = {
+            'production_order': forms.Select(attrs={'class': 'form-select'}),
             'permit_type': forms.Select(attrs={'class': 'form-select'}),
             'items_description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
@@ -426,6 +427,16 @@ class ExitPermitForm(forms.ModelForm):
             'valid_until': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
+    def __init__(self, *args, **kwargs):
+        # This __init__ is optional but good practice to filter the queryset
+        super().__init__(*args, **kwargs)
+        # Show only active, non-cancelled orders in the dropdown
+        self.fields['production_order'].queryset = ProductionOrder.objects.filter(
+            is_active=True
+        ).exclude(
+            status__in=['completed', 'cancelled']
+        )
+        self.fields['production_order'].empty_label = "--- اختر أمر إنتاج ---"
 class ReceiptConfirmationForm(forms.ModelForm):
     class Meta:
         model = ReceiptConfirmation

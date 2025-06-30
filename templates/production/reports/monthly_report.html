@@ -1,0 +1,78 @@
+{% extends 'production/production_base.html' %}
+{% load i18n %}
+
+{% block production_title %}التقرير الشهري{% endblock %}
+
+{% block production_page_title %}
+    <i class="fas fa-calendar-alt me-2"></i>
+    {% trans "التقرير الشهري للإنتاج" %} ({{ "now"|date:"F Y" }})
+{% endblock %}
+
+{% block production_content %}
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="production-metric">
+            <div class="production-metric-icon primary"><i class="fas fa-folder-plus"></i></div>
+            <div class="production-metric-value">{{ monthly_stats.orders_created|default:0 }}</div>
+            <div class="production-metric-label">{% trans "أوامر هذا الشهر" %}</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="production-metric">
+            <div class="production-metric-icon success"><i class="fas fa-tasks"></i></div>
+            <div class="production-metric-value">{{ monthly_stats.orders_completed|default:0 }}</div>
+            <div class="production-metric-label">{% trans "أوامر مكتملة" %}</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="production-metric">
+            <div class="production-metric-icon warning"><i class="fas fa-box-open"></i></div>
+            <div class="production-metric-value">{{ monthly_stats.total_pieces|default:0 }}</div>
+            <div class="production-metric-label">{% trans "إجمالي القطع المنتجة" %}</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="production-metric">
+            <div class="production-metric-icon danger"><i class="fas fa-ruler-combined"></i></div>
+            <div class="production-metric-value">{{ monthly_stats.total_fabric_used|floatformat:2 }}</div>
+            <div class="production-metric-label">{% trans "إجمالي القماش المستخدم (متر)" %}</div>
+        </div>
+    </div>
+</div>
+
+<div class="production-card">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">{% trans "أداء المنتجات هذا الشهر" %}</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table production-table table-striped">
+                <thead>
+                    <tr>
+                        <th>{% trans "اسم المنتج" %}</th>
+                        <th class="text-center">{% trans "إجمالي الأوامر" %}</th>
+                        <th class="text-center">{% trans "الأوامر المكتملة" %}</th>
+                        <th class="text-center">{% trans "إجمالي القطع" %}</th>
+                        <th class="text-center">{% trans "إجمالي القماش (متر)" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in product_performance %}
+                    <tr>
+                        <td>{{ product.product__name }}</td>
+                        <td class="text-center">{{ product.total_orders }}</td>
+                        <td class="text-center">{{ product.completed_orders }}</td>
+                        <td class="text-center">{{ product.total_pieces }}</td>
+                        <td class="text-center">{{ product.total_fabric|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-4">{% trans "لا توجد بيانات إنتاج لهذا الشهر." %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

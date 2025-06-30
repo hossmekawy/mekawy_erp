@@ -1,0 +1,94 @@
+{% extends 'production/production_base.html' %}
+{% load i18n %}
+
+{% block production_title %}تقرير تحليل التكلفة{% endblock %}
+
+{% block production_page_title %}
+    <i class="fas fa-dollar-sign me-2"></i>
+    {% trans "تقرير تحليل التكلفة" %}
+{% endblock %}
+
+{% block production_content %}
+<div class="production-card mb-4">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">{% trans "تصفية حسب التاريخ" %}</h6>
+    </div>
+    <div class="card-body">
+        <form method="get">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label for="start_date" class="form-label">{% trans "من تاريخ" %}</label>
+                    <input type="date" name="start_date" id="start_date" value="{{ start_date|date:'Y-m-d' }}" class="form-control">
+                </div>
+                <div class="col-md-4">
+                    <label for="end_date" class="form-label">{% trans "إلى تاريخ" %}</label>
+                    <input type="date" name="end_date" id="end_date" value="{{ end_date|date:'Y-m-d' }}" class="form-control">
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-production w-100">{% trans "تطبيق" %}</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="production-metric">
+            <div class="production-metric-icon primary"><i class="fas fa-wallet"></i></div>
+            <div class="production-metric-value">{{ total_production_cost|floatformat:2 }}</div>
+            <div class="production-metric-label">{% trans "إجمالي تكلفة الإنتاج" %}</div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="production-metric">
+            <div class="production-metric-icon success"><i class="fas fa-boxes"></i></div>
+            <div class="production-metric-value">{{ total_material_cost|floatformat:2 }}</div>
+            <div class="production-metric-label">{% trans "إجمالي تكلفة المواد" %}</div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="production-metric">
+            <div class="production-metric-icon warning"><i class="fas fa-cogs"></i></div>
+            <div class="production-metric-value">{{ total_process_cost|floatformat:2 }}</div>
+            <div class="production-metric-label">{% trans "إجمالي تكلفة العمليات" %}</div>
+        </div>
+    </div>
+</div>
+
+<div class="production-card">
+    <div class="card-header">
+        <h6 class="m-0 font-weight-bold text-primary">{% trans "تفاصيل تحليل التكلفة" %}</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table production-table">
+                <thead>
+                    <tr>
+                        <th>{% trans "أمر الإنتاج" %}</th>
+                        <th>{% trans "المنتج" %}</th>
+                        <th class="text-center">{% trans "تكلفة الإنتاج الإجمالية" %}</th>
+                        <th class="text-center">{% trans "تكلفة القطعة" %}</th>
+                        <th>{% trans "تاريخ التحليل" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for analysis in cost_analyses %}
+                    <tr>
+                        <td><a href="{% url 'production:cost_analysis_detail' analysis.pk %}">{{ analysis.production_order.order_number }}</a></td>
+                        <td>{{ analysis.production_order.product.name }}</td>
+                        <td class="text-center fw-bold">{{ analysis.total_production_cost|floatformat:2 }}</td>
+                        <td class="text-center">{{ analysis.cost_per_piece|floatformat:2 }}</td>
+                        <td>{{ analysis.analysis_date|date:"Y-m-d" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-4">{% trans "لا توجد بيانات تحليل تكلفة للفترة المحددة." %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

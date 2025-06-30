@@ -19,6 +19,9 @@
                 <i class="fas fa-edit"></i> تعديل
             </a>
             {% endif %}
+            <a href="{% url 'warehouses:stock_detail_pdf' stock_item.pk %}" class="btn btn-danger" target="_blank">
+                <i class="fas fa-file-pdf"></i> تصدير PDF
+            </a>
         </div>
     </div>
 

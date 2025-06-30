@@ -161,6 +161,43 @@ class FinishedProduct(models.Model):
         return base_requirement
     def __str__(self):
         return f"{self.name} ({self.code})"
+    
+    def save(self, *args, **kwargs):
+        """
+        Overrides the save method to create or update the corresponding
+        WarehouseProduct automatically, removing the need for a signal.
+        """
+        # Save the FinishedProduct instance first
+        super().save(*args, **kwargs)
+        
+        # Logic to sync with warehouses.Product
+        if self.warehouse_product:
+            # Update existing warehouse product
+            product = self.warehouse_product
+            product.name = self.name
+            product.code = self.code
+            product.cost_price = self.base_cost
+            product.selling_price = self.selling_price
+            product.is_active = self.is_active
+            product.save()
+        else:
+            # Create a new warehouse product if one doesn't exist
+            # This is robust and handles both creation and linking on update.
+            product, created = WarehouseProduct.objects.get_or_create(
+                code=self.code,
+                defaults={
+                    'name': self.name,
+                    'product_type': 'finished',
+                    'unit': 'piece', # Assuming 'piece' is a valid choice
+                    'cost_price': self.base_cost,
+                    'selling_price': self.selling_price,
+                    'is_active': self.is_active,
+                }
+            )
+            if self.warehouse_product_id != product.id:
+                 # Link it back to this instance and save without triggering a recursive loop
+                self.warehouse_product = product
+                super().save(update_fields=['warehouse_product'])
 class BillOfMaterials(models.Model):
     """
     Represents the Bill of Materials (BOM) for a specific finished product.
@@ -387,7 +424,7 @@ class CuttingProcess(models.Model):
         """
         # 1. Calculate the meterage per piece for the single layer
         if self.single_layer_fabric_length and self.single_layer_fabric_length > 0 and self.single_layer_pieces:
-            self.single_layer_meterage = Decimal(self.single_layer_pieces) / self.single_layer_fabric_length
+            self.single_layer_meterage = self.single_layer_fabric_length / Decimal(self.single_layer_pieces) 
         else:
             self.single_layer_meterage = None
 
@@ -870,8 +907,8 @@ class FinalProduct(models.Model):
     total_production_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="إجمالي تكلفة الإنتاج")
     cost_per_piece = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="تكلفة القطعة")
     
-    # معلومات المنتج النهائي
-    product_code = models.CharField(max_length=200, verbose_name="كود المنتج النهائي")
+    # Simplified product code - it no longer includes batch info
+    product_code = models.CharField(max_length=200, blank=True, verbose_name="كود المنتج النهائي")
     batch_info = models.TextField(verbose_name="معلومات الدفعة")
     
     # التواريخ
@@ -889,23 +926,80 @@ class FinalProduct(models.Model):
         return f"{self.product_code} - {self.size} ({self.quantity})"
     
     def save(self, *args, **kwargs):
-        if not self.product_code:
-            production_order = self.finishing_process.dyeing_process.assembly_process.production_order
-            batch = production_order.batch_number
-            product_name = production_order.product.name
-            self.product_code = f"{product_name}+{batch}+Final+{self.size}"
-            
-            # معلومات الدفعة
-            self.batch_info = f"Batch: {batch}, Product: {product_name}, Size: {self.size}, Quality: {self.quality_grade}"
+        """
+        Handles the creation of the final product and updates warehouse stock
+        by creating a ProductBatch and a StockMovement, all within a transaction.
+        This completely replaces the old signal-based logic.
+        """
+        from warehouses.models import Product as WarehouseProduct, StockItem, StockMovement, ProductBatch
         
-        # حساب التكلفة الإجمالية
-        if not self.total_production_cost:
+        # Ensure calculations happen before saving
+        is_new = self._state.adding
+        if is_new:
             self.calculate_total_cost()
         
-        super().save(*args, **kwargs)
-    
+            production_order = self.finishing_process.dyeing_process.assembly_process.production_order
+            batch_number = production_order.batch_number
+            product_name = production_order.product.name
+            
+            # The product_code is now the generic code of the product design
+            self.product_code = production_order.product.code
+            self.batch_info = f"Batch: {batch_number}, Product: {product_name}, Size: {self.size}, Quality: {self.quality_grade}"
+
+        # Use a transaction to ensure atomicity of inventory operations
+        with transaction.atomic():
+            super().save(*args, **kwargs) # Save the FinalProduct instance
+            
+            if is_new and self.quantity > 0:
+                production_order = self.finishing_process.dyeing_process.assembly_process.production_order
+                
+                # 1. Get the generic Warehouse Product associated with the FinishedProduct design
+                generic_warehouse_product = production_order.product.warehouse_product
+                if not generic_warehouse_product:
+                    # This is a critical error, the system should not allow this to happen
+                    # but we raise an exception to prevent data corruption.
+                    raise Exception(f"FinishedProduct '{production_order.product.name}' is not linked to a WarehouseProduct.")
+
+                # 2. Create the new ProductBatch record
+                product_batch, created = ProductBatch.objects.get_or_create(
+                    product=generic_warehouse_product,
+                    warehouse=self.warehouse,
+                    batch_number=production_order.batch_number,
+                    defaults={
+                        'quantity': self.quantity,
+                        'cost_per_piece': self.cost_per_piece,
+                        'final_product_source': self,
+                    }
+                )
+                if not created:
+                    # If batch already exists, just add quantity
+                    product_batch.quantity = F('quantity') + self.quantity
+                    product_batch.save()
+
+                # 3. Find or create the main StockItem (which aggregates all batches)
+                stock_item, _ = StockItem.objects.get_or_create(
+                    warehouse=self.warehouse,
+                    product=generic_warehouse_product,
+                    defaults={'quantity': 0}
+                )
+                
+                # 4. Create a StockMovement to record the transaction
+                StockMovement.objects.create(
+                    stock_item=stock_item,
+                    movement_type='in',
+                    quantity=self.quantity,
+                    reference_number=f"PROD-{production_order.order_number}",
+                    notes=f"إنتاج من أمر {production_order.order_number} - دفعة {production_order.batch_number}",
+                    created_by=self.stored_by
+                )
+
+                # 5. Manually update the aggregate stock quantity
+                stock_item.quantity = F('quantity') + self.quantity
+                stock_item.save()
+
     def calculate_total_cost(self):
         """حساب إجمالي تكلفة الإنتاج"""
+        # ... (this method remains unchanged) ...
         production_order = self.finishing_process.dyeing_process.assembly_process.production_order
         
         # تكلفة القماش
@@ -1381,79 +1475,8 @@ class ProductionReport(models.Model):
 
 # إشارات Django لتحديث الحالات تلقائياً
 from django.db.models.signals import post_save
-from django.dispatch import receiver
 
-@receiver(post_save, sender=CuttingProcess)
-def update_production_order_status_cutting(sender, instance, **kwargs):
-    """تحديث حالة أمر الإنتاج عند إكمال القص"""
-    if instance.is_completed:
-        instance.production_order.status = 'in_assembly'
-        instance.production_order.save()
 
-@receiver(post_save, sender=AssemblyProcess)
-def update_production_order_status_assembly(sender, instance, **kwargs):
-    """تحديث حالة أمر الإنتاج عند إكمال التجميع"""
-    if instance.is_completed:
-        instance.production_order.status = 'in_dyeing'
-        instance.production_order.save()
-
-@receiver(post_save, sender=DyeingProcess)
-def update_production_order_status_dyeing(sender, instance, **kwargs):
-    """تحديث حالة أمر الإنتاج عند إكمال الصباغة"""
-    if instance.is_completed:
-        instance.assembly_process.production_order.status = 'in_finishing'
-        instance.assembly_process.production_order.save()
-
-@receiver(post_save, sender=FinishingProcess)
-def update_production_order_status_finishing(sender, instance, **kwargs):
-    """تحديث حالة أمر الإنتاج عند إكمال التشطيب"""
-    if instance.is_completed:
-        instance.dyeing_process.assembly_process.production_order.status = 'completed'
-        instance.dyeing_process.assembly_process.production_order.actual_completion_date = timezone.now().date()
-        instance.dyeing_process.assembly_process.production_order.save()
-
-@receiver(post_save, sender=FinalProduct)
-def update_warehouse_stock(sender, instance, created, **kwargs):
-    """تحديث مخزون المستودع عند إضافة منتج نهائي"""
-    if created:
-        from warehouses.models import StockItem, StockMovement
-        
-        # البحث عن عنصر المخزون أو إنشاؤه
-        production_order = instance.finishing_process.dyeing_process.assembly_process.production_order
-        
-        # إنشاء منتج في نظام المخازن إذا لم يكن موجوداً
-        from warehouses.models import Product as WarehouseProduct
-        warehouse_product, created = WarehouseProduct.objects.get_or_create(
-            code=instance.product_code,
-            defaults={
-                'name': f"{production_order.product.name} - {instance.size}",
-                'product_type': 'finished',
-                'cost_price': instance.cost_per_piece,
-                'selling_price': production_order.product.selling_price,
-                'unit': 'piece',
-            }
-        )
-        
-        # تحديث أو إنشاء عنصر المخزون
-        stock_item, created = StockItem.objects.get_or_create(
-            warehouse=instance.warehouse,
-            product=warehouse_product,
-            defaults={'quantity': 0}
-        )
-        
-        # إضافة الكمية
-        stock_item.quantity += instance.quantity
-        stock_item.save()
-        
-        # إنشاء حركة مخزون
-        StockMovement.objects.create(
-            stock_item=stock_item,
-            movement_type='in',
-            quantity=instance.quantity,
-            reference_number=f"PROD-{production_order.order_number}",
-            notes=f"إنتاج من أمر {production_order.order_number} - دفعة {production_order.batch_number}",
-            created_by=instance.stored_by
-        )
 
 
 class GarmentDraw(models.Model):

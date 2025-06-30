@@ -1,12 +1,12 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, authenticate
+from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.views import LoginView, LogoutView, PasswordChangeView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.views.generic import TemplateView, CreateView, UpdateView, DeleteView, ListView
 from django.urls import reverse_lazy
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseRedirect
 from django.core.exceptions import PermissionDenied
 from .models import User, UserProfile
 from .forms import CustomUserCreationForm, CustomAuthenticationForm, UserProfileForm, UserEditForm, UserProfileSettingsForm
@@ -24,11 +24,21 @@ class CustomLoginView(LoginView):
         return super().form_valid(form)
 
 class CustomLogoutView(LogoutView):
+    # The next_page attribute is used by the default GET handler if we were to use it.
+    # We will handle redirection manually for clarity.
     next_page = reverse_lazy('users:login')
-    
+
     def dispatch(self, request, *args, **kwargs):
+        # This is the key change. We handle the GET request directly here.
+        if request.method == 'GET':
+            messages.info(request, 'تم تسجيل الخروج بنجاح.')
+            logout(request)
+            return HttpResponseRedirect(self.next_page)
+        
+        # The default POST handler remains unchanged.
         messages.info(request, 'تم تسجيل الخروج بنجاح.')
         return super().dispatch(request, *args, **kwargs)
+
 
 class RegisterView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     form_class = CustomUserCreationForm
@@ -50,7 +60,6 @@ class RegisterView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
         )
         return response
 
-# NEW: Custom Password Change View to add success messages
 class CustomPasswordChangeView(LoginRequiredMixin, PasswordChangeView):
     template_name = 'users/password_change.html'
     success_url = reverse_lazy('users:password_change_done')
@@ -64,7 +73,6 @@ class ProfileView(LoginRequiredMixin, TemplateView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # The signal ensures the profile exists
         context['profile'] = self.request.user.profile
         return context
 
@@ -95,7 +103,6 @@ class ProfileEditView(LoginRequiredMixin, UpdateView):
             messages.success(self.request, 'تم تحديث الملف الشخصي بنجاح!')
             return redirect(self.get_success_url())
         else:
-            # Pass both forms back to the template on failure
             return self.render_to_response(
                 self.get_context_data(form=form, profile_settings_form=profile_settings_form)
             )
@@ -115,7 +122,7 @@ class UserManagementView(LoginRequiredMixin, UserPassesTestMixin, ListView):
 class UserCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     model = User
     form_class = CustomUserCreationForm
-    template_name = 'users/user_form.html' # Use a generic form template
+    template_name = 'users/user_form.html'
     success_url = reverse_lazy('users:manage')
     
     def test_func(self):
@@ -130,16 +137,10 @@ class UserCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
         messages.success(self.request, f'تم إنشاء المستخدم بنجاح!')
         return super().form_valid(form)
 
-class RegisterView(UserCreateView):
-    # Inherits everything from UserCreateView, just uses a different template if needed
-    # Or can be removed if /users/manage/create/ is sufficient
-    pass
-
-
 class UserEditView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     model = User
     form_class = UserEditForm
-    template_name = 'users/user_form.html' # Use a generic form template
+    template_name = 'users/user_form.html'
     success_url = reverse_lazy('users:manage')
     
     def test_func(self):
@@ -156,7 +157,7 @@ class UserEditView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
 
 class UserDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     model = User
-    template_name = 'users/user_confirm_delete.html' # Use a generic confirm delete template
+    template_name = 'users/user_confirm_delete.html'
     success_url = reverse_lazy('users:manage')
     
     def test_func(self):

@@ -1,21 +1,27 @@
+from django.conf import settings
 from django.shortcuts import render, get_object_or_404, redirect
+from django.template.loader import render_to_string
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView, TemplateView, View
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib import messages
 from django.db.models import Q, F, Sum, Count, ExpressionWrapper
+from django.db import transaction  # Import transaction module
 from django.http import JsonResponse
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+import pdfkit
 from .models import Category, Warehouse, Product, StockItem, StockMovement, StockTransfer
 # Add the missing import at the top of the file
 from django.http import HttpResponse
+from decimal import Decimal, InvalidOperation
+
 import json
 from django.contrib.auth.decorators import login_required, permission_required
 from django.views.decorators.http import require_http_methods
 import csv
 from datetime import datetime, timedelta
-from .forms import CategoryForm, WarehouseForm, ProductForm, StockItemForm, UnitForm,UnitConversionForm
+from .forms import CategoryForm, StockItemUpdateForm, WarehouseForm, ProductForm, StockItemForm, UnitForm,UnitConversionForm
 # views.py
 
 class WarehouseDashboardView(LoginRequiredMixin, TemplateView):
@@ -33,12 +39,12 @@ class WarehouseDashboardView(LoginRequiredMixin, TemplateView):
         return context
 
 # Categories
-class CategoryListView(LoginRequiredMixin, ListView):
+class CategoryListView(LoginRequiredMixin, PermissionRequiredMixin,ListView):
     model = Category
     template_name = 'warehouses/category_list.html'
     context_object_name = 'categories'
     paginate_by = 20
-    
+    permission_required = 'warehouses.view_category'
     def get_queryset(self):
         queryset = Category.objects.all()
         search = self.request.GET.get('search')
@@ -62,7 +68,7 @@ class CategoryCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
     form_class = CategoryForm
     template_name = 'warehouses/category_form.html'
     success_url = reverse_lazy('warehouses:category_list')
-    
+    permission_required = 'warehouses.add_category'
     def form_valid(self, form):
         messages.success(self.request, 'تم إضافة التصنيف بنجاح!')
         return super().form_valid(form)
@@ -71,11 +77,13 @@ class CategoryCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
         messages.error(self.request, 'يرجى تصحيح الأخطاء المذكورة.')
         return super().form_invalid(form)
 
-class CategoryDetailView(LoginRequiredMixin, DetailView):
+class CategoryDetailView(LoginRequiredMixin, PermissionRequiredMixin,DetailView):
     model = Category
     template_name = 'warehouses/category_detail.html'
     context_object_name = 'category'
-    
+    permission_required = 'warehouses.view_category'
+
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['products'] = self.object.product_set.all()[:10]  # Show first 10 products
@@ -87,7 +95,7 @@ class CategoryUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView
     form_class = CategoryForm
     template_name = 'warehouses/category_form.html'
     success_url = reverse_lazy('warehouses:category_list')
-    
+    permission_required = 'warehouses.change_category'
     def form_valid(self, form):
         messages.success(self.request, 'تم تحديث التصنيف بنجاح!')
         return super().form_valid(form)
@@ -101,8 +109,8 @@ class CategoryDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView
     template_name = 'warehouses/category_confirm_delete.html'
     success_url = reverse_lazy('warehouses:category_list')
     required_roles = ['admin']
-
-class CategorySearchView(LoginRequiredMixin, View):
+    permission_required = 'warehouses.delete_category'
+class CategorySearchView(LoginRequiredMixin, PermissionRequiredMixin,View):
     def get(self, request):
         search = request.GET.get('q', '')
         categories = Category.objects.filter(
@@ -113,12 +121,12 @@ class CategorySearchView(LoginRequiredMixin, View):
         return JsonResponse({'categories': data})
 
 # Products
-class ProductListView(LoginRequiredMixin, ListView):
+class ProductListView(LoginRequiredMixin, PermissionRequiredMixin,ListView):
     model = Product
     template_name = 'warehouses/product_list.html'
     context_object_name = 'products'
     paginate_by = 25
-    
+    permission_required = 'warehouses.view_product'
     def get_queryset(self):
         queryset = Product.objects.select_related('category').all()
         search = self.request.GET.get('search')
@@ -143,12 +151,17 @@ class ProductCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView)
     template_name = 'warehouses/product_form.html'
     fields = ['name', 'code', 'barcode', 'category', 'product_type', 'unit', 'cost_price', 'selling_price', 'min_stock_level', 'is_active']
     success_url = reverse_lazy('warehouses:product_list')
-    required_roles = ['admin', 'warehouse_manager']
+    permission_required = 'warehouses.add_product'
 
-class ProductDetailView(LoginRequiredMixin, DetailView):
+
+
+class ProductDetailView(LoginRequiredMixin,PermissionRequiredMixin, DetailView):
     model = Product
     template_name = 'warehouses/product_detail.html'
     context_object_name = 'product'
+    permission_required = 'warehouses.view_product'
+
+
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -164,13 +177,13 @@ class ProductUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView)
     template_name = 'warehouses/product_form.html'
     fields = ['name', 'code', 'barcode', 'category', 'product_type', 'unit', 'cost_price', 'selling_price', 'min_stock_level', 'is_active']
     success_url = reverse_lazy('warehouses:product_list')
-    required_roles = ['admin', 'warehouse_manager']
-
+    permission_required = 'warehouses.change_product'
 class ProductDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
     model = Product
     template_name = 'warehouses/product_confirm_delete.html'
     success_url = reverse_lazy('warehouses:product_list')
     required_roles = ['admin']
+    permission_required = 'warehouses.delete_product'
 
 class ProductSearchView(LoginRequiredMixin, View):
     def get(self, request):
@@ -206,12 +219,12 @@ class ProductBarcodeView(LoginRequiredMixin, View):
 # Warehouses
 # Update the WarehouseListView in your existing warehouses/views.py file
 
-class WarehouseListView(LoginRequiredMixin, ListView):
+class WarehouseListView(LoginRequiredMixin,PermissionRequiredMixin, ListView):
     model = Warehouse
     template_name = 'warehouses/warehouse_list.html'
     context_object_name = 'warehouses'
     paginate_by = 25
-    
+    permission_required = 'warehouses.view_warehouse'
     def get_queryset(self):
         queryset = Warehouse.objects.select_related('manager').all()
         search = self.request.GET.get('search')
@@ -243,22 +256,25 @@ class WarehouseListView(LoginRequiredMixin, ListView):
         
         return context
 
-class WarehouseCreateView(CreateView):
+class WarehouseCreateView(CreateView ,LoginRequiredMixin, PermissionRequiredMixin):
     model = Warehouse
     form_class = WarehouseForm
     template_name = 'warehouses/warehouse_form.html' # Assumes this template exists
     success_url = reverse_lazy('warehouses:warehouse_list') # Assumes this URL name exists
+    permission_required = 'warehouses.add_warehouse'
+
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'إنشاء مخزن جديد'
         return context
 
-class WarehouseDetailView(DetailView):
+class WarehouseDetailView(DetailView ,LoginRequiredMixin, PermissionRequiredMixin):
     model = Warehouse
     template_name = 'warehouses/warehouse_detail.html'
     context_object_name = 'warehouse'
-
+    permission_required = 'warehouses.view_warehouse'
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         warehouse = self.get_object()
@@ -291,12 +307,12 @@ class WarehouseDetailView(DetailView):
         return context
 
 
-class WarehouseUpdateView(UpdateView):
+class WarehouseUpdateView(UpdateView ,LoginRequiredMixin, PermissionRequiredMixin):
     model = Warehouse
     form_class = WarehouseForm
     template_name = 'warehouses/warehouse_form.html' # Assumes this template exists
     success_url = reverse_lazy('warehouses:warehouse_list') # Assumes this URL name exists
-
+    permission_required = 'warehouses.change_warehouse'
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'تعديل المخزن'
@@ -306,8 +322,7 @@ class WarehouseDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteVie
     model = Warehouse
     template_name = 'warehouses/warehouse_confirm_delete.html'
     success_url = reverse_lazy('warehouses:warehouse_list')
-    required_roles = ['admin']
-
+    permission_required = 'warehouses.delete_warehouse'
 class WarehouseSearchView(LoginRequiredMixin, View):
     def get(self, request):
         search = request.GET.get('q', '')
@@ -322,11 +337,12 @@ class WarehouseSearchView(LoginRequiredMixin, View):
 from django.db.models import Sum, F, DecimalField, Value
 from django.db.models.functions import Coalesce, Cast
 
-class StockListView(LoginRequiredMixin, ListView):
+class StockListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     model = StockItem
     template_name = 'warehouses/stock_list.html'
     context_object_name = 'stock_items'
     paginate_by = 25
+    permission_required = 'warehouses.view_stockitem'
     
     def get_queryset(self):
         queryset = StockItem.objects.select_related('product', 'warehouse', 'product__category')
@@ -404,8 +420,7 @@ class StockListView(LoginRequiredMixin, ListView):
 
 class StockCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
     template_name = 'warehouses/stock_form.html'
-    required_roles = ['admin', 'warehouse_manager', 'warehouse_employee']
-    
+    permission_required = 'warehouses.add_stockitem'    
     def get(self, request):
         from django import forms
         
@@ -541,34 +556,6 @@ class StockCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
             return render(request, self.template_name, {'form': form})
 
 
-@csrf_exempt
-def quick_stock_adjustment(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            stock_item_id = data.get('stock_item_id')
-            new_quantity = float(data.get('new_quantity', 0))
-            reason = data.get('reason', '')
-            
-            stock_item = get_object_or_404(StockItem, id=stock_item_id)
-            old_quantity = stock_item.quantity
-            
-            # DON'T update quantity here - let signal handle it
-            # Create movement record - signal will handle quantity update
-            StockMovement.objects.create(
-                stock_item=stock_item,
-                movement_type='adjustment',
-                quantity=new_quantity,  # For adjustment, quantity is the new total
-                notes=f'تسوية سريعة: {reason}' if reason else 'تسوية سريعة',
-                created_by=request.user
-            )
-            
-            return JsonResponse({'success': True})
-            
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
-    
-    return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 
 class CheckExistingStockView(LoginRequiredMixin, View):
@@ -603,18 +590,126 @@ class StockDetailView(LoginRequiredMixin, DetailView):
     model = StockItem
     template_name = 'warehouses/stock_detail.html'
     context_object_name = 'stock_item'
-    
+    permission_required = 'warehouses.view_stockitem'
+
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['recent_movements'] = self.object.movements.all()[:10]
         return context
 
+
+class InventoryCountView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    """
+    A professional view for performing a full inventory count (جرد المخزون).
+    """
+    template_name = 'warehouses/inventory_count.html'
+    permission_required = 'warehouses.change_stockitem'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        warehouse_id = self.request.GET.get('warehouse')
+        
+        if warehouse_id:
+            try:
+                # Ensure the warehouse_id is a valid integer before querying
+                warehouse = get_object_or_404(Warehouse, id=int(warehouse_id))
+                stock_items = StockItem.objects.filter(
+                    warehouse=warehouse
+                ).select_related('product').order_by('product__name')
+                
+                context.update({
+                    'selected_warehouse': warehouse,
+                    'stock_items': stock_items
+                })
+            except (ValueError, TypeError):
+                messages.error(self.request, "معرف المخزن المحدد غير صالح.")
+            except Warehouse.DoesNotExist:
+                messages.error(self.request, "المخزن المحدد غير موجود.")
+        
+        context['warehouses'] = Warehouse.objects.filter(is_active=True)
+        return context
+    
+    def post(self, request, *args, **kwargs):
+        """
+        Processes the submitted stock count form with improved error handling.
+        """
+        # --- FIX: Get the warehouse_id from the hidden input ---
+        warehouse_id = request.POST.get('warehouse_id')
+        
+        if not warehouse_id:
+            messages.error(request, 'حدث خطأ: لم يتم تحديد المخزن. يرجى إعادة المحاولة.')
+            return redirect('warehouses:inventory_count')
+
+        try:
+            warehouse = get_object_or_404(Warehouse, id=warehouse_id)
+            adjustments_made = 0
+            
+            # Iterate through all POST data to find submitted quantities
+            for key, counted_quantity_str in request.POST.items():
+                if key.startswith('quantity_'):
+                    stock_item_id = key.split('_')[1]
+                    
+                    # Skip items where the quantity was not entered or is empty
+                    if not counted_quantity_str:
+                        continue
+                        
+                    # Ensure the stock item belongs to the correct warehouse to prevent mix-ups
+                    stock_item = get_object_or_404(StockItem, id=stock_item_id, warehouse=warehouse)
+                    counted_quantity = Decimal(counted_quantity_str)
+                    
+                    # Only create a movement if the quantity has actually changed
+                    if stock_item.quantity != counted_quantity:
+                        old_quantity = stock_item.quantity
+                        
+                        # The signal on StockMovement handles the actual quantity update.
+                        # For 'adjustment' type, the quantity field represents the NEW total.
+                        StockMovement.objects.create(
+                            stock_item=stock_item,
+                            movement_type='adjustment',
+                            quantity=counted_quantity,
+                            notes=f'جرد مخزون لمخزن {warehouse.name}. الكمية السابقة: {old_quantity}',
+                            created_by=request.user
+                        )
+                        adjustments_made += 1
+            
+            if adjustments_made > 0:
+                messages.success(
+                    request, 
+                    f'تم حفظ نتائج الجرد لمخزن "{warehouse.name}" بنجاح. تم إجراء {adjustments_made} تسوية.'
+                )
+            else:
+                messages.info(request, "لم يتم إجراء أي تغييرات حيث أن جميع الكميات كانت متطابقة.")
+            
+        except (ValueError, TypeError):
+             messages.error(request, 'معرف المخزن المحدد غير صالح.')
+        except Warehouse.DoesNotExist:
+             messages.error(request, 'المخزن الذي تحاول الجرد له غير موجود.')
+        except StockItem.DoesNotExist:
+             messages.error(request, 'تم العثور على عنصر مخزون غير صالح في الطلب. قد يكون تم حذفه.')
+        except Exception as e:
+            messages.error(request, f'حدث خطأ غير متوقع أثناء حفظ الجرد: {str(e)}')
+        
+        # Redirect back to the same page to show the results/messages
+        return redirect(f"{reverse('warehouses:inventory_count')}?warehouse={warehouse_id}")
+
 class StockUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     model = StockItem
+    # Use the new, specific update form
+    form_class = StockItemUpdateForm
     template_name = 'warehouses/stock_form.html'
-    fields = ['quantity', 'location']
     success_url = reverse_lazy('warehouses:stock_list')
-    required_roles = ['admin', 'warehouse_manager', 'warehouse_employee']
+    permission_required = 'warehouses.change_stockitem'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Pass the object to the template for display purposes
+        context['object'] = self.get_object()
+        return context
+
+    def form_valid(self, form):
+        messages.success(self.request, f'تم تحديث مخزون المنتج "{self.object.product.name}" بنجاح.')
+        return super().form_valid(form)
 
 class StockSearchView(LoginRequiredMixin, View):
     def get(self, request):
@@ -636,18 +731,87 @@ class LowStockView(LoginRequiredMixin, ListView):
     template_name = 'warehouses/low_stock.html'
     context_object_name = 'stock_items'
     paginate_by = 25
+    permission_required = 'warehouses.view_stockitem'
     
     def get_queryset(self):
         return StockItem.objects.filter(
             quantity__lte=F('product__min_stock_level')
         ).select_related('product', 'warehouse').order_by('quantity')
 
+
+class LowStockPDFView(LoginRequiredMixin, View):
+    """
+    Generates a PDF report for all low stock items.
+    """
+    def get(self, request, *args, **kwargs):
+        low_stock_items = StockItem.objects.filter(
+            quantity__lte=F('product__min_stock_level'),
+            quantity__gt=0
+        ).select_related('product', 'warehouse').order_by('product__name')
+
+        context = {
+            'stock_items': low_stock_items,
+            'timestamp': timezone.now(),
+        }
+
+        html_string = render_to_string('pdf/warehouses/low_stock_pdf.html', context)
+        
+        try:
+            config = pdfkit.configuration(wkhtmltopdf=settings.WKHTMLTOPDF_PATH)
+            pdf = pdfkit.from_string(html_string, False, configuration=config, options={"enable-local-file-access": ""})
+            response = HttpResponse(pdf, content_type='application/pdf')
+            response['Content-Disposition'] = 'attachment; filename="low_stock_report.pdf"'
+            return response
+        except FileNotFoundError:
+            messages.error(request, "Could not generate PDF. wkhtmltopdf executable not found.")
+            return redirect('warehouses:low_stock')
+        except Exception as e:
+            messages.error(request, f"An unexpected error occurred while generating the PDF: {e}")
+            return redirect('warehouses:low_stock')
+
+
+class StockItemDetailPDFView(LoginRequiredMixin, View):
+    """
+    Generates a PDF report for a single StockItem.
+    """
+    def get(self, request, *args, **kwargs):
+        stock_item = get_object_or_404(StockItem, pk=self.kwargs['pk'])
+        recent_movements = stock_item.movements.all().select_related('created_by')[:20]
+
+        context = {
+            'stock_item': stock_item,
+            'recent_movements': recent_movements,
+            'timestamp': timezone.now(),
+        }
+
+        # Render the PDF template to a string
+        html_string = render_to_string('pdf/warehouses/stock_item_detail_pdf.html', context)
+        
+        try:
+            # IMPORTANT: Ensure WKHTMLTOPDF_PATH is set correctly in your settings.py
+            config = pdfkit.configuration(wkhtmltopdf=settings.WKHTMLTOPDF_PATH)
+            
+            pdf = pdfkit.from_string(html_string, False, configuration=config, options={"enable-local-file-access": ""})
+
+            response = HttpResponse(pdf, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="stock_item_report_{stock_item.product.code}.pdf"'
+            
+            return response
+            
+        except FileNotFoundError:
+            messages.error(request, "Could not generate PDF. wkhtmltopdf executable not found.")
+            return redirect('warehouses:stock_detail', pk=stock_item.pk)
+        except Exception as e:
+            messages.error(request, f"An unexpected error occurred while generating the PDF: {e}")
+            return redirect('warehouses:stock_detail', pk=stock_item.pk)
+
+
 class OutOfStockView(LoginRequiredMixin, ListView):
     model = StockItem
     template_name = 'warehouses/out_of_stock.html'
     context_object_name = 'stock_items'
     paginate_by = 25
-    
+    permission_required = 'warehouses.view_stockitem'
     def get_queryset(self):
         return StockItem.objects.filter(
             quantity=0
@@ -713,8 +877,7 @@ class StockMovementCreateView(LoginRequiredMixin, PermissionRequiredMixin, Creat
     template_name = 'warehouses/movement_form.html'
     fields = ['stock_item', 'movement_type', 'quantity', 'reference_number', 'notes']
     success_url = reverse_lazy('warehouses:movement_list')
-    required_roles = ['admin', 'warehouse_manager', 'warehouse_employee']
-    
+    permission_required = 'warehouses.add_stockmovement'
     def form_valid(self, form):
         form.instance.created_by = self.request.user
         response = super().form_valid(form)
@@ -737,10 +900,12 @@ class StockMovementCreateView(LoginRequiredMixin, PermissionRequiredMixin, Creat
         return response
 
 
-class StockMovementDetailView(LoginRequiredMixin, DetailView):
+class StockMovementDetailView(LoginRequiredMixin,PermissionRequiredMixin, DetailView):
     model = StockMovement
     template_name = 'warehouses/movement_detail.html'
     context_object_name = 'movement'
+    permission_required = 'warehouses.view_stockmovement'
+
 
 
 # Stock Transfers
@@ -796,8 +961,7 @@ class StockTransferCreateView(LoginRequiredMixin, PermissionRequiredMixin, Creat
     template_name = 'warehouses/transfer_form.html'
     fields = ['from_warehouse', 'to_warehouse', 'product', 'quantity', 'reason']
     success_url = reverse_lazy('warehouses:transfer_list')
-    required_roles = ['admin', 'warehouse_manager', 'warehouse_employee']
-    
+    permission_required = 'warehouses.add_stocktransfer'    
     def form_valid(self, form):
         form.instance.requested_by = self.request.user
         
@@ -840,8 +1004,7 @@ class StockTransferDetailView(LoginRequiredMixin, DetailView):
 
 
 class StockTransferApproveView(LoginRequiredMixin, PermissionRequiredMixin, View):
-    required_roles = ['admin', 'warehouse_manager']
-    
+    permission_required = 'warehouses.change_stocktransfer'    
     def post(self, request, pk):
         transfer = get_object_or_404(StockTransfer, pk=pk)
         
@@ -877,8 +1040,7 @@ class StockTransferApproveView(LoginRequiredMixin, PermissionRequiredMixin, View
 
 
 class StockTransferCompleteView(LoginRequiredMixin, PermissionRequiredMixin, View):
-    required_roles = ['admin', 'warehouse_manager', 'warehouse_employee']
-    
+    permission_required = 'warehouses.change_stocktransfer'    
     def post(self, request, pk):
         transfer = get_object_or_404(StockTransfer, pk=pk)
         
@@ -942,60 +1104,108 @@ class StockTransferCompleteView(LoginRequiredMixin, PermissionRequiredMixin, Vie
 
 
 # Additional utility views
-class StockAdjustmentView(LoginRequiredMixin, PermissionRequiredMixin, View):
-    """تسوية المخزون"""
-    required_roles = ['admin', 'warehouse_manager']
-    
-    def get(self, request):
-        return render(request, 'warehouses/stock_adjustment.html', {
-            'warehouses': Warehouse.objects.filter(is_active=True),
-            'products': Product.objects.filter(is_active=True)
-        })
-    
-    def post(self, request):
-        warehouse_id = request.POST.get('warehouse')
-        product_id = request.POST.get('product')
-        new_quantity = request.POST.get('quantity')
-        reason = request.POST.get('reason')
+class StockAdjustmentView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    """
+    A view for performing stock adjustments for a selected warehouse.
+    Handles both displaying the stock items and processing the adjustments.
+    """
+    template_name = 'warehouses/stock_adjustment.html'
+    permission_required = 'warehouses.change_stockitem'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        warehouse_id = self.request.GET.get('warehouse')
         
+        # Populate the list of all warehouses for the dropdown
+        context['warehouses'] = Warehouse.objects.filter(is_active=True)
+        
+        if warehouse_id:
+            try:
+                # Get the selected warehouse and its stock items
+                warehouse = get_object_or_404(Warehouse, id=int(warehouse_id))
+                stock_items = StockItem.objects.filter(
+                    warehouse=warehouse
+                ).select_related('product', 'product__unit_new').order_by('product__name')
+                
+                context.update({
+                    'selected_warehouse': warehouse,
+                    'stock_items': stock_items
+                })
+            except (ValueError, TypeError):
+                messages.error(self.request, "معرف المخزن المحدد غير صالح.")
+            except Warehouse.DoesNotExist:
+                messages.error(self.request, "المخزن المحدد غير موجود.")
+        
+        return context
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        """
+        Processes the submitted stock adjustment form.
+        """
+        warehouse_id = request.POST.get('warehouse_id')
+        
+        if not warehouse_id:
+            messages.error(request, 'حدث خطأ: لم يتم تحديد المخزن. يرجى إعادة المحاولة.')
+            return redirect('warehouses:stock_adjustment')
+
         try:
-            warehouse = Warehouse.objects.get(id=warehouse_id)
-            product = Product.objects.get(id=product_id)
-            new_quantity = float(new_quantity)
+            warehouse = get_object_or_404(Warehouse, id=warehouse_id)
+            adjustments_made = 0
             
-            stock_item, created = StockItem.objects.get_or_create(
-                warehouse=warehouse,
-                product=product,
-                defaults={'quantity': 0}
-            )
+            # Iterate through all POST data to find submitted quantities
+            for key, quantity_str in request.POST.items():
+                if key.startswith('quantity_') and quantity_str:
+                    try:
+                        stock_item_id = key.split('_')[1]
+                        adjustment_quantity = Decimal(quantity_str)
+                        
+                        # Get corresponding movement type and notes
+                        movement_type = request.POST.get(f'movement_type_{stock_item_id}')
+                        notes = request.POST.get(f'notes_{stock_item_id}', '')
+
+                        # Get the stock item, ensuring it belongs to the correct warehouse
+                        stock_item = get_object_or_404(StockItem, id=stock_item_id, warehouse=warehouse)
+                        
+                        # Skip if quantity is zero or movement type is not selected
+                        if adjustment_quantity <= 0 or not movement_type:
+                            continue
+
+                        # The signal on StockMovement will handle the actual quantity update.
+                        # We just need to create the movement record with the correct data.
+                        StockMovement.objects.create(
+                            stock_item=stock_item,
+                            movement_type=movement_type,
+                            quantity=adjustment_quantity,
+                            notes=f"تسوية يدوية: {notes}",
+                            reference_number=f'ADJ-{timezone.now().strftime("%Y%m%d%H%M%S")}',
+                            created_by=request.user
+                        )
+                        adjustments_made += 1
+                        
+                    except (InvalidOperation, ValueError):
+                        messages.warning(request, f"تم تخطي عنصر بقيمة كمية غير صالحة: '{quantity_str}'.")
+                        continue
+                    except StockItem.DoesNotExist:
+                        messages.warning(request, f"تم تخطي عنصر مخزون غير موجود بالمعرف: {stock_item_id}.")
+                        continue
+
+            if adjustments_made > 0:
+                messages.success(
+                    request, 
+                    f'تم حفظ التسويات لمخزن "{warehouse.name}" بنجاح. تم إجراء {adjustments_made} حركة.'
+                )
+            else:
+                messages.info(request, "لم يتم إدخال أي كميات للتسوية.")
             
-            old_quantity = stock_item.quantity
-            difference = new_quantity - old_quantity
-            
-            # تحديث الكمية
-            stock_item.quantity = new_quantity
-            stock_item.save()
-            
-            # إنشاء حركة تسوية
-            StockMovement.objects.create(
-                stock_item=stock_item,
-                movement_type='adjustment',
-                quantity=difference,
-                reference_number=f'ADJ-{timezone.now().strftime("%Y%m%d%H%M%S")}',
-                notes=f'تسوية: {reason}. الكمية السابقة: {old_quantity}',
-                created_by=request.user
-            )
-            
-            messages.success(request, f'تم تسوية المخزون بنجاح. الفرق: {difference}')
-            
-        except (Warehouse.DoesNotExist, Product.DoesNotExist):
-            messages.error(request, 'بيانات غير صحيحة')
-        except ValueError:
-            messages.error(request, 'الكمية يجب أن تكون رقم')
+        except Warehouse.DoesNotExist:
+             messages.error(request, 'المخزن الذي تحاول التسوية له غير موجود.')
         except Exception as e:
-            messages.error(request, f'حدث خطأ: {str(e)}')
+            # Catch any other unexpected errors and report them
+            messages.error(request, f'حدث خطأ غير متوقع أثناء حفظ التسويات: {str(e)}')
         
-        return redirect('warehouses:stock_adjustment')
+        # Redirect back to the same page (with the warehouse parameter) to show results
+        return redirect(f"{reverse('warehouses:stock_adjustment')}?warehouse={warehouse_id}")
 
 
 class StockReportView(LoginRequiredMixin, TemplateView):
@@ -1069,75 +1279,6 @@ class StockReportView(LoginRequiredMixin, TemplateView):
         return context
 
 
-class InventoryCountView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
-    """جرد المخزون"""
-    template_name = 'warehouses/inventory_count.html'
-    required_roles = ['admin', 'warehouse_manager']
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        warehouse_id = self.request.GET.get('warehouse')
-        
-        if warehouse_id:
-            warehouse = get_object_or_404(Warehouse, id=warehouse_id)
-            stock_items = StockItem.objects.filter(
-                warehouse=warehouse
-            ).select_related('product').order_by('product__name')
-            
-            context.update({
-                'selected_warehouse': warehouse,
-                'stock_items': stock_items
-            })
-        
-        context['warehouses'] = Warehouse.objects.filter(is_active=True)
-        return context
-    
-    def post(self, request):
-        """حفظ نتائج الجرد"""
-        warehouse_id = request.POST.get('warehouse')
-        count_data = request.POST.getlist('count_data')
-        
-        try:
-            warehouse = Warehouse.objects.get(id=warehouse_id)
-            adjustments_made = 0
-            
-            for item_data in count_data:
-                if not item_data:
-                    continue
-                    
-                stock_item_id, counted_quantity = item_data.split(':')
-                stock_item = StockItem.objects.get(id=stock_item_id)
-                counted_quantity = float(counted_quantity)
-                
-                if stock_item.quantity != counted_quantity:
-                    difference = counted_quantity - stock_item.quantity
-                    old_quantity = stock_item.quantity
-                    
-                    # تحديث الكمية
-                    stock_item.quantity = counted_quantity
-                    stock_item.save()
-                    
-                    # إنشاء حركة تسوية
-                    StockMovement.objects.create(
-                        stock_item=stock_item,
-                        movement_type='adjustment',
-                        quantity=difference,
-                        reference_number=f'INV-{timezone.now().strftime("%Y%m%d%H%M%S")}',
-                        notes=f'جرد مخزون. الكمية السابقة: {old_quantity}',
-                        created_by=request.user
-                    )
-                    
-                    adjustments_made += 1
-            
-            messages.success(
-                request, 
-                f'تم حفظ نتائج الجرد بنجاح. تم إجراء {adjustments_made} تسوية'
-            )
-            
-        except Exception as e:
-            messages.error(request, f'حدث خطأ أثناء حفظ الجرد: {str(e)}')
-        
-        return redirect('warehouses:inventory_count')
 
 
 # API Views for AJAX requests
@@ -1917,7 +2058,7 @@ class UnitCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     form_class = UnitForm
     template_name = 'warehouses/unit_form.html'
     success_url = reverse_lazy('warehouses:unit_list')
-    required_roles = ['admin', 'warehouse_manager']
+    permission_required = 'warehouses.add_unit'    
     
     def form_valid(self, form):
         messages.success(self.request, 'تم إضافة الوحدة بنجاح!')
@@ -1928,8 +2069,7 @@ class UnitUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     form_class = UnitForm
     template_name = 'warehouses/unit_form.html'
     success_url = reverse_lazy('warehouses:unit_list')
-    required_roles = ['admin', 'warehouse_manager']
-    
+    permission_required = 'warehouses.change_unit'    
     def form_valid(self, form):
         messages.success(self.request, 'تم تحديث الوحدة بنجاح!')
         return super().form_valid(form)
@@ -1938,8 +2078,7 @@ class UnitDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
     model = Unit
     template_name = 'warehouses/unit_confirm_delete.html'
     success_url = reverse_lazy('warehouses:unit_list')
-    required_roles = ['admin']
-
+    permission_required = 'warehouses.delete_unit'
 # Unit Conversions Management
 class UnitConversionListView(LoginRequiredMixin, ListView):
     model = UnitConversion
@@ -1955,8 +2094,7 @@ class UnitConversionCreateView(LoginRequiredMixin, PermissionRequiredMixin, Crea
     form_class = UnitConversionForm
     template_name = 'warehouses/unit_conversion_form.html'
     success_url = reverse_lazy('warehouses:unit_conversion_list')
-    required_roles = ['admin', 'warehouse_manager']
-    
+    permission_required = 'warehouses.add_unitconversion'    
     def form_valid(self, form):
         messages.success(self.request, 'تم إضافة تحويل الوحدة بنجاح!')
         return super().form_valid(form)
@@ -1966,8 +2104,7 @@ class UnitConversionUpdateView(LoginRequiredMixin, PermissionRequiredMixin, Upda
     form_class = UnitConversionForm
     template_name = 'warehouses/unit_conversion_form.html'
     success_url = reverse_lazy('warehouses:unit_conversion_list')
-    required_roles = ['admin', 'warehouse_manager']
-    
+    permission_required = 'warehouses.change_unitconversion'    
     def form_valid(self, form):
         messages.success(self.request, 'تم تحديث تحويل الوحدة بنجاح!')
         return super().form_valid(form)
@@ -1976,8 +2113,8 @@ class UnitConversionDeleteView(LoginRequiredMixin, PermissionRequiredMixin, Dele
     model = UnitConversion
     template_name = 'warehouses/unit_conversion_confirm_delete.html'
     success_url = reverse_lazy('warehouses:unit_conversion_list')
-    required_roles = ['admin']
-
+    permission_required = 'warehouses.delete_unitconversion'
+    
 # API for unit conversion
 class UnitConversionAPIView(LoginRequiredMixin, View):
     def get(self, request):
@@ -2006,5 +2143,52 @@ class UnitConversionAPIView(LoginRequiredMixin, View):
                 'error': str(e)
             })
 
+
+
+class WarehouseDetailPDFView(LoginRequiredMixin, View):
+    """
+    Generates a PDF report for a single warehouse's stock.
+    """
+    def get(self, request, *args, **kwargs):
+        warehouse = get_object_or_404(Warehouse, pk=self.kwargs['pk'])
+        # Filter out items with zero quantity
+        stock_items = StockItem.objects.filter(
+            warehouse=warehouse, 
+            quantity__gt=0
+        ).select_related('product').order_by('product__name')
+        
+        total_value = sum(item.total_value for item in stock_items)
+
+        context = {
+            'warehouse': warehouse,
+            'stock_items': stock_items,
+            'total_value': total_value,
+            'timestamp': timezone.now(),
+        }
+
+        # Render the HTML template from the new path to a string
+        html_string = render_to_string('pdf/warehouses/warehouse_detail_pdf.html', context)
+        
+        try:
+            # Configure pdfkit to point to the wkhtmltopdf executable
+            # IMPORTANT: You may need to change this path depending on your system
+            config = pdfkit.configuration(wkhtmltopdf=settings.WKHTMLTOPDF_PATH)
+            
+            # Generate the PDF from the HTML string
+            pdf = pdfkit.from_string(html_string, False, configuration=config, options={"enable-local-file-access": ""})
+
+            # Create an HTTP response with the PDF
+            response = HttpResponse(pdf, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="warehouse_report_{warehouse.code}.pdf"'
+            
+            return response
+            
+        except FileNotFoundError:
+            # Handle the case where wkhtmltopdf is not found
+            messages.error(request, "Could not generate PDF. wkhtmltopdf executable not found.")
+            return redirect('warehouses:warehouse_detail', pk=warehouse.pk)
+        except Exception as e:
+            messages.error(request, f"An unexpected error occurred while generating the PDF: {e}")
+            return redirect('warehouses:warehouse_detail', pk=warehouse.pk)
 
 

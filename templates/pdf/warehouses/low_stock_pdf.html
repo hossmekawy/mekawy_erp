@@ -1,0 +1,43 @@
+{% extends 'pdf/base_pdf.html' %}
+{% load humanize %}
+
+{% block pdf_title %}
+    تقرير المخزون المنخفض
+{% endblock %}
+
+{% block pdf_header %}
+    <h1>تقرير المخزون المنخفض</h1>
+    <div class="meta-info">
+        تاريخ الطباعة: {{ timestamp|date:"Y-m-d H:i" }}
+    </div>
+{% endblock %}
+
+{% block pdf_content %}
+    <h2>قائمة الأصناف ذات المخزون المنخفض ({{ stock_items.count }} صنف)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>المنتج</th>
+                <th>الكود</th>
+                <th>المخزن</th>
+                <th>الكمية الحالية</th>
+                <th>الحد الأدنى</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in stock_items %}
+            <tr>
+                <td>{{ item.product.name }}</td>
+                <td>{{ item.product.code }}</td>
+                <td>{{ item.warehouse.name }}</td>
+                <td style="color: #d9534f; font-weight: bold;">{{ item.quantity|floatformat:2 }}</td>
+                <td>{{ item.product.min_stock_level|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 20px;">لا توجد أصناف ذات مخزون منخفض حالياً.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

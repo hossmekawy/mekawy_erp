@@ -254,18 +254,38 @@ class PaymentListView(LoginRequiredMixin, ListView):
         return queryset.order_by('-payment_date')
 
 
+
+# In your views.py file, replace the existing SupplierPerformanceView class with this one:
+
 class SupplierPerformanceView(LoginRequiredMixin, ListView):
     """عرض أداء الموردين"""
     model = SupplierPerformanceMetric
     template_name = 'suppliers/supplier_performance.html'
     context_object_name = 'metrics'
-    
+    paginate_by = 20 # Added for better performance with many suppliers
+
     def get_queryset(self):
-        # الحصول على آخر مقاييس الأداء لكل مورد
-        return SupplierPerformanceMetric.objects.select_related('supplier').order_by(
-            'supplier', '-period_end'
-        ).distinct('supplier')
-    
+        """
+        الحصول على آخر مقاييس الأداء لكل مورد بطريقة متوافقة مع جميع قواعد البيانات.
+        """
+        # Get the IDs of all active suppliers
+        active_supplier_ids = Supplier.objects.filter(is_active=True).values_list('id', flat=True)
+
+        latest_metric_ids = []
+        for supplier_id in active_supplier_ids:
+            # For each supplier, find their most recent performance metric record
+            latest_metric = SupplierPerformanceMetric.objects.filter(
+                supplier_id=supplier_id
+            ).order_by('-period_end', '-id').first()
+            
+            if latest_metric:
+                latest_metric_ids.append(latest_metric.id)
+        
+        # Return a queryset containing only the latest metrics
+        return SupplierPerformanceMetric.objects.filter(
+            id__in=latest_metric_ids
+        ).select_related('supplier').order_by('-period_end')
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
@@ -277,8 +297,6 @@ class SupplierPerformanceView(LoginRequiredMixin, ListView):
         ).order_by('-current_rating')[:5]
         
         return context
-
-
 # Dashboard Views
 class SupplierDashboardView(LoginRequiredMixin, ListView):
     """لوحة تحكم الموردين"""

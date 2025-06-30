@@ -1,5 +1,7 @@
 from django import forms
 from django.contrib.auth import get_user_model
+from django.contrib import messages
+from django.shortcuts import get_object_or_404, redirect
 from .models import Category, Unit, UnitConversion, Warehouse, Product, StockItem, StockMovement, StockTransfer
 
 User = get_user_model()
@@ -71,6 +73,9 @@ class WarehouseForm(forms.ModelForm):
         self.fields['manager'].required = False
         self.fields['manager'].empty_label = "--- اختر مديراً ---"
 class StockItemForm(forms.ModelForm):
+    """
+    Form for CREATING a new stock item. It includes warehouse and product selection.
+    """
     class Meta:
         model = StockItem
         fields = ['warehouse', 'product', 'quantity', 'reserved_quantity', 'location']
@@ -121,20 +126,64 @@ class StockItemForm(forms.ModelForm):
         quantity = cleaned_data.get('quantity')
         reserved_quantity = cleaned_data.get('reserved_quantity', 0)
         
-        if warehouse and product:
-            # Check if stock item already exists for this warehouse-product combination
-            existing = StockItem.objects.filter(warehouse=warehouse, product=product)
-            if self.instance.pk:
-                existing = existing.exclude(pk=self.instance.pk)
-            
-            if existing.exists():
-                raise forms.ValidationError('يوجد عنصر مخزون لهذا المنتج في هذا المخزن بالفعل')
-        
+        if self.instance and not self.instance.pk: # Only on create
+            if warehouse and product:
+                # Check if stock item already exists for this warehouse-product combination
+                if StockItem.objects.filter(warehouse=warehouse, product=product).exists():
+                    raise forms.ValidationError('يوجد عنصر مخزون لهذا المنتج في هذا المخزن بالفعل. يرجى تعديل العنصر الموجود بدلاً من إضافة جديد.')
+
         if quantity is not None and reserved_quantity is not None:
             if reserved_quantity > quantity:
                 raise forms.ValidationError('الكمية المحجوزة لا يمكن أن تكون أكبر من الكمية الإجمالية')
         
         return cleaned_data
+
+# --- NEW FORM FOR UPDATING ---
+class StockItemUpdateForm(forms.ModelForm):
+    """
+    A simplified form for UPDATING an existing stock item.
+    Only allows changing the quantity and location.
+    """
+    class Meta:
+        model = StockItem
+        fields = ['quantity', 'reserved_quantity', 'location']
+        widgets = {
+            'quantity': forms.NumberInput(attrs={
+                'class': 'form-control form-control-lg',
+                'step': '0.01',
+                'min': '0',
+                'required': True
+            }),
+            'reserved_quantity': forms.NumberInput(attrs={
+                'class': 'form-control form-control-lg',
+                'step': '0.01',
+                'min': '0'
+            }),
+            'location': forms.TextInput(attrs={
+                'class': 'form-control form-control-lg',
+                'placeholder': 'مثال: الرف A - المستوى 2'
+            })
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['quantity'].label = 'الكمية الإجمالية الجديدة'
+        self.fields['reserved_quantity'].label = 'الكمية المحجوزة الجديدة'
+        self.fields['location'].label = 'الموقع الجديد في المخزن'
+
+    def clean(self):
+        cleaned_data = super().clean()
+        quantity = cleaned_data.get('quantity')
+        reserved_quantity = cleaned_data.get('reserved_quantity', 0)
+        
+        if quantity is not None and reserved_quantity is not None:
+            if reserved_quantity > quantity:
+                raise forms.ValidationError('الكمية المحجوزة لا يمكن أن تكون أكبر من الكمية الإجمالية.')
+        
+        return cleaned_data
+
+
+
 
 class ProductForm(forms.ModelForm):
     class Meta:

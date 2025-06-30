@@ -1,0 +1,73 @@
+{% extends 'pdf/base_pdf.html' %}
+{% load humanize %}
+
+{% block pdf_title %}
+    تقرير مخزن - {{ warehouse.name }}
+{% endblock %}
+
+{% block pdf_header %}
+    <h1>تقرير مخزون: {{ warehouse.name }}</h1>
+    <div class="meta-info">
+        كود المخزن: {{ warehouse.code }} | تاريخ الطباعة: {{ timestamp|date:"Y-m-d H:i" }}
+    </div>
+{% endblock %}
+
+{% block pdf_content %}
+    <h2>ملخص المخزون</h2>
+    <table>
+        <tbody>
+            <tr>
+                <td><strong>إجمالي الأصناف</strong></td>
+                <td>{{ stock_items.count }}</td>
+            </tr>
+            <tr>
+                <td><strong>القيمة الإجمالية للمخزون</strong></td>
+                <td>{{ total_value|floatformat:2|intcomma }} جنيه</td>
+            </tr>
+             <tr>
+                <td><strong>المدير المسؤول</strong></td>
+                <td>{{ warehouse.manager.get_full_name|default:"غير محدد" }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2 style="margin-top: 30px;">قائمة المنتجات في المخزن</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>المنتج</th>
+                <th>الكود</th>
+                <th>الكمية الحالية</th>
+                <th>قيمة المخزون</th>
+                <th>الحالة</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in stock_items %}
+            <tr>
+                <td>{{ item.product.name }}</td>
+                <td>{{ item.product.code }}</td>
+                <td>{{ item.quantity|floatformat:2 }} {{ item.product.get_unit_display }}</td>
+                <td>{{ item.total_value|floatformat:2|intcomma }} جنيه</td>
+                <td>
+                    {% if item.is_low_stock %}
+                        <span style="color: #d9534f;">منخفض</span>
+                    {% else %}
+                        <span style="color: #5cb85c;">طبيعي</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 20px;">لا توجد منتجات في هذا المخزن حالياً.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr style="background-color: #f2f2f2; font-weight: bold;">
+                <td colspan="3">الإجمالي</td>
+                <td colspan="2">{{ total_value|floatformat:2|intcomma }} جنيه</td>
+            </tr>
+        </tfoot>
+    </table>
+{% endblock %}

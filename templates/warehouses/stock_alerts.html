@@ -1,0 +1,128 @@
+{% extends 'warehouses/base.html' %}
+{% load static %}
+
+{% block title %}
+    تنبيهات المخزون - المخازن
+{% endblock %}
+
+{% block warehouse_content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-bell text-primary me-2"></i>
+            تنبيهات المخزون
+        </h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'warehouses:dashboard' %}">لوحة التحكم</a></li>
+                <li class="breadcrumb-item active" aria-current="page">تنبيهات المخزون</li>
+            </ol>
+        </nav>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">مخزون منخفض</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ alerts_count.low_stock }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-battery-quarter fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-danger shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">نفد من المخزون</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ alerts_count.out_of_stock }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-battery-empty fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">أصناف راكدة</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ alerts_count.slow_moving }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-history fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-secondary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-secondary text-uppercase mb-1">تحويلات متأخرة</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ alerts_count.overdue_transfers }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-truck-loading fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerts Tabs -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <ul class="nav nav-tabs card-header-tabs" id="alertsTab" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" id="low-stock-tab" data-bs-toggle="tab" href="#low-stock" role="tab">المخزون المنخفض</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="out-of-stock-tab" data-bs-toggle="tab" href="#out-of-stock" role="tab">النافد من المخزون</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="slow-moving-tab" data-bs-toggle="tab" href="#slow-moving" role="tab">الأصناف الراكدة</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="overdue-transfers-tab" data-bs-toggle="tab" href="#overdue-transfers" role="tab">التحويلات المتأخرة</a>
+                </li>
+            </ul>
+        </div>
+        <div class="card-body">
+            <div class="tab-content" id="alertsTabContent">
+                <!-- Low Stock Tab Pane -->
+                <div class="tab-pane fade show active" id="low-stock" role="tabpanel">
+                    {% include 'warehouses/partials/alert_table.html' with items=low_stock_items alert_type="low_stock" %}
+                </div>
+                <!-- Out of Stock Tab Pane -->
+                <div class="tab-pane fade" id="out-of-stock" role="tabpanel">
+                    {% include 'warehouses/partials/alert_table.html' with items=out_of_stock_items alert_type="out_of_stock" %}
+                </div>
+                <!-- Slow Moving Tab Pane -->
+                <div class="tab-pane fade" id="slow-moving" role="tabpanel">
+                    {% include 'warehouses/partials/alert_table.html' with items=slow_moving_items alert_type="slow_moving" %}
+                </div>
+                <!-- Overdue Transfers Tab Pane -->
+                <div class="tab-pane fade" id="overdue-transfers" role="tabpanel">
+                    {% include 'warehouses/partials/alert_table_transfers.html' with items=overdue_transfers %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
