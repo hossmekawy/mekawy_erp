@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}أداء الموردين - Mekawy ERP{% endblock %}
+
+{% block extra_css %}
+<style>
+    .performance-table { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+    .progress { height: 10px; }
+    .rating-badge { font-size: 0.9em; font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-0 text-gray-800 fw-bold">أداء الموردين</h1>
+            <p class="text-muted mb-0">تحليل ومقارنة مقاييس الأداء للموردين</p>
+        </div>
+    </div>
+    
+    <div class="performance-table">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">المورد</th>
+                        <th>فترة التقرير</th>
+                        <th>معدل الإكمال</th>
+                        <th>التسليم في الوقت</th>
+                        <th>متوسط التقييم</th>
+                        <th>إجمالي الأوامر</th>
+                        <th>قيمة التعامل</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for metric in metrics %}
+                    <tr>
+                        <td class="ps-4">
+                            <a href="{% url 'suppliers:detail' metric.supplier.pk %}" class="text-decoration-none text-dark fw-bold">
+                                {{ metric.supplier.name }}
+                            </a>
+                        </td>
+                        <td>{{ metric.period_start|date:"Y/m/d" }} - {{ metric.period_end|date:"Y/m/d" }}</td>
+                        <td>
+                            <div class="progress" title="{{ metric.completion_rate|floatformat:1 }}%">
+                                <div class="progress-bar bg-success" role="progressbar" style="width: {{ metric.completion_rate }}%;" aria-valuenow="{{ metric.completion_rate }}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="progress" title="{{ metric.on_time_delivery_rate|floatformat:1 }}%">
+                                <div class="progress-bar bg-info" role="progressbar" style="width: {{ metric.on_time_delivery_rate }}%;" aria-valuenow="{{ metric.on_time_delivery_rate }}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge rounded-pill bg-warning text-dark rating-badge">
+                                <i class="fas fa-star"></i> {{ metric.average_rating|floatformat:1 }}
+                            </span>
+                        </td>
+                        <td>{{ metric.completed_orders }} / {{ metric.total_orders }}</td>
+                        <td class="fw-bold">{{ metric.total_amount|floatformat:0 }} جنيه</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5">
+                            <p class="text-muted">لا توجد بيانات أداء متاحة حالياً.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

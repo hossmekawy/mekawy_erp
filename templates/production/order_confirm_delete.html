@@ -1,0 +1,222 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+
+{% block production_title %}حذف أمر الإنتاج{% endblock %}
+
+{% block production_page_title %}
+    <i class="fas fa-trash-alt me-2"></i>
+    حذف أمر الإنتاج
+{% endblock %}
+
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item">
+        <a href="{% url 'production:order_list' %}" class="text-black-50">
+            <i class="fas fa-list"></i> أوامر الإنتاج
+        </a>
+    </li>
+    <li class="breadcrumb-item">
+        <a href="{% url 'production:order_detail' object.pk %}" class="text-black-50">
+            {{ object.order_number }}
+        </a>
+    </li>
+    <li class="breadcrumb-item active">حذف</li>
+{% endblock %}
+
+{% block production_header_actions %}
+    <div class="d-flex gap-2">
+        <a href="{% url 'production:order_detail' object.pk %}" class="btn btn-production-outline">
+            <i class="fas fa-arrow-right me-1"></i>
+            العودة
+        </a>
+    </div>
+{% endblock %}
+
+{% block production_content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8 col-xl-6">
+        <!-- Delete Confirmation Card -->
+        <div class="production-card">
+            <div class="production-card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    تأكيد حذف أمر الإنتاج
+                </h5>
+            </div>
+            <div class="production-card-body">
+                <!-- Warning Alert -->
+                <div class="production-alert alert-danger mb-4">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>تحذير:</strong> هذا الإجراء لا يمكن التراجع عنه. سيتم حذف جميع البيانات المرتبطة بهذا الأمر نهائياً.
+                </div>
+
+                <!-- Order Details -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h6 class="text-muted mb-3">تفاصيل أمر الإنتاج المراد حذفه:</h6>
+                        
+                        <div class="bg-light p-3 rounded">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <strong>رقم الأمر:</strong>
+                                    <span class="text-primary">{{ object.order_number }}</span>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <strong>تاريخ الإنشاء:</strong>
+                                    <span>{{ object.created_at|date:"d/m/Y" }}</span>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <strong>المنتج:</strong>
+                                    <span>{{ object.product.name }}</span>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <strong>الكمية:</strong>
+                                    <span>{{ object.quantity|floatformat:0 }} قطعة</span>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <strong>الحالة:</strong>
+                                    {% if object.status == 'pending' %}
+                                        <span class="production-status pending">
+                                            <i class="fas fa-clock me-1"></i>
+                                            معلق
+                                        </span>
+                                    {% elif object.status == 'approved' %}
+                                        <span class="production-status approved">
+                                            <i class="fas fa-check me-1"></i>
+                                            معتمد
+                                        </span>
+                                    {% elif object.status == 'in_progress' %}
+                                        <span class="production-status in-progress">
+                                            <i class="fas fa-cogs me-1"></i>
+                                            قيد التنفيذ
+                                        </span>
+                                    {% elif object.status == 'completed' %}
+                                        <span class="production-status completed">
+                                            <i class="fas fa-check-circle me-1"></i>
+                                            مكتمل
+                                        </span>
+                                    {% elif object.status == 'cancelled' %}
+                                        <span class="production-status cancelled">
+                                            <i class="fas fa-times-circle me-1"></i>
+                                            ملغي
+                                        </span>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <strong>الأولوية:</strong>
+                                    {% if object.priority == 'low' %}
+                                        <span class="badge bg-secondary">منخفضة</span>
+                                    {% elif object.priority == 'normal' %}
+                                        <span class="badge bg-primary">عادية</span>
+                                    {% elif object.priority == 'high' %}
+                                        <span class="badge bg-warning">عالية</span>
+                                    {% elif object.priority == 'urgent' %}
+                                        <span class="badge bg-danger">عاجلة</span>
+                                    {% endif %}
+                                </div>
+                                {% if object.due_date %}
+                                <div class="col-md-6 mb-3">
+                                    <strong>تاريخ التسليم:</strong>
+                                    <span>{{ object.due_date|date:"d/m/Y" }}</span>
+                                </div>
+                                {% endif %}
+                                {% if object.notes %}
+                                <div class="col-12">
+                                    <strong>الملاحظات:</strong>
+                                    <p class="text-muted mb-0 mt-1">{{ object.notes|truncatewords:20 }}</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Related Data Warning -->
+                {% if object.cutting_processes.exists or object.assembly_processes.exists or object.dyeing_processes.exists or object.finishing_processes.exists %}
+                <div class="production-alert alert-warning mb-4">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>تنبيه:</strong> يحتوي هذا الأمر على عمليات إنتاج مرتبطة به. سيتم حذف جميع العمليات التالية:
+                    <ul class="mt-2 mb-0">
+                        {% if object.cutting_processes.exists %}
+                            <li>عمليات القص ({{ object.cutting_processes.count }})</li>
+                        {% endif %}
+                        {% if object.assembly_processes.exists %}
+                            <li>عمليات التجميع ({{ object.assembly_processes.count }})</li>
+                        {% endif %}
+                        {% if object.dyeing_processes.exists %}
+                            <li>عمليات الصباغة ({{ object.dyeing_processes.count }})</li>
+                        {% endif %}
+                        {% if object.finishing_processes.exists %}
+                            <li>عمليات التشطيب ({{ object.finishing_processes.count }})</li>
+                        {% endif %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <!-- Confirmation Form -->
+                <form method="post" class="mt-4">
+                    {% csrf_token %}
+                    
+                    <!-- Confirmation Checkbox -->
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" id="confirmDelete" required>
+                        <label class="form-check-label text-danger fw-bold" for="confirmDelete">
+                            أؤكد أنني أريد حذف هذا الأمر وجميع البيانات المرتبطة به نهائياً
+                        </label>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'production:order_detail' object.pk %}" class="btn btn-production-outline">
+                            <i class="fas fa-arrow-right me-1"></i>
+                            إلغاء والعودة
+                        </a>
+                        
+                        <button type="submit" class="btn btn-danger" id="deleteBtn" disabled>
+                            <i class="fas fa-trash-alt me-1"></i>
+                            حذف نهائياً
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block production_extra_js %}
+<script>
+$(document).ready(function() {
+    // Enable/disable delete button based on confirmation checkbox
+    $('#confirmDelete').on('change', function() {
+        $('#deleteBtn').prop('disabled', !this.checked);
+    });
+
+    // Add confirmation dialog on form submit
+    $('form').on('submit', function(e) {
+        if (!confirm('هل أنت متأكد تماماً من حذف هذا الأمر؟ لا يمكن التراجع عن هذا الإجراء.')) {
+            e.preventDefault();
+            return false;
+        }
+        
+        // Show loading state
+        $('#deleteBtn').html('<i class="fas fa-spinner fa-spin me-1"></i> جاري الحذف...');
+        $('#deleteBtn').prop('disabled', true);
+    });
+
+    // Add warning when user tries to leave page
+    let formSubmitted = false;
+    
+    $('form').on('submit', function() {
+        formSubmitted = true;
+    });
+
+    $(window).on('beforeunload', function(e) {
+        if (!formSubmitted && $('#confirmDelete').is(':checked')) {
+            const message = 'لديك تأكيد حذف معلق. هل تريد المغادرة؟';
+            e.returnValue = message;
+            return message;
+        }
+    });
+});
+</script>
+{% endblock %}

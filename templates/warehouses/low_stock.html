@@ -1,0 +1,150 @@
+{% extends 'warehouses/base.html' %}
+{% load static %}
+
+{% block title %}
+    تقرير المخزون المنخفض - المخازن
+{% endblock %}
+
+{% block warehouse_content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+            تقرير المخزون المنخفض
+        </h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'warehouses:dashboard' %}">لوحة التحكم</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'warehouses:stock_list' %}">قائمة المخزون</a></li>
+                <li class="breadcrumb-item active" aria-current="page">المخزون المنخفض</li>
+            </ol>
+        </nav>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row">
+        <div class="col-xl-12 col-md-12 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                عدد الأصناف ذات المخزون المنخفض</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stock_items.count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-battery-quarter fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Low Stock Table -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+            <h6 class="m-0 font-weight-bold text-primary">قائمة الأصناف</h6>
+            <div>
+                <a href="{% url 'warehouses:low_stock_pdf' %}" class="btn btn-sm btn-danger me-2" target="_blank">
+                    <i class="fas fa-file-pdf fa-sm"></i> تصدير كـ PDF
+                </a>
+                <a href="{% url 'warehouses:export_stock_csv' %}?status=low" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-download fa-sm"></i> تصدير كـ CSV
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover" id="dataTable" width="100%" cellspacing="0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>المنتج</th>
+                            <th>كود المنتج</th>
+                            <th>المخزن</th>
+                            <th class="text-center">الكمية الحالية</th>
+                            <th class="text-center">الحد الأدنى للمخزون</th>
+                            <th class="text-center">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in stock_items %}
+                        <tr class="align-middle">
+                            <td>
+                                <a href="{% url 'warehouses:product_detail' item.product.pk %}">{{ item.product.name }}</a>
+                            </td>
+                            <td>{{ item.product.code }}</td>
+                            <td>
+                                <a href="{% url 'warehouses:warehouse_detail' item.warehouse.pk %}">{{ item.warehouse.name }}</a>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-danger rounded-pill fs-6">{{ item.quantity|floatformat:2 }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-secondary rounded-pill fs-6">{{ item.product.min_stock_level|floatformat:2 }}</span>
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'warehouses:stock_detail' item.pk %}" class="btn btn-info btn-sm" data-bs-toggle="tooltip" title="عرض التفاصيل">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'warehouses:stock_edit' item.pk %}" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" title="تعديل المخزون">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5">
+                                <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                                <h4 class="text-success">لا توجد أصناف ذات مخزون منخفض حالياً.</h4>
+                                <p class="text-muted">عمل رائع في الحفاظ على مستويات المخزون!</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if is_paginated %}
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center mt-4">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}" aria-label="Previous">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link" aria-hidden="true">&laquo;</span>
+                        </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                        {% else %}
+                            <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}" aria-label="Next">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link" aria-hidden="true">&raquo;</span>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

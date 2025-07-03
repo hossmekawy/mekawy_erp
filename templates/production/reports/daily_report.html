@@ -1,0 +1,80 @@
+{% extends 'production/production_base.html' %}
+{% load i18n %}
+
+{% block production_title %}التقرير اليومي{% endblock %}
+
+{% block production_page_title %}
+    <i class="fas fa-sun me-2"></i>
+    {% trans "التقرير اليومي للإنتاج" %} ({{ "now"|date:"Y-m-d" }})
+{% endblock %}
+
+{% block production_content %}
+<div class="row mb-4">
+    <div class="col-md-4 col-lg-3 mb-3">
+        <div class="production-metric">
+            <div class="production-metric-icon primary"><i class="fas fa-plus"></i></div>
+            <div class="production-metric-value">{{ daily_stats.orders_created|default:0 }}</div>
+            <div class="production-metric-label">{% trans "أوامر تم إنشاؤها" %}</div>
+        </div>
+    </div>
+    <div class="col-md-4 col-lg-3 mb-3">
+        <div class="production-metric">
+            <div class="production-metric-icon success"><i class="fas fa-check-double"></i></div>
+            <div class="production-metric-value">{{ daily_stats.orders_completed|default:0 }}</div>
+            <div class="production-metric-label">{% trans "أوامر مكتملة" %}</div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="production-card mb-4">
+            <div class="card-header">
+                <h6 class="m-0 font-weight-bold text-primary">{% trans "العمليات المكتملة اليوم" %}</h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {% trans "عمليات القص" %}
+                        <span class="badge bg-primary rounded-pill">{{ daily_stats.cutting_completed|default:0 }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {% trans "عمليات التجميع" %}
+                        <span class="badge bg-primary rounded-pill">{{ daily_stats.assembly_completed|default:0 }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {% trans "عمليات الصباغة" %}
+                        <span class="badge bg-primary rounded-pill">{{ daily_stats.dyeing_completed|default:0 }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {% trans "عمليات التشطيب" %}
+                        <span class="badge bg-primary rounded-pill">{{ daily_stats.finishing_completed|default:0 }}</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="production-card">
+            <div class="card-header">
+                <h6 class="m-0 font-weight-bold text-primary">{% trans "أوامر نشطة حالياً" %}</h6>
+            </div>
+            <div class="card-body">
+                {% if active_orders %}
+                    <ul class="list-group list-group-flush">
+                        {% for order in active_orders %}
+                            <li class="list-group-item">
+                                <a href="{% url 'production:order_detail' order.pk %}">{{ order.order_number }}</a> - {{ order.product.name }}
+                                <span class="float-end">{{ order.get_status_display }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted text-center">{% trans "لا توجد أوامر نشطة حالياً." %}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

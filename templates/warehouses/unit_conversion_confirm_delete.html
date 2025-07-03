@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block title %}حذف التحويل - Mekawy ERP{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card shadow">
+                <div class="card-header bg-danger text-white">
+                    <h6 class="m-0 font-weight-bold">
+                        <i class="fas fa-exclamation-triangle"></i> تأكيد الحذف
+                    </h6>
+                </div>
+                <div class="card-body text-center">
+                    <i class="fas fa-exchange-alt fa-3x text-danger mb-3"></i>
+                    <h5>هل أنت متأكد من حذف هذا التحويل؟</h5>
+                    <div class="alert alert-warning">
+                        <strong>{{ object }}</strong>
+                    </div>
+                    <p class="text-danger">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        تحذير: لا يمكن التراجع عن هذا الإجراء
+                    </p>
+                    
+                    <form method="post" class="d-inline">
+                        {% csrf_token %}
+                        <a href="{% url 'warehouses:unit_conversion_list' %}" class="btn btn-secondary me-2">
+                            <i class="fas fa-times"></i> إلغاء
+                        </a>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> حذف نهائياً
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

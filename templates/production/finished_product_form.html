@@ -1,0 +1,283 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block production_title %}
+    {% if object %}تعديل المنتج{% else %}منتج جديد{% endif %}
+{% endblock %}
+
+{% block production_page_title %}
+    <i class="fas fa-box me-2"></i>
+    {% if object %}تعديل المنتج{% else %}إضافة منتج جديد{% endif %}
+{% endblock %}
+
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item">
+        <a href="{% url 'production:finished_product_list' %}">المنتجات النهائية</a>
+    </li>
+    <li class="breadcrumb-item active">
+        {% if object %}تعديل {{ object.name }}{% else %}منتج جديد{% endif %}
+    </li>
+{% endblock %}
+
+{% block production_header_actions %}
+    <div class="d-flex gap-2">
+        <a href="{% url 'production:finished_product_list' %}" class="btn btn-production-outline">
+            <i class="fas fa-arrow-right me-2"></i>العودة للقائمة
+        </a>
+        {% if object %}
+            <a href="{% url 'production:finished_product_detail' object.pk %}" class="btn btn-production-outline">
+                <i class="fas fa-eye me-2"></i>عرض التفاصيل
+            </a>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block production_content %}
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="production-card">
+                <div class="production-card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-edit me-2"></i>
+                        {% if object %}تعديل بيانات المنتج{% else %}بيانات المنتج الجديد{% endif %}
+                    </h5>
+                </div>
+                <div class="production-card-body">
+                    <form method="post" class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        
+                        <!-- Basic Information -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary border-bottom pb-2 mb-3">
+                                    <i class="fas fa-info-circle me-2"></i>المعلومات الأساسية
+                                </h6>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label required">{{ form.name.label }}</label>
+                                {{ form.name|add_class:"form-control"|attr:"placeholder:أدخل اسم المنتج" }}
+                                {% if form.name.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.name.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label required">{{ form.code.label }}</label>
+                                {{ form.code|add_class:"form-control"|attr:"placeholder:كود المنتج الفريد" }}
+                                {% if form.code.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.code.errors.0 }}</div>
+                                {% endif %}
+                                <div class="form-text">يجب أن يكون الكود فريداً لكل منتج</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">{{ form.category.label }}</label>
+                                {{ form.category|add_class:"form-select" }}
+                                {% if form.category.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.category.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">{{ form.size_group.label }}</label>
+                                {{ form.size_group|add_class:"form-select" }}
+                                {% if form.size_group.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.size_group.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">{{ form.fabric_per_meter.label }}</label>
+                                <div class="input-group">
+                                    {{ form.fabric_per_meter|add_class:"form-control"|attr:"placeholder:0.00" }}
+                                    <span class="input-group-text">متر</span>
+                                </div>
+                                {% if form.fabric_per_meter.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.fabric_per_meter.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">{{ form.fabric_quantity_per_piece.label }}</label>
+                                <div class="input-group">
+                                    {{ form.fabric_quantity_per_piece|add_class:"form-control"|attr:"placeholder:0.00" }}
+                                    <span class="input-group-text">متر/قطعة</span>
+                                </div>
+                                {% if form.fabric_quantity_per_piece.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.fabric_quantity_per_piece.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-12 mb-3">
+                                <label class="form-label">{{ form.description.label }}</label>
+                                {{ form.description|add_class:"form-control"|attr:"placeholder:وصف المنتج (اختياري)"|attr:"rows:3" }}
+                                {% if form.description.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.description.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Pricing Information -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary border-bottom pb-2 mb-3">
+                                    <i class="fas fa-money-bill-wave me-2"></i>معلومات التسعير
+                                </h6>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">{{ form.base_cost.label }}</label>
+                                <div class="input-group">
+                                    {{ form.base_cost|add_class:"form-control"|attr:"placeholder:0.00"|attr:"step:0.01" }}
+                                    <span class="input-group-text">ج.م</span>
+                                </div>
+                                {% if form.base_cost.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.base_cost.errors.0 }}</div>
+                                {% endif %}
+                                <div class="form-text">التكلفة الأساسية للإنتاج</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">{{ form.selling_price.label }}</label>
+                                <div class="input-group">
+                                    {{ form.selling_price|add_class:"form-control"|attr:"placeholder:0.00"|attr:"step:0.01" }}
+                                    <span class="input-group-text">ج.م</span>
+                                </div>
+                                {% if form.selling_price.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.selling_price.errors.0 }}</div>
+                                {% endif %}
+                                <div class="form-text">سعر البيع للعملاء</div>
+                            </div>
+                        </div>
+
+                        <!-- Status -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary border-bottom pb-2 mb-3">
+                                    <i class="fas fa-toggle-on me-2"></i>الحالة
+                                </h6>
+                            </div>
+                            
+                            <div class="col-12 mb-3">
+                                <div class="form-check form-switch">
+                                    {{ form.is_active|add_class:"form-check-input" }}
+                                    <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                        {{ form.is_active.label }}
+                                    </label>
+                                </div>
+                                <div class="form-text">المنتجات غير النشطة لن تظهر في قوائم الإنتاج</div>
+                            </div>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                            <a href="{% url 'production:finished_product_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-2"></i>إلغاء
+                            </a>
+                            <button type="submit" class="btn btn-production">
+                                <i class="fas fa-save me-2"></i>
+                                {% if object %}حفظ التعديلات{% else %}إضافة المنتج{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block production_extra_css %}
+<style>
+    .required::after {
+        content: " *";
+        color: #dc3545;
+    }
+    
+    .form-text {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+    
+    .input-group-text {
+        background-color: #f8f9fa;
+        border-color: #dee2e6;
+        color: #495057;
+        font-weight: 500;
+    }
+    
+    .form-check-input:checked {
+        background-color: var(--production-primary);
+        border-color: var(--production-primary);
+    }
+    
+    .border-bottom {
+        border-bottom: 2px solid #e9ecef !important;
+    }
+</style>
+{% endblock %}
+
+{% block production_extra_js %}
+<script>
+$(document).ready(function() {
+    // Auto-generate code from name if creating new product
+    {% if not object %}
+    $('#id_name').on('input', function() {
+        const name = $(this).val();
+        if (name && !$('#id_code').val()) {
+            // Generate code from name (remove spaces, special chars, make uppercase)
+            const code = name.replace(/[^a-zA-Z0-9\u0600-\u06FF]/g, '').toUpperCase().substring(0, 10);
+            $('#id_code').val(code);
+        }
+    });
+    {% endif %}
+    
+    // Calculate profit margin
+    $('#id_base_cost, #id_selling_price').on('input', function() {
+        const baseCost = parseFloat($('#id_base_cost').val()) || 0;
+        const sellingPrice = parseFloat($('#id_selling_price').val()) || 0;
+        
+        if (baseCost > 0 && sellingPrice > 0) {
+            const profit = sellingPrice - baseCost;
+            const margin = ((profit / sellingPrice) * 100).toFixed(1);
+            
+            // Show profit info
+            if (!$('.profit-info').length) {
+                $('#id_selling_price').parent().after(`
+                    <div class="profit-info mt-2 p-2 bg-light rounded">
+                        <small class="text-muted">
+                            <strong>الربح:</strong> <span class="profit-amount">${profit.toFixed(2)} ج.م</span> |
+                            <strong>هامش الربح:</strong> <span class="profit-margin">${margin}%</span>
+                        </small>
+                    </div>
+                `);
+            } else {
+                $('.profit-amount').text(profit.toFixed(2) + ' ج.م');
+                $('.profit-margin').text(margin + '%');
+            }
+        } else {
+            $('.profit-info').remove();
+        }
+    });
+    
+    // Form validation
+    $('.needs-validation').on('submit', function(e) {
+        if (!this.checkValidity()) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        $(this).addClass('was-validated');
+    });
+    
+    // Real-time validation
+    $('.form-control, .form-select').on('blur', function() {
+        if ($(this).is(':invalid')) {
+            $(this).addClass('is-invalid');
+        } else {
+            $(this).removeClass('is-invalid').addClass('is-valid');
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends 'production/production_base.html' %}
+{% load static humanize %}
+
+{% block production_title %}
+    {{ page_title }}
+{% endblock %}
+
+{% block production_page_title %}
+    <i class="fas fa-edit me-2"></i>{{ page_title }}
+{% endblock %}
+
+{% block production_content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="production-card">
+            <div class="production-card-header">
+                تعديل بنود التكلفة الإضافية واليدوية
+            </div>
+            <div class="production-card-body">
+                <p class="text-muted">
+                    التكاليف الأساسية (القماش، التجميع، الصباغة، التشطيب) تم حسابها تلقائياً. يمكنك هنا تعديل التكاليف الأخرى.
+                </p>
+                <hr>
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.thread_cost.id_for_label }}" class="form-label">{{ form.thread_cost.label }}</label>
+                            {{ form.thread_cost }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.accessories_cost.id_for_label }}" class="form-label">{{ form.accessories_cost.label }}</label>
+                            {{ form.accessories_cost }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.cutting_cost.id_for_label }}" class="form-label">{{ form.cutting_cost.label }}</label>
+                            {{ form.cutting_cost }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.transportation_cost.id_for_label }}" class="form-label">{{ form.transportation_cost.label }}</label>
+                            {{ form.transportation_cost }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.overhead_cost.id_for_label }}" class="form-label">{{ form.overhead_cost.label }}</label>
+                            {{ form.overhead_cost }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.quality_control_cost.id_for_label }}" class="form-label">{{ form.quality_control_cost.label }}</label>
+                            {{ form.quality_control_cost }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.waste_cost.id_for_label }}" class="form-label">{{ form.waste_cost.label }}</label>
+                            {{ form.waste_cost }}
+                        </div>
+                         <div class="col-md-6 mb-3">
+                            <label for="{{ form.defect_cost.id_for_label }}" class="form-label">{{ form.defect_cost.label }}</label>
+                            {{ form.defect_cost }}
+                        </div>
+                        <div class="col-12 mb-3">
+                            <label for="{{ form.notes.id_for_label }}" class="form-label">{{ form.notes.label }}</label>
+                            {{ form.notes }}
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 d-flex justify-content-end">
+                        <a href="{% url 'production:cost_analysis_detail' object.pk %}" class="btn btn-secondary me-2">
+                            <i class="fas fa-times me-1"></i>إلغاء
+                        </a>
+                        <button type="submit" class="btn btn-production">
+                            <i class="fas fa-save me-1"></i>حفظ التعديلات
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

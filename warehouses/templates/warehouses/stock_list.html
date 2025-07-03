@@ -1,0 +1,398 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}إدارة المخزون - Mekawy ERP{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-clipboard-list text-primary"></i> إدارة المخزون
+        </h1>
+        {% if user.role != 'viewer' %}
+        <div class="btn-group">
+            <a href="{% url 'warehouses:stock_add' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> إضافة مخزون
+            </a>
+            <button type="button" class="btn btn-success dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown">
+                <span class="visually-hidden">Toggle Dropdown</span>
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="{% url 'warehouses:stock_adjustment' %}">
+                    <i class="fas fa-balance-scale"></i> تسوية المخزون
+                </a></li>
+                <li><a class="dropdown-item" href="{% url 'warehouses:import_stock_csv' %}">
+                    <i class="fas fa-file-import"></i> استيراد من CSV
+                </a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="{% url 'warehouses:export_stock_csv' %}">
+                    <i class="fas fa-file-export"></i> تصدير إلى CSV
+                </a></li>
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                إجمالي المنتجات</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_items  }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-boxes fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                مخزون منخفض</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ low_stock_count }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-danger shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                مخزون نافد</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{out_of_stock_count}}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-times-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                القيمة الإجمالية</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_value|floatformat:2 }} ج.م</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters Card -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">البحث والفلترة</h6>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">البحث</label>
+                    <input type="text" name="search" class="form-control" 
+                           placeholder="البحث في المنتج أو المخزن..." 
+                           value="{{ request.GET.search }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">المخزن</label>
+                    <select name="warehouse" class="form-select">
+                        <option value="">جميع المخازن</option>
+                        {% for warehouse in warehouses %}
+                        <option value="{{ warehouse.id }}" 
+                                {% if request.GET.warehouse == warehouse.id|stringformat:"s" %}selected{% endif %}>
+                            {{ warehouse.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">التصنيف</label>
+                    <select name="category" class="form-select">
+                        <option value="">جميع التصنيفات</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}" 
+                                {% if request.GET.category == category.id|stringformat:"s" %}selected{% endif %}>
+                            {{ category.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fas fa-search"></i> بحث
+                    </button>
+                    <a href="{% url 'warehouses:stock_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Stock Table -->
+    <div class="card shadow">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">
+                قائمة المخزون ({{ stock_items|length }} عنصر)
+            </h6>
+            <div class="btn-group">
+                <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="fas fa-download"></i> تصدير
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{% url 'warehouses:export_stock_csv' %}">
+                        <i class="fas fa-file-csv"></i> CSV
+                    </a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if stock_items %}
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>المنتج</th>
+                            <th>المخزن</th>
+                            <th>الكمية</th>
+                            <th>الكمية المتاحة</th>
+                            <th>الكمية المحجوزة</th>
+                            <th>الموقع</th>
+                            <th>الحالة</th>
+                            <th>الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in stock_items %}
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div>
+                                        <strong>{{ item.product.name }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ item.product.code }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ item.warehouse.name }}</span>
+                            </td>
+                            <td>
+                                <strong>{{ item.quantity }}</strong>
+                                <small class="text-muted">{{ item.product.get_unit_display }}</small>
+                            </td>
+                            <td>
+                                <span class="text-success">{{ item.available_quantity }}</span>
+                            </td>
+                            <td>
+                                {% if item.reserved_quantity > 0 %}
+                                    <span class="text-warning">{{ item.reserved_quantity }}</span>
+                                {% else %}
+                                    <span class="text-muted">0</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.location|default:"غير محدد" }}</td>
+                            <td>
+                                {% if item.quantity == 0 %}
+                                    <span class="badge bg-danger">نافد</span>
+                                {% elif item.is_low_stock %}
+                                    <span class="badge bg-warning">منخفض</span>
+                                {% else %}
+                                    <span class="badge bg-success">طبيعي</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'warehouses:stock_detail' item.pk %}" 
+                                       class="btn btn-sm btn-outline-info" title="عرض">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if user.role != 'viewer' %}
+                                    <a href="{% url 'warehouses:stock_edit' item.pk %}" 
+                                       class="btn btn-sm btn-outline-primary" title="تعديل">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-outline-success" 
+                                            onclick="quickAdjustment({{ item.pk }})" title="تسوية سريعة">
+                                        <i class="fas fa-balance-scale"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% include 'partials/pagination.html' %}
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">لا يوجد مخزون</h5>
+                <p class="text-muted">لم يتم العثور على أي عناصر مخزون.</p>
+                {% if user.role != 'viewer' %}
+                <a href="{% url 'warehouses:stock_add' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> إضافة مخزون جديد
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Quick Adjustment Modal -->
+<div class="modal fade" id="quickAdjustmentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">تسوية سريعة للمخزون</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="quickAdjustmentForm">
+                    <input type="hidden" id="stockItemId">
+                    <div class="mb-3">
+                        <label class="form-label">الكمية الجديدة</label>
+                        <input type="number" class="form-control" id="newQuantity" step="0.01" min="0" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">السبب</label>
+                        <textarea class="form-control" id="adjustmentReason" rows="3" placeholder="سبب التسوية..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" onclick="submitQuickAdjustment()">حفظ التسوية</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.border-left-primary {
+    border-left: 0.25rem solid var(--primary-color) !important;
+}
+.border-left-success {
+    border-left: 0.25rem solid var(--success-color) !important;
+}
+.border-left-warning {
+    border-left: 0.25rem solid var(--warning-color) !important;
+    .border-left-danger {
+        border-left: 0.25rem solid var(--danger-color) !important;
+    }
+    
+    .card {
+        transition: transform 0.2s ease-in-out;
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .table th {
+        font-weight: 600;
+        background-color: #f8f9fc;
+        border-bottom: 2px solid #e3e6f0;
+    }
+    
+    .badge {
+        font-size: 0.75rem;
+        padding: 0.375rem 0.75rem;
+    }
+    
+    .btn-group .btn {
+        margin: 0 1px;
+    }
+    </style>
+    {% endblock %}
+    
+    {% block extra_js %}
+    <script>
+    function quickAdjustment(stockItemId) {
+        document.getElementById('stockItemId').value = stockItemId;
+        const modal = new bootstrap.Modal(document.getElementById('quickAdjustmentModal'));
+        modal.show();
+    }
+    
+    function submitQuickAdjustment() {
+        const stockItemId = document.getElementById('stockItemId').value;
+        const newQuantity = document.getElementById('newQuantity').value;
+        const reason = document.getElementById('adjustmentReason').value;
+        
+        if (!newQuantity) {
+            showErrorToast('يرجى إدخال الكمية الجديدة');
+            return;
+        }
+        
+        // AJAX call to update stock
+        fetch(`{% url 'warehouses:quick_stock_adjustment' %}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                stock_item_id: stockItemId,
+                new_quantity: newQuantity,
+                reason: reason
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccessToast('تم تحديث المخزون بنجاح');
+                location.reload();
+            } else {
+                showErrorToast(data.error || 'حدث خطأ أثناء التحديث');
+            }
+        })
+        .catch(error => {
+            showErrorToast('حدث خطأ في الاتصال');
+        });
+        
+        const modal = bootstrap.Modal.getInstance(document.getElementById('quickAdjustmentModal'));
+        modal.hide();
+    }
+    
+    // Auto-refresh every 5 minutes
+    setInterval(function() {
+        if (document.visibilityState === 'visible') {
+            location.reload();
+        }
+    }, 300000);
+    </script>
+    {% endblock %}
+    

@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+    {% if object %}تعديل التصنيف{% else %}إضافة تصنيف جديد{% endif %} - Mekawy ERP
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            {% if object %}
+                <i class="fas fa-edit text-primary"></i> تعديل التصنيف
+            {% else %}
+                <i class="fas fa-plus text-success"></i> إضافة تصنيف جديد
+            {% endif %}
+        </h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'warehouses:category_list' %}">التصنيفات</a></li>
+                <li class="breadcrumb-item active" aria-current="page">
+                    {% if object %}تعديل{% else %}إضافة جديد{% endif %}
+                </li>
+            </ol>
+        </nav>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-xl-8 col-lg-10">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-gradient-primary text-white">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h5 class="mb-0">
+                            <i class="fas fa-tags me-2"></i>
+                            {% if object %}
+                                تعديل التصنيف: <span class="fw-bold">{{ object.name }}</span>
+                            {% else %}
+                                بيانات التصنيف الجديد
+                            {% endif %}
+                        </h5>
+                        <a href="{% url 'warehouses:category_list' %}" 
+                           class="btn btn-light btn-sm" 
+                           data-bs-toggle="tooltip" 
+                           title="العودة للقائمة">
+                            <i class="fas fa-arrow-left"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="card-body p-4">
+                    <form method="post" id="categoryForm" novalidate>
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label for="{{ form.name.id_for_label }}" class="form-label fw-bold">
+                                    <i class="fas fa-tag text-primary me-1"></i>
+                                    اسم التصنيف 
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light">
+                                        <i class="fas fa-tags text-muted"></i>
+                                    </span>
+                                    {{ form.name }}
+                                </div>
+                                <div class="invalid-feedback" id="name-error"></div>
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">
+                                    <i class="fas fa-toggle-on text-primary me-1"></i>
+                                    حالة التصنيف
+                                </label>
+                                <div class="form-check form-switch mt-2">
+                                    {{ form.is_active }}
+                                    <label class="form-check-label fw-bold" for="{{ form.is_active.id_for_label }}">
+                                        <span class="status-text">التصنيف نشط</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="{{ form.description.id_for_label }}" class="form-label fw-bold">
+                                <i class="fas fa-align-left text-primary me-1"></i>
+                                الوصف
+                            </label>
+                            {{ form.description }}
+                            <div class="form-text">
+                                <small class="text-muted">
+                                    <span id="charCount">0</span>/500 حرف
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <!-- Form Actions -->
+                        <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                            <div>
+                                <button type="submit" class="btn btn-primary btn-lg me-2" id="submitBtn">
+                                    <i class="fas fa-save me-2"></i>
+                                    {% if object %}تحديث التصنيف{% else %}إضافة التصنيف{% endif %}
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-lg" id="resetBtn">
+                                    <i class="fas fa-undo me-2"></i>إعادة تعيين
+                                </button>
+                            </div>
+                            <a href="{% url 'warehouses:category_list' %}" class="btn btn-light btn-lg">
+                                <i class="fas fa-times me-2"></i>إلغاء
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .bg-gradient-primary {
+        background: linear-gradient(135deg, var(--primary-color) 0%, #224abe 100%);
+    }
+    
+    .form-control, .form-select {
+        border-radius: 0.5rem;
+        border: 2px solid #e3e6f0;
+        padding: 0.75rem 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 0.25rem rgba(78, 115, 223, 0.15);
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Add form classes
+    $('input[type="text"], textarea, select').addClass('form-control');
+    $('input[type="checkbox"]').addClass('form-check-input');
+    
+    const nameField = document.getElementById('id_name');
+    const descriptionField = document.getElementById('id_description');
+    const statusText = document.querySelector('.status-text');
+    const charCount = document.getElementById('charCount');
+    
+    // Character counter
+    function updateCharCount() {
+        const count = descriptionField.value.length;
+        charCount.textContent = count;
+        
+        if (count > 400) {
+            charCount.style.color = 'var(--danger-color)';
+        } else if (count > 300) {
+            charCount.style.color = 'var(--warning-color)';
+        } else {
+            charCount.style.color = 'var(--success-color)';
+        }
+    }
+    
+    // Status switch text update
+    document.getElementById('id_is_active').addEventListener('change', function() {
+        statusText.textContent = this.checked ? 'التصنيف نشط' : 'التصنيف غير نشط';
+        statusText.style.color = this.checked ? 'var(--success-color)' : 'var(--danger-color)';
+    });
+    
+    descriptionField.addEventListener('input', updateCharCount);
+    
+    // Initialize
+    updateCharCount();
+    const isActiveCheckbox = document.getElementById('id_is_active');
+    statusText.textContent = isActiveCheckbox.checked ? 'التصنيف نشط' : 'التصنيف غير نشط';
+    statusText.style.color = isActiveCheckbox.checked ? 'var(--success-color)' : 'var(--danger-color)';
+    
+    // Form submission
+    document.getElementById('categoryForm').addEventListener('submit', function(e) {
+        const submitBtn = document.getElementById('submitBtn');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>جاري الحفظ...';
+        submitBtn.disabled = true;
+    });
+});
+
+// Handle form errors
+{% if form.errors %}
+$(document).ready(function() {
+    {% for field, errors in form.errors.items %}
+        {% for error in errors %}
+            showErrorToast('{{ error|escapejs }}');
+        {% endfor %}
+    {% endfor %}
+});
+{% endif %}
+</script>
+{% endblock %}

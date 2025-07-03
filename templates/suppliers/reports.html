@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}تقارير الموردين{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h2 mb-4 text-gray-800 fw-bold">تقارير الموردين</h1>
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row align-items-end">
+                <div class="col-md-4"><label class="form-label">من تاريخ</label><input type="date" name="date_from" class="form-control" value="{{ date_from|date:'Y-m-d' }}"></div>
+                <div class="col-md-4"><label class="form-label">إلى تاريخ</label><input type="date" name="date_to" class="form-control" value="{{ date_to|date:'Y-m-d' }}"></div>
+                <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">عرض التقرير</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center h-100"><div class="card-body">
+                <div class="fs-2 fw-bold">{{ period_stats.total_orders }}</div><div class="text-muted">إجمالي الأوامر</div>
+            </div></div>
+        </div>
+         <div class="col-md-3">
+            <div class="card text-center h-100"><div class="card-body">
+                <div class="fs-2 fw-bold">{{ period_stats.total_amount|floatformat:0 }}</div><div class="text-muted">إجمالي القيمة</div>
+            </div></div>
+        </div>
+         <div class="col-md-3">
+            <div class="card text-center h-100"><div class="card-body">
+                <div class="fs-2 fw-bold">{{ period_stats.unique_suppliers }}</div><div class="text-muted">موردين فريدين</div>
+            </div></div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header"><h6 class="m-0 font-weight-bold text-primary">أفضل الموردين في الفترة من {{ date_from|date:"d M Y" }} إلى {{ date_to|date:"d M Y" }}</h6></div>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead><tr><th>المورد</th><th>عدد الأوامر</th><th>إجمالي القيمة</th></tr></thead>
+                <tbody>
+                    {% for supplier in top_suppliers_period %}
+                    <tr>
+                        <td>{{ supplier.name }}</td>
+                        <td>{{ supplier.period_orders }}</td>
+                        <td>{{ supplier.period_amount|floatformat:0 }} جنيه</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

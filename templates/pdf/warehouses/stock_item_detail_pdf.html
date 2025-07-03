@@ -1,0 +1,81 @@
+{% extends 'pdf/base_pdf.html' %}
+{% load humanize %}
+
+{% block pdf_title %}
+    تقرير عنصر مخزون - {{ stock_item.product.name }}
+{% endblock %}
+
+{% block pdf_header %}
+    <h1>تقرير عنصر مخزون</h1>
+    <div class="meta-info">
+        {{ stock_item.product.name }} ({{ stock_item.product.code }}) | تاريخ الطباعة: {{ timestamp|date:"Y-m-d H:i" }}
+    </div>
+{% endblock %}
+
+{% block pdf_content %}
+    <h2>ملخص المخزون</h2>
+    <table class="summary-table">
+        <tbody>
+            <tr>
+                <td><strong>المخزن:</strong></td>
+                <td>{{ stock_item.warehouse.name }}</td>
+                <td><strong>الكمية الإجمالية:</strong></td>
+                <td style="font-weight: bold; color: #004a99;">{{ stock_item.quantity|floatformat:2 }} {{ stock_item.product.get_unit_display }}</td>
+            </tr>
+            <tr>
+                <td><strong>الموقع:</strong></td>
+                <td>{{ stock_item.location|default:"غير محدد" }}</td>
+                <td><strong>الكمية المتاحة:</strong></td>
+                <td style="font-weight: bold; color: #28a745;">{{ stock_item.available_quantity|floatformat:2 }} {{ stock_item.product.get_unit_display }}</td>
+            </tr>
+            <tr>
+                <td><strong>الحالة:</strong></td>
+                <td>
+                    {% if stock_item.quantity == 0 %}
+                        <span style="color: #dc3545;">نافد</span>
+                    {% elif stock_item.is_low_stock %}
+                        <span style="color: #ffc107;">منخفض</span>
+                    {% else %}
+                        <span style="color: #28a745;">طبيعي</span>
+                    {% endif %}
+                </td>
+                <td><strong>الكمية المحجوزة:</strong></td>
+                <td style="font-weight: bold; color: #fd7e14;">{{ stock_item.reserved_quantity|floatformat:2 }} {{ stock_item.product.get_unit_display }}</td>
+            </tr>
+            <tr>
+                <td><strong>قيمة المخزون:</strong></td>
+                <td colspan="3" style="font-weight: bold;">{{ stock_item.total_value|floatformat:2|intcomma }} جنيه</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2 style="margin-top: 30px;">الحركات الأخيرة (آخر 20 حركة)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>التاريخ</th>
+                <th>النوع</th>
+                <th>الكمية</th>
+                <th>المرجع</th>
+                <th>المستخدم</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for movement in recent_movements %}
+            <tr>
+                <td>{{ movement.created_at|date:"Y-m-d H:i" }}</td>
+                <td>{{ movement.get_movement_type_display }}</td>
+                <td style="font-weight: bold; color: {% if movement.quantity > 0 %}#28a745{% else %}#dc3545{% endif %};">
+                    {% if movement.quantity > 0 %}+{% endif %}{{ movement.quantity|floatformat:2 }}
+                </td>
+                <td>{{ movement.reference_number|default:"-" }}</td>
+                <td>{{ movement.created_by.get_full_name|default:movement.created_by.username|default:"-" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 20px;">لا توجد حركات مسجلة لهذا العنصر.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

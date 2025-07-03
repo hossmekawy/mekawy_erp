@@ -1,0 +1,168 @@
+{% extends 'production/production_base.html' %}
+{% load i18n widget_tweaks %}
+
+{% block production_title %}
+    {% if form.instance.pk %}
+        تعديل تصريح خروج
+    {% else %}
+        إصدار تصريح خروج جديد
+    {% endif %}
+{% endblock %}
+
+{% block production_extra_css %}
+    {{ block.super }}
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <style>
+        .form-section-header {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--production-primary);
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .select2-container--default .select2-selection--single {
+            height: calc(1.5em + .75rem + 2px) !important;
+            border: 1px solid #ced4da;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height: calc(1.5em + .75rem);
+            padding-right: .75rem; /* For RTL */
+            padding-left: 0;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: calc(1.5em + .75rem);
+        }
+        .form-label .text-danger {
+            margin-right: 4px;
+        }
+    </style>
+{% endblock %}
+
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item"><a href="{% url 'production:exit_permits:exit_permit_list' %}" class="text-black-50">تصاريح الخروج</a></li>
+    <li class="breadcrumb-item active" aria-current="page">
+        {% if form.instance.pk %}تعديل تصريح{% else %}تصريح جديد{% endif %}
+    </li>
+{% endblock %}
+
+{% block production_content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <form method="post" novalidate>
+            {% csrf_token %}
+            <div class="production-card">
+                <div class="production-card-header">
+                    <i class="fas fa-file-signature ms-2"></i>
+                    {% if form.instance.pk %}
+                        تعديل بيانات تصريح الخروج
+                    {% else %}
+                        بيانات تصريح خروج جديد
+                    {% endif %}
+                </div>
+                <div class="production-card-body p-4">
+
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                                <p class="mb-0">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    
+                    <h5 class="form-section-header">البيانات الأساسية</h5>
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-6">
+                            <label for="{{ form.production_order.id_for_label }}" class="form-label">أمر الإنتاج<span class="text-danger">*</span></label>
+                            {% render_field form.production_order class="form-select select2-field" %}
+                            {% for error in form.production_order.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="{{ form.permit_type.id_for_label }}" class="form-label">نوع التصريح<span class="text-danger">*</span></label>
+                            {% render_field form.permit_type class="form-select" %}
+                            {% for error in form.permit_type.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <h5 class="form-section-header">تفاصيل التصريح</h5>
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-6">
+                            <label for="{{ form.destination.id_for_label }}" class="form-label">الوجهة<span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-truck-moving"></i></span>
+                                {% render_field form.destination class+="form-control" placeholder="مثال: اسم المصنع الخارجي" %}
+                            </div>
+                            {% for error in form.destination.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="{{ form.quantity.id_for_label }}" class="form-label">الكمية<span class="text-danger">*</span></label>
+                             <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-boxes-stacked"></i></span>
+                                {% render_field form.quantity class+="form-control" placeholder="0" %}
+                            </div>
+                            {% for error in form.quantity.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label for="{{ form.items_description.id_for_label }}" class="form-label">وصف المواد<span class="text-danger">*</span></label>
+                            {% render_field form.items_description class+="form-control" rows="3" placeholder="وصف تفصيلي للمواد أو المنتجات التي سيتم نقلها..." %}
+                            {% for error in form.items_description.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label for="{{ form.purpose.id_for_label }}" class="form-label">الغرض من الخروج<span class="text-danger">*</span></label>
+                            {% render_field form.purpose class+="form-control" rows="3" placeholder="وصف الغرض من تصريح الخروج..." %}
+                            {% for error in form.purpose.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <h5 class="form-section-header">الصلاحية والملاحظات</h5>
+                    <div class="row g-4">
+                         <div class="col-md-6">
+                            <label for="{{ form.valid_until.id_for_label }}" class="form-label">صالح حتى تاريخ<span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                 <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                                {% render_field form.valid_until class+="form-control" %}
+                            </div>
+                             {% for error in form.valid_until.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                        </div>
+                         <div class="col-md-6">
+                            <label for="{{ form.notes.id_for_label }}" class="form-label">ملاحظات إضافية</label>
+                            <div class="input-group">
+                                 <span class="input-group-text"><i class="fas fa-sticky-note"></i></span>
+                                {% render_field form.notes class+="form-control" placeholder="ملاحظات اختيارية..." %}
+                            </div>
+                             {% for error in form.notes.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end mt-5 border-top pt-4">
+                        <a href="{% url 'production:exit_permits:exit_permit_list' %}" class="btn btn-outline-secondary ms-3">
+                            <i class="fas fa-times ms-2"></i>إلغاء
+                        </a>
+                        <button type="submit" class="btn btn-production btn-lg">
+                            <i class="fas fa-save ms-2"></i>حفظ وإصدار التصريح
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block production_extra_js %}
+    {{ block.super }}
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            // تفعيل Select2 لحقل أمر الإنتاج
+            $('.select2-field').select2({
+                placeholder: "ابحث واختر أمر إنتاج",
+                allowClear: true,
+                dir: "rtl", // تفعيل دعم اللغة العربية من اليمين لليسار
+                language: "ar"
+            });
+        });
+    </script>
+{% endblock %}

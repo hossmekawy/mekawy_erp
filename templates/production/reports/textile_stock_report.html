@@ -1,0 +1,141 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+
+{% block production_title %}تقرير مخزون القماش - {{ textile_stock.name }}{% endblock %}
+
+{% block production_content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h3">تقرير مخزون القماش</h1>
+                <button onclick="window.print()" class="btn btn-primary">
+                    <i class="fas fa-print me-2"></i>طباعة
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Report Header -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>{{ textile_stock.name }}</h5>
+                    <p class="text-muted mb-1">نوع القماش: {{ textile_stock.get_fabric_type_display }}</p>
+                    <p class="text-muted mb-1">اللون: {{ textile_stock.color }}</p>
+                    <p class="text-muted mb-0">العرض: {{ textile_stock.width }} سم</p>
+                </div>
+                <div class="col-md-6 text-end">
+                    <p class="mb-1"><strong>تاريخ التقرير:</strong> {{ generated_at|date:"d/m/Y H:i" }}</p>
+                    <p class="mb-1"><strong>المستخدم:</strong> {{ generated_by.username }}</p>
+                    <p class="mb-0"><strong>الكمية المتاحة:</strong> {{ textile_stock.length_available }} متر</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Statistics -->
+    {% if statistics %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">الإحصائيات</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <h3 class="text-primary">{{ statistics.total_orders }}</h3>
+                        <p class="text-muted">إجمالي الأوامر</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <h3 class="text-success">{{ statistics.total_allocated|floatformat:2 }}</h3>
+                        <p class="text-muted">متر مخصص</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <h3 class="text-info">{{ statistics.completed_orders }}</h3>
+                        <p class="text-muted">أوامر مكتملة</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Orders Table -->
+    {% if orders %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">أوامر الإنتاج المرتبطة</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>رقم الأمر</th>
+                            <th>المنتج</th>
+                            <th>الكمية</th>
+                            <th>القماش المخصص</th>
+                            <th>الحالة</th>
+                            <th>تاريخ الإنشاء</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr>
+                            <td>{{ order.order_number }}</td>
+                            <td>{{ order.product.name }}</td>
+                            <td>{{ order.quantity_ordered }}</td>
+                            <td>{{ order.fabric_meters_allocated|floatformat:2 }} متر</td>
+                            <td>{{ order.get_status_display }}</td>
+                            <td>{{ order.created_at|date:"d/m/Y" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Movements Table -->
+    {% if movements %}
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">حركات المخزون الأخيرة</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>التاريخ</th>
+                            <th>نوع الحركة</th>
+                            <th>الكمية</th>
+                            <th>المرجع</th>
+                            <th>المستخدم</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for movement in movements %}
+                        <tr>
+                            <td>{{ movement.created_at|date:"d/m/Y H:i" }}</td>
+                            <td>{{ movement.get_movement_type_display }}</td>
+                            <td>{{ movement.quantity|floatformat:2 }} متر</td>
+                            <td>{{ movement.reference_number|default:"-" }}</td>
+                            <td>{{ movement.created_by.username|default:"-" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

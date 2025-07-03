@@ -1,0 +1,58 @@
+<!-- Pagination Component -->
+{% if is_paginated %}
+<div class="flex items-center justify-between">
+    <div class="flex-1 flex justify-between sm:hidden">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}" 
+           class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+            السابق
+        </a>
+        {% endif %}
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}" 
+           class="mr-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+            التالي
+        </a>
+        {% endif %}
+    </div>
+    
+    <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+        <div>
+            <p class="text-sm text-gray-700">
+                عرض
+                <span class="font-medium">{{ page_obj.start_index }}</span>
+                إلى
+                <span class="font-medium">{{ page_obj.end_index }}</span>
+                من
+                <span class="font-medium">{{ paginator.count }}</span>
+                نتيجة
+            </p>
+        </div>
+        <div>
+            <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                {% if page_obj.has_previous %}
+                <a href="?page=1" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+                <a href="?page={{ page_obj.previous_page_number }}" class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+                {% endif %}
+                
+                <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-blue-50 text-sm font-medium text-blue-600">
+                    {{ page_obj.number }}
+                </span>
+                
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}" class="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                    <i class="fas fa-angle-left"></i>
+                </a>
+                <a href="?page={{ paginator.num_pages }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+                {% endif %}
+            </nav>
+        </div>
+    </div>
+</div>
+{% endif %}

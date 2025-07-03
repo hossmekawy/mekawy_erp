@@ -1,0 +1,450 @@
+{% extends 'production/production_base.html' %}
+{% load static i18n widget_tweaks %}
+{% load production_extras %} {# Load your custom filters from production_extras.py #}
+
+{% block production_title %}تفاصيل عملية التشطيب{% endblock %}
+
+{% block production_header_actions %}
+    <a href="{% url 'production:finishing_print_pdf' finishing_process.pk %}" class="btn btn-secondary" target="_blank">
+        <i class="fas fa-print me-2"></i> طباعة
+    </a>
+    {% if not finishing_process.is_completed %}
+        <button type="button" class="btn btn-production" data-bs-toggle="modal" data-bs-target="#receiveFinishingModal">
+            <i class="fas fa-clipboard-check me-2"></i>إنهاء العملية
+        </button>
+    {% endif %}
+{% endblock %}
+
+{% block production_extra_css %}
+    {{ block.super }}
+    <style>
+        .details-card .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .details-card .card-title {
+            color: var(--production-primary);
+            font-weight: 600;
+        }
+        .details-list dt {
+            font-weight: 600;
+            color: #495057;
+        }
+        .details-list dd {
+            color: #6c757d;
+        }
+        .nav-tabs .nav-link {
+            color: var(--production-secondary);
+            font-weight: 500;
+        }
+        .nav-tabs .nav-link.active {
+            color: var(--production-primary);
+            border-color: #dee2e6 #dee2e6 #fff;
+            background-color: #fff;
+            font-weight: 700;
+        }
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: .25rem;
+            font-size: 0.9rem;
+        }
+        .progress-label .value {
+            font-weight: 700;
+        }
+        .checklist-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 1rem;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .checklist-item:last-child {
+            border-bottom: none;
+        }
+        .checklist-item .form-check {
+            padding-top: 0.3rem;
+        }
+        .checklist-item .comment-wrapper {
+            flex-grow: 1;
+        }
+        .notes-display {
+            background-color: #f8f9fa;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            white-space: pre-wrap; /* Preserve line breaks */
+            font-family: monospace;
+            color: #495057;
+            border: 1px solid #dee2e6;
+        }
+    </style>
+{% endblock %}
+
+
+{% block production_content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Tab Navigation -->
+        <ul class="nav nav-tabs mb-4" id="finishingDetailTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="main-details-tab" data-bs-toggle="tab" data-bs-target="#main-details" type="button" role="tab" aria-controls="main-details" aria-selected="true">
+                    <i class="fas fa-info-circle me-2"></i>التفاصيل الأساسية
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="related-processes-tab" data-bs-toggle="tab" data-bs-target="#related-processes" type="button" role="tab" aria-controls="related-processes" aria-selected="false">
+                    <i class="fas fa-project-diagram me-2"></i>العمليات المرتبطة
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="checklist-tab" data-bs-toggle="tab" data-bs-target="#checklist" type="button" role="tab" aria-controls="checklist" aria-selected="false">
+                    <i class="fas fa-tasks me-2"></i>قائمة التحقق والملاحظات
+                </button>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="finishingDetailTabContent">
+            <!-- Main Details Tab -->
+            <div class="tab-pane fade show active" id="main-details" role="tabpanel" aria-labelledby="main-details-tab">
+                <div class="row">
+                    <div class="col-lg-7">
+                        <div class="card details-card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-magic me-2"></i>تفاصيل التشطيب
+                                    <span class="production-status float-end {% if finishing_process.is_completed %}completed{% else %}in-progress{% endif %}">
+                                        {% if finishing_process.is_completed %}مكتمل{% else %}قيد التنفيذ{% endif %}
+                                    </span>
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <dl class="row details-list">
+                                    <dt class="col-sm-4">نوع التشطيب</dt>
+                                    <dd class="col-sm-8">{{ finishing_process.get_finishing_type_display }}</dd>
+
+                                    {% if finishing_process.finishing_type == 'outsourced' %}
+                                        <dt class="col-sm-4">المصنع الخارجي</dt>
+                                        <dd class="col-sm-8">{{ finishing_process.external_manufacturer.name }}</dd>
+                                        <dt class="col-sm-4">تصريح الخروج</dt>
+                                        <dd class="col-sm-8">
+                                            {% if exit_permit %}
+                                                <a href="{{ exit_permit.get_absolute_url }}">{{ exit_permit.permit_number }}</a>
+                                            {% elif not finishing_process.is_completed %}
+                                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#createExitPermitModal">إنشاء تصريح</button>
+                                            {% else %}
+                                                <span class="text-muted">لا يوجد</span>
+                                            {% endif %}
+                                        </dd>
+                                    {% else %}
+                                        <dt class="col-sm-4">المسؤول</dt>
+                                        <dd class="col-sm-8">{{ finishing_process.finisher.get_full_name|default:finishing_process.finisher.username }}</dd>
+                                        <dt class="col-sm-4">المشرف</dt>
+                                        <dd class="col-sm-8">{{ finishing_process.supervisor.get_full_name|default:finishing_process.supervisor.username }}</dd>
+                                    {% endif %}
+
+                                    <dt class="col-sm-4">الكمية المدخلة</dt>
+                                    <dd class="col-sm-8">{{ finishing_process.quantity_input }} قطعة</dd>
+                                    
+                                    <dt class="col-sm-4">الكمية المخرجة (الصالحة)</dt>
+                                    <dd class="col-sm-8">{{ finishing_process.quantity_output }} قطعة</dd>
+
+                                    <dt class="col-sm-4">المخزن النهائي</dt>
+                                    <dd class="col-sm-8">{{ finishing_process.destination_warehouse.name }}</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-5">
+                        <div class="card details-card">
+                            <div class="card-header"><h5 class="card-title mb-0"><i class="fas fa-chart-line me-2"></i>مؤشرات الأداء</h5></div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="progress-label"><span>كفاءة العملية</span> <span class="value">{{ finishing_stats.efficiency|floatformat:2 }}%</span></div>
+                                    <div class="progress" style="height: 10px;">
+                                        <div class="progress-bar bg-success" role="progressbar" style="width: {{ finishing_stats.efficiency|floatformat:0 }}%;" aria-valuenow="{{ finishing_stats.efficiency|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="progress-label"><span>معدل العيوب</span> <span class="value">{{ finishing_stats.defect_rate|floatformat:2 }}%</span></div>
+                                    <div class="progress" style="height: 10px;">
+                                        <div class="progress-bar bg-warning" role="progressbar" style="width: {{ finishing_stats.defect_rate|floatformat:0 }}%;" aria-valuenow="{{ finishing_stats.defect_rate|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="progress-label"><span>معدل العجز</span> <span class="value">{{ finishing_stats.loss_rate|floatformat:2 }}%</span></div>
+                                    <div class="progress" style="height: 10px;">
+                                        <div class="progress-bar bg-danger" role="progressbar" style="width: {{ finishing_stats.loss_rate|floatformat:0 }}%;" aria-valuenow="{{ finishing_stats.loss_rate|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Related Processes Tab -->
+            <div class="tab-pane fade" id="related-processes" role="tabpanel" aria-labelledby="related-processes-tab">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card details-card">
+                            <div class="card-header"><h5 class="card-title mb-0"><i class="fas fa-box-open me-2"></i>أمر الإنتاج</h5></div>
+                            <div class="card-body">
+                                <dl class="row details-list">
+                                    <dt class="col-sm-4">رقم الأمر</dt>
+                                    <dd class="col-sm-8"><a href="{% url 'production:order_detail' finishing_process.dyeing_process.assembly_process.production_order.pk %}">{{ finishing_process.dyeing_process.assembly_process.production_order.order_number }}</a></dd>
+                                    <dt class="col-sm-4">المنتج</dt>
+                                    <dd class="col-sm-8">{{ finishing_process.dyeing_process.assembly_process.production_order.product.name }}</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card details-card">
+                            <div class="card-header"><h5 class="card-title mb-0"><i class="fas fa-palette me-2"></i>عملية الصباغة</h5></div>
+                            <div class="card-body">
+                                <dl class="row details-list">
+                                    <dt class="col-sm-5">الكمية المستلمة</dt>
+                                    <dd class="col-sm-7">{{ finishing_process.dyeing_process.quantity_received }} قطعة</dd>
+                                    <dt class="col-sm-5">المقاسات</dt>
+                                    <dd class="col-sm-7">{% if finishing_process.dyeing_process.assembly_process.production_order.product.size_group %}{{ finishing_process.dyeing_process.assembly_process.production_order.product.size_group.sizes|join:", " }}{% else %}غير محدد{% endif %}</dd>
+                                    <dt class="col-sm-5">الحالة</dt>
+                                    <dd class="col-sm-7"><span class="production-status completed">مكتمل</span></dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Checklist Tab -->
+            <div class="tab-pane fade" id="checklist" role="tabpanel" aria-labelledby="checklist-tab">
+                <div class="card details-card">
+                    <div class="card-header"><h5 class="card-title mb-0"><i class="fas fa-tasks me-2"></i>قائمة مهام التشطيب المكتملة</h5></div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                           {% for field_name, field_label in finishing_process.get_checklist_items.items %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    {{ field_label }}
+                                    {% if field_name in finishing_process.get_completed_checklist_keys %}
+                                        <i class="fas fa-check-circle text-success fs-5"></i>
+                                    {% else %}
+                                        <i class="fas fa-times-circle text-danger fs-5"></i>
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                 {% if finishing_process.notes %}
+                <div class="card details-card mt-4">
+                    <div class="card-header"><h5 class="card-title mb-0"><i class="fas fa-file-alt me-2"></i>الملاحظات المسجلة</h5></div>
+                    <div class="card-body">
+                        <div class="notes-display">{{ finishing_process.notes }}</div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block production_modals %}
+    {{ block.super }} {# Include parent modals like confirmDeleteModal #}
+
+    <!-- Receive/Complete Modal -->
+    <div class="modal fade" id="receiveFinishingModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form id="receiveFinishingForm" action="{% url 'production:finishing_receive' finishing_process.pk %}" method="post">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <h5 class="modal-title">إنهاء عملية التشطيب</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>توثيق اكتمال عملية التشطيب وإيداع المنتجات في المخزون.</p>
+                        
+                        <!-- This is the hidden notes field that will be populated by JS -->
+                        {{ receive_form.notes }}
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">الكمية المخرجة (الصالحة)</label>
+                                {% render_field receive_form.quantity_output class+="form-control" %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">عدد العيوب</label>
+                                {% render_field receive_form.defects_in_finishing class+="form-control" %}
+                            </div>
+                        </div>
+                        <hr>
+                        <h6>قائمة التحقق (Checklist)</h6>
+                        <div id="modal-checklist-container" class="card card-body p-0">
+                            {% for field in receive_form.get_checklist_fields %}
+                            <div class="checklist-item">
+                                <div class="form-check form-switch">
+                                    {% render_field field class+="form-check-input" role="switch" %}
+                                    <label for="{{ field.id_for_label }}" class="form-check-label fw-bold">{{ field.label }}</label>
+                                </div>
+                                <div class="comment-wrapper">
+                                    <textarea class="form-control form-control-sm modal-checklist-comment" 
+                                              data-comment-label="{{ field.label }}" 
+                                              placeholder="ملاحظات لـ {{ field.label }}..."></textarea>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="mt-3">
+                            <label for="general_notes_modal" class="form-label">ملاحظات عامة</label>
+                            <textarea id="general_notes_modal" class="form-control" rows="3" placeholder="أضف أي ملاحظات عامة عن عملية الاستلام..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                        <button type="submit" class="btn btn-production">إنهاء العملية</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Exit Permit Modal -->
+    {% if finishing_process.finishing_type == 'outsourced' and not exit_permit and not finishing_process.is_completed %}
+    <div class="modal fade" id="createExitPermitModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="createFinishingExitPermitForm" action="{% url 'production:ajax_create_exit_permit' %}" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="finishing_id" value="{{ finishing_process.pk }}">
+                    {{ exit_permit_form.permit_type.as_hidden }}
+
+                    <div class="modal-header">
+                        <h5 class="modal-title">إنشاء تصريح خروج للتشطيب</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                       <p class="mb-3">
+                           إصدار تصريح خروج لـ <strong>{{ finishing_process.quantity_input }} قطعة</strong> من المنتج
+                           <strong>{{ finishing_process.dyeing_process.assembly_process.production_order.product.name }}</strong>
+                           إلى <strong>{{ finishing_process.external_manufacturer.name }}</strong>.
+                       </p>
+                       
+                       <div class="mb-3">
+                           <label for="{{ exit_permit_form.items_description.id_for_label }}" class="form-label">وصف المواد</label>
+                           {% render_field exit_permit_form.items_description class+="form-control mb-2" readonly=True %}
+                       </div>
+                       <div class="mb-3">
+                           <label for="{{ exit_permit_form.quantity.id_for_label }}" class="form-label">الكمية</label>
+                           {% render_field exit_permit_form.quantity class+="form-control mb-2" readonly=True %}
+                       </div>
+                       <div class="mb-3">
+                           <label for="{{ exit_permit_form.destination.id_for_label }}" class="form-label">الوجهة</label>
+                           {% render_field exit_permit_form.destination class+="form-control mb-2" readonly=True %}
+                       </div>
+                       <div class="mb-3">
+                           <label for="{{ exit_permit_form.purpose.id_for_label }}" class="form-label">الغرض</label>
+                           {% render_field exit_permit_form.purpose class+="form-control mb-2" readonly=True %}
+                       </div>
+                       <div class="mb-3">
+                           <label for="{{ exit_permit_form.valid_until.id_for_label }}" class="form-label">صالح حتى <span class="text-danger">*</span></label>
+                           {% render_field exit_permit_form.valid_until class+="form-control" type="datetime-local" %}
+                           {% for error in exit_permit_form.valid_until.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                       </div>
+                       <div class="mb-3">
+                           <label for="{{ exit_permit_form.notes.id_for_label }}" class="form-label">ملاحظات</label>
+                           {% render_field exit_permit_form.notes class+="form-control" rows="2" %}
+                       </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                        <button type="submit" id="submitFinishingExitPermitBtn" class="btn btn-success">إصدار</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+{% endblock %}
+
+{% block production_extra_js %}
+    {{ block.super }} {# This includes scripts from parent templates #}
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Handle Exit Permit Form Submission via AJAX
+            const permitForm = document.getElementById('createFinishingExitPermitForm');
+            if (permitForm) {
+                permitForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const submitBtn = document.getElementById('submitFinishingExitPermitBtn');
+                    const originalBtnHtml = submitBtn.innerHTML;
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> جاري الإصدار...`;
+                    const formData = new FormData(permitForm);
+                    const url = "{% url 'production:ajax_create_exit_permit' %}";
+                    fetch(url, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {'X-CSRFToken': formData.get('csrfmiddlewaretoken')}
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            if (typeof showSuccessToast === 'function') {
+                                showSuccessToast(data.message || 'تم إنشاء التصريح بنجاح.');
+                            }
+                            setTimeout(() => { window.location.reload(); }, 1500);
+                        } else {
+                            let errorMessage = 'فشل الإنشاء: ' + (data.error || 'Please check the form for errors.');
+                            if (typeof showErrorToast === 'function') { showErrorToast(errorMessage); } 
+                            else { alert('Error: ' + errorMessage); }
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = originalBtnHtml;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        if (typeof showErrorToast === 'function') { showErrorToast('حدث خطأ غير متوقع في الشبكة.'); }
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnHtml;
+                    });
+                });
+            }
+
+            // Handle Receive Form Submission (to combine notes)
+            const receiveForm = document.getElementById('receiveFinishingForm');
+            if (receiveForm) {
+                receiveForm.addEventListener('submit', function(e) {
+                    const finalNotesField = receiveForm.querySelector('#id_notes');
+                    const generalNotesField = receiveForm.querySelector('#general_notes_modal');
+                    let combinedNotes = '';
+
+                    if (generalNotesField && generalNotesField.value.trim() !== '') {
+                        combinedNotes += generalNotesField.value.trim();
+                    }
+
+                    const checklistComments = [];
+                    receiveForm.querySelectorAll('.modal-checklist-comment').forEach(textarea => {
+                        if (textarea.value.trim() !== '') {
+                            const label = textarea.dataset.commentLabel;
+                            checklistComments.push(`${label}: ${textarea.value.trim()}`);
+                        }
+                    });
+
+                    if (checklistComments.length > 0) {
+                        if (combinedNotes) {
+                            combinedNotes += '\n\n--- ملاحظات القائمة ---\n';
+                        }
+                        combinedNotes += checklistComments.join('\n');
+                    }
+
+                    if (finalNotesField) {
+                        finalNotesField.value = combinedNotes;
+                    }
+                });
+            }
+        });
+    </script>
+{% endblock %}

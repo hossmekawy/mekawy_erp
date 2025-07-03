@@ -1,0 +1,1072 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+
+{% block production_title %}إدارة مخزون الأقمشة{% endblock %}
+
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item active">مخزون الأقمشة</li>
+{% endblock %}
+
+{% block production_page_title %}
+    <i class="fas fa-cut me-2"></i>
+    إدارة مخزون الأقمشة
+{% endblock %}
+
+{% block production_header_actions %}
+    <div class="d-flex gap-2">
+        <a href="{% url 'production:textile_stock_create' %}" class="btn btn-production">
+            <i class="fas fa-plus me-2"></i>
+            إضافة قماش جديد
+        </a>
+        
+        <div class="dropdown">
+            <button class="btn btn-production-outline dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="fas fa-download me-2"></i>
+                تصدير
+            </button>
+            <ul class="dropdown-menu">
+                <li>
+                    <a class="dropdown-item" href="{% url 'production:export_textile_stock' %}?{{ request.GET.urlencode }}">
+                        <i class="fas fa-file-excel me-2"></i>
+                        تصدير Excel
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item" href="#" onclick="printPage()">
+                        <i class="fas fa-print me-2"></i>
+                        طباعة
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+{% endblock %}
+
+{% block production_content %}
+    <!-- Search & Filters -->
+    <div class="production-filters">
+        <form method="get" class="row g-3" id="search-form">
+            <!-- Search Input -->
+            <div class="col-lg-4">
+                <label class="form-label">البحث</label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-search"></i>
+                    </span>
+                    <input type="text" 
+                           name="search" 
+                           value="{{ search }}" 
+                           placeholder="البحث باسم القماش، اللون، أو رقم الباتش..."
+                           class="form-control search-input">
+                    {% if search %}
+                    <button type="button" class="btn btn-outline-secondary clear-search">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Fabric Type Filter -->
+            <div class="col-lg-2">
+                <label class="form-label">نوع القماش</label>
+                <select name="fabric_type" class="form-select">
+                    <option value="">جميع الأنواع</option>
+                    {% for type_value, type_label in fabric_types %}
+                    <option value="{{ type_value }}" {% if fabric_type_filter == type_value %}selected{% endif %}>
+                        {{ type_label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Warehouse Filter -->
+            <div class="col-lg-2">
+                <label class="form-label">المخزن</label>
+                <select name="warehouse" class="form-select">
+                    <option value="">جميع المخازن</option>
+                    {% for warehouse_id, warehouse_name in warehouses %}
+                    <option value="{{ warehouse_id }}" {% if warehouse_filter == warehouse_id|stringformat:"s" %}selected{% endif %}>
+                        {{ warehouse_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Low Stock Filter -->
+            <div class="col-lg-2">
+                <label class="form-label">المخزون المنخفض</label>
+                <select name="low_stock" class="form-select">
+                    <option value="">الكل</option>
+                    <option value="1" {% if low_stock_filter %}selected{% endif %}>
+                        أقل من 50 متر
+                    </option>
+                </select>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="col-lg-2 d-flex align-items-end">
+                <div class="btn-group w-100">
+                    <button type="submit" class="btn btn-production">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <a href="{% url 'production:textile_stock_list' %}" class="btn btn-production-outline">
+                        <i class="fas fa-times"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Results Count -->
+            <div class="col-12 mt-3 border-top pt-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="production-metric-label">
+                        إجمالي النتائج: 
+                        <span class="fw-bold text-primary">{{ paginator.count }}</span>
+                        {% if search or fabric_type_filter or warehouse_filter or low_stock_filter %}
+                        من أصل {{ textile_stocks.model.objects.filter.count }} عنصر
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Quick Stats -->
+                    <div class="d-flex gap-3">
+                        <small class="text-muted">
+                            <i class="fas fa-exclamation-triangle text-warning me-1"></i>
+                            مخزون منخفض: 
+                            <span class="fw-bold">
+                                {{ textile_stocks|length|add:"0" }}
+                            </span>
+                        </small>
+                        <small class="text-muted">
+                            <i class="fas fa-check-circle text-success me-1"></i>
+                            متوفر: 
+                            <span class="fw-bold">
+                                {{ textile_stocks|length }}
+                            </span>
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Textile Stock Table -->
+    <div class="production-card">
+        <div class="production-card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-list me-2"></i>
+                قائمة مخزون الأقمشة
+            </h5>
+            
+            <!-- Bulk Actions -->
+            <div class="d-flex gap-2">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="selectAll">
+                    <label class="form-check-label" for="selectAll">
+                        تحديد الكل
+                    </label>
+                </div>
+                
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" 
+                            type="button" data-bs-toggle="dropdown" disabled id="bulkActionsBtn">
+                        إجراءات مجمعة
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li>
+                            <a class="dropdown-item" href="#" onclick="bulkUpdateStock()">
+                                <i class="fas fa-edit me-2"></i>
+                                تحديث المخزون
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="#" onclick="bulkExport()">
+                                <i class="fas fa-download me-2"></i>
+                                تصدير المحدد
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="production-card-body p-0">
+            {% if textile_stocks %}
+            <div class="table-responsive">
+                <table class="table production-table mb-0">
+                    <thead>
+                        <tr>
+                            <th width="40">
+                                <input type="checkbox" class="form-check-input" id="selectAllTable">
+                            </th>
+                            <th>اسم القماش</th>
+                            <th>النوع</th>
+                            <th>اللون</th>
+                            <th>العرض</th>
+                            <th>الطول المتاح</th>
+                            <th>التكلفة/متر</th>
+                            <th>المخزن</th>
+                            <th>الحالة</th>
+                            <th>الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stock in textile_stocks %}
+                        <tr>
+                            <td>
+                                <input type="checkbox" class="form-check-input row-checkbox" 
+                                       value="{{ stock.id }}">
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    {% if stock.image %}
+                                    <img src="{{ stock.image.url }}" 
+                                         alt="{{ stock.name }}" 
+                                         class="rounded me-2"
+                                         style="width: 40px; height: 40px; object-fit: cover;">
+                                    {% else %}
+                                    <div class="bg-light rounded me-2 d-flex align-items-center justify-content-center"
+                                         style="width: 40px; height: 40px;">
+                                        <i class="fas fa-cut text-muted"></i>
+                                    </div>
+                                    {% endif %}
+                                    <div>
+                                        <div class="fw-bold">{{ stock.name }}</div>
+                                        <small class="text-muted">{{ stock.batch_number }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ stock.get_fabric_type_display }}</span>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    {% if stock.color_code %}
+                                    <div class="rounded me-2" 
+                                         style="width: 20px; height: 20px; background-color: {{ stock.color_code }};"></div>
+                                    {% endif %}
+                                    {{ stock.color }}
+                                </div>
+                            </td>
+                            <td>{{ stock.width|floatformat:1 }} سم</td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <span class="{% if stock.length_available < 50 %}text-danger fw-bold{% elif stock.length_available < 100 %}text-warning fw-bold{% else %}text-success{% endif %}">
+                                        {{ stock.length_available|floatformat:1 }} متر
+                                    </span>
+                                    {% if stock.length_available < 50 %}
+                                    <i class="fas fa-exclamation-triangle text-danger ms-1" 
+                                       data-bs-toggle="tooltip" 
+                                       title="مخزون منخفض"></i>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <span class="fw-bold">{{ stock.cost_per_meter|floatformat:2 }} ج.م</span>
+                            </td>
+                            <td>
+                                {% if stock.warehouse %}
+                                <span class="badge bg-secondary">{{ stock.warehouse.name }}</span>
+                                {% else %}
+                                <span class="text-muted">غير محدد</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if stock.is_active %}
+                                <span class="production-status approved">
+                                    <i class="fas fa-check me-1"></i>
+                                    نشط
+                                </span>
+                                {% else %}
+                                <span class="production-status cancelled">
+                                    <i class="fas fa-times me-1"></i>
+                                    غير نشط
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'production:textile_stock_detail' stock.pk %}" 
+                                       class="btn btn-outline-primary"
+                                       data-bs-toggle="tooltip" title="عرض التفاصيل">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'production:textile_stock_update' stock.pk %}" 
+                                       class="btn btn-outline-warning"
+                                       data-bs-toggle="tooltip" title="تعديل">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button type="button" 
+                                            class="btn btn-outline-info"
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#updateStockModal"
+                                            data-stock-id="{{ stock.id }}"
+                                            data-stock-name="{{ stock.name }}"
+                                            data-current-stock="{{ stock.length_available }}"
+                                            title="تحديث المخزون">
+                                        <i class="fas fa-plus-minus"></i>
+                                    </button>
+                                    <a href="{% url 'production:textile_stock_delete' stock.pk %}" 
+                                       class="btn btn-outline-danger"
+                                       data-delete-url="{% url 'production:textile_stock_delete' stock.pk %}"
+                                       data-item-name="{{ stock.name }}"
+                                       data-bs-toggle="tooltip" title="حذف">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            {% if is_paginated %}
+            <div class="d-flex justify-content-between align-items-center p-3 border-top">
+                <div class="text-muted">
+                    عرض {{ page_obj.start_index }} إلى {{ page_obj.end_index }} 
+                    من أصل {{ paginator.count }} عنصر
+                </div>
+                
+                <nav aria-label="pagination">
+                    <ul class="pagination pagination-sm mb-0">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page=1">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}">
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ num }}">{{ num }}</a>
+                        </li>
+                        {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ page_obj.next_page_number }}">
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ paginator.num_pages }}">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+            
+            {% else %}
+            <!-- Empty State -->
+            <div class="production-empty">
+                <i class="fas fa-cut"></i>
+                <h5>لا توجد أقمشة في المخزون</h5>
+                <p class="text-muted">لم يتم العثور على أي أقمشة تطابق معايير البحث المحددة.</p>
+                <div class="mt-3">
+                    {% if search or fabric_type_filter or warehouse_filter or low_stock_filter %}
+                    <a href="{% url 'production:textile_stock_list' %}" class="btn btn-production-outline me-2">
+                        <i class="fas fa-times me-2"></i>
+                        مسح الفلاتر
+                    </a>
+                    {% endif %}
+                    <a href="{% url 'production:textile_stock_create' %}" class="btn btn-production">
+                        <i class="fas fa-plus me-2"></i>
+                        إضافة قماش جديد
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Quick Stats Cards -->
+    <div class="row mt-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="production-metric">
+                <div class="production-metric-icon primary">
+                    <i class="fas fa-cut"></i>
+                </div>
+                <div class="production-metric-value">{{ paginator.count }}</div>
+                <div class="production-metric-label">إجمالي الأقمشة</div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="production-metric">
+                <div class="production-metric-icon success">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="production-metric-value">
+                    {{ textile_stocks|length|add:"-5" }}
+                </div>
+                <div class="production-metric-label">مخزون جيد</div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="production-metric">
+                <div class="production-metric-icon warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="production-metric-value">5</div>
+                <div class="production-metric-label">مخزون منخفض</div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="production-metric">
+                <div class="production-metric-icon danger">
+                    <i class="fas fa-times-circle"></i>
+                </div>
+                <div class="production-metric-value">0</div>
+                <div class="production-metric-label">نفد المخزون</div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block production_modals %}
+    {{ block.super }}
+    
+    <!-- Update Stock Modal -->
+    <div class="modal fade" id="updateStockModal" tabindex="-1" aria-labelledby="updateStockModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title" id="updateStockModalLabel">
+                        <i class="fas fa-plus-minus me-2"></i>
+                        تحديث مخزون القماش
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="updateStockForm" method="post">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">اسم القماش</label>
+                            <div id="stockName" class="form-control-plaintext bg-light p-2 rounded"></div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">المخزون الحالي</label>
+                            <div id="currentStock" class="form-control-plaintext bg-light p-2 rounded"></div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="action" class="form-label">نوع العملية</label>
+                            <select name="action" id="action" class="form-select" required>
+                                <option value="">اختر نوع العملية</option>
+                                <option value="add">إضافة إلى المخزون</option>
+                                <option value="subtract">خصم من المخزون</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="quantity" class="form-label">الكمية (متر)</label>
+                            <input type="number" 
+                                   name="quantity" 
+                                   id="quantity" 
+                                   class="form-control" 
+                                   step="0.1" 
+                                   min="0.1" 
+                                   required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="reference" class="form-label">رقم المرجع</label>
+                            <input type="text" 
+                                   name="reference" 
+                                   id="reference" 
+                                   class="form-control" 
+                                   placeholder="رقم الفاتورة أو المرجع">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">ملاحظات</label>
+                            <textarea name="notes" 
+                                      id="notes" 
+                                      class="form-control" 
+                                      rows="3" 
+                                      placeholder="ملاحظات إضافية..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>
+                            إلغاء
+                        </button>
+                        <button type="submit" class="btn btn-info">
+                            <i class="fas fa-save me-1"></i>
+                            حفظ التحديث
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Update Stock Modal -->
+    <div class="modal fade" id="bulkUpdateModal" tabindex="-1" aria-labelledby="bulkUpdateModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="bulkUpdateModalLabel">
+                        <i class="fas fa-edit me-2"></i>
+                        تحديث مجمع للمخزون
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="bulkUpdateForm" method="post">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <div class="production-alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            سيتم تطبيق هذا التحديث على جميع العناصر المحددة.
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="bulkAction" class="form-label">نوع العملية</label>
+                                <select name="bulk_action" id="bulkAction" class="form-select" required>
+                                    <option value="">اختر نوع العملية</option>
+                                    <option value="add">إضافة إلى المخزون</option>
+                                    <option value="subtract">خصم من المخزون</option>
+                                    <option value="set">تحديد قيمة ثابتة</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="bulkQuantity" class="form-label">الكمية (متر)</label>
+                                <input type="number" 
+                                       name="bulk_quantity" 
+                                       id="bulkQuantity" 
+                                       class="form-control" 
+                                       step="0.1" 
+                                       min="0.1" 
+                                       required>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <label for="bulkReference" class="form-label">رقم المرجع</label>
+                            <input type="text" 
+                                   name="bulk_reference" 
+                                   id="bulkReference" 
+                                   class="form-control" 
+                                   placeholder="رقم الفاتورة أو المرجع">
+                        </div>
+                        
+                        <div class="mt-3">
+                            <label for="bulkNotes" class="form-label">ملاحظات</label>
+                            <textarea name="bulk_notes" 
+                                      id="bulkNotes" 
+                                      class="form-control" 
+                                      rows="3" 
+                                      placeholder="ملاحظات إضافية..."></textarea>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <h6>العناصر المحددة:</h6>
+                            <div id="selectedItems" class="bg-light p-3 rounded max-height-200 overflow-auto">
+                                <!-- سيتم ملء هذا القسم بـ JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>
+                            إلغاء
+                        </button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-save me-1"></i>
+                            تطبيق التحديث
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block production_extra_js %}
+    <script>
+        $(document).ready(function() {
+            // Initialize textile stock specific features
+            initTextileStockFeatures();
+        });
+
+        function initTextileStockFeatures() {
+            // Handle select all functionality
+            $('#selectAll, #selectAllTable').on('change', function() {
+                const isChecked = $(this).is(':checked');
+                $('.row-checkbox').prop('checked', isChecked);
+                updateBulkActionsButton();
+            });
+
+            // Handle individual row selection
+            $('.row-checkbox').on('change', function() {
+                updateBulkActionsButton();
+                updateSelectAllState();
+            });
+
+            // Handle update stock modal
+            $('#updateStockModal').on('show.bs.modal', function(event) {
+                const button = $(event.relatedTarget);
+                const stockId = button.data('stock-id');
+                const stockName = button.data('stock-name');
+                const currentStock = button.data('current-stock');
+
+                $('#stockName').text(stockName);
+                $('#currentStock').text(currentStock + ' متر');
+                $('#updateStockForm').attr('action', `/production/textile-stock/${stockId}/update-stock/`);
+            });
+
+            // Handle update stock form submission
+            $('#updateStockForm').on('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = $(this).serialize();
+                const actionUrl = $(this).attr('action');
+                
+                $.ajax({
+                    url: actionUrl,
+                    method: 'POST',
+                    data: formData,
+                    success: function(response) {
+                        if (response.success) {
+                            showSuccessToast(response.message);
+                            $('#updateStockModal').modal('hide');
+                            setTimeout(() => location.reload(), 1500);
+                        } else {
+                            showErrorToast(response.error || 'حدث خطأ غير متوقع');
+                        }
+                    },
+                    error: function() {
+                        showErrorToast('حدث خطأ في الاتصال بالخادم');
+                    }
+                });
+            });
+
+            // Initialize tooltips
+            $('[data-bs-toggle="tooltip"]').tooltip();
+        }
+
+        function updateBulkActionsButton() {
+            const selectedCount = $('.row-checkbox:checked').length;
+            const bulkBtn = $('#bulkActionsBtn');
+            
+            if (selectedCount > 0) {
+                bulkBtn.prop('disabled', false);
+                bulkBtn.text(`إجراءات مجمعة (${selectedCount})`);
+            } else {
+                bulkBtn.prop('disabled', true);
+                bulkBtn.text('إجراءات مجمعة');
+            }
+        }
+
+        function updateSelectAllState() {
+            const totalCheckboxes = $('.row-checkbox').length;
+            const checkedCheckboxes = $('.row-checkbox:checked').length;
+            
+            if (checkedCheckboxes === 0) {
+                $('#selectAll, #selectAllTable').prop('indeterminate', false).prop('checked', false);
+            } else if (checkedCheckboxes === totalCheckboxes) {
+                $('#selectAll, #selectAllTable').prop('indeterminate', false).prop('checked', true);
+            } else {
+                $('#selectAll, #selectAllTable').prop('indeterminate', true);
+            }
+        }
+
+        function bulkUpdateStock() {
+            const selectedIds = $('.row-checkbox:checked').map(function() {
+                return $(this).val();
+            }).get();
+
+            if (selectedIds.length === 0) {
+                showErrorToast('يرجى تحديد عنصر واحد على الأقل');
+                return;
+            }
+
+            // Update selected items display
+            let selectedItemsHtml = '';
+            $('.row-checkbox:checked').each(function() {
+                const row = $(this).closest('tr');
+                const stockName = row.find('td:nth-child(2) .fw-bold').text();
+                const currentStock = row.find('td:nth-child(6) span').text();
+                
+                selectedItemsHtml += `
+                    <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                        <span>${stockName}</span>
+                        <span class="text-muted">${currentStock}</span>
+                    </div>
+                `;
+            });
+            
+            $('#selectedItems').html(selectedItemsHtml);
+            $('#bulkUpdateModal').modal('show');
+        }
+
+        function bulkExport() {
+            const selectedIds = $('.row-checkbox:checked').map(function() {
+                return $(this).val();
+            }).get();
+
+            if (selectedIds.length === 0) {
+                showErrorToast('يرجى تحديد عنصر واحد على الأقل');
+                return;
+            }
+
+            const exportUrl = '{% url "production:export_textile_stock" %}?' + 
+                             'ids=' + selectedIds.join(',') + 
+                             '&{{ request.GET.urlencode }}';
+            
+            exportData(exportUrl, 'textile_stock_selected.xlsx');
+        }
+
+        // Handle bulk update form submission
+        $('#bulkUpdateForm').on('submit', function(e) {
+            e.preventDefault();
+            
+            const selectedIds = $('.row-checkbox:checked').map(function() {
+                return $(this).val();
+            }).get();
+
+            const formData = $(this).serialize() + '&ids=' + selectedIds.join(',');
+            
+            $.ajax({
+                url: '{% url "production:bulk_update_textile_stock" %}',
+                method: 'POST',
+                data: formData,
+                success: function(response) {
+                    if (response.success) {
+                        showSuccessToast(`تم تحديث ${response.updated_count} عنصر بنجاح`);
+                        $('#bulkUpdateModal').modal('hide');
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        showErrorToast(response.error || 'حدث خطأ غير متوقع');
+                    }
+                },
+                error: function() {
+                    showErrorToast('حدث خطأ في الاتصال بالخادم');
+                }
+            });
+        });
+
+        // Auto-submit search form with debounce
+        let searchTimeout;
+        $('.search-input').on('input', function() {
+            clearTimeout(searchTimeout);
+            const form = $(this).closest('form');
+            searchTimeout = setTimeout(function() {
+                form.submit();
+            }, 1000);
+        });
+
+        // Auto-submit on filter change
+        $('select[name="fabric_type"], select[name="warehouse"], select[name="low_stock"]').on('change', function() {
+            $(this).closest('form').submit();
+        });
+
+        // Clear search functionality
+        $('.clear-search').on('click', function() {
+            $(this).siblings('.search-input').val('').focus();
+            $(this).closest('form').submit();
+        });
+
+        // Stock level color coding
+        function updateStockColors() {
+            $('td:nth-child(6) span').each(function() {
+                const stockText = $(this).text();
+                const stockValue = parseFloat(stockText.replace(' متر', ''));
+                
+                $(this).removeClass('text-danger text-warning text-success fw-bold');
+                
+                if (stockValue < 50) {
+                    $(this).addClass('text-danger fw-bold');
+                } else if (stockValue < 100) {
+                    $(this).addClass('text-warning fw-bold');
+                } else {
+                    $(this).addClass('text-success');
+                }
+            });
+        }
+
+        // Initialize stock colors on page load
+        updateStockColors();
+
+        // Print functionality
+        function printPage() {
+            const printContent = `
+                <html>
+                    <head>
+                        <title>قائمة مخزون الأقمشة</title>
+                        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+                        <style>
+                            body { font-family: 'Cairo', sans-serif; direction: rtl; }
+                            @media print { 
+                                .no-print { display: none !important; }
+                                .table { font-size: 12px; }
+                            }
+                            .header-print {
+                                text-align: center;
+                                margin-bottom: 30px;
+                                border-bottom: 2px solid #dee2e6;
+                                padding-bottom: 20px;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container-fluid">
+                            <div class="header-print">
+                                <h2>قائمة مخزون الأقمشة</h2>
+                                <p class="text-muted">تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG')}</p>
+                            </div>
+                            ${$('.production-card .table-responsive').html()}
+                        </div>
+                    </body>
+                </html>
+            `;
+            
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            printWindow.print();
+        }
+
+        // Advanced filtering
+        function showAdvancedFilters() {
+            $('#advancedFiltersModal').modal('show');
+        }
+
+        // Quick actions
+        function quickAddStock() {
+            $('#quickAddModal').modal('show');
+        }
+
+        // Keyboard shortcuts
+        $(document).on('keydown', function(e) {
+            // Ctrl + N for new stock
+            if (e.ctrlKey && e.key === 'n') {
+                e.preventDefault();
+                window.location.href = '{% url "production:textile_stock_create" %}';
+            }
+            
+            // Ctrl + F for search focus
+            if (e.ctrlKey && e.key === 'f') {
+                e.preventDefault();
+                $('.search-input').focus();
+            }
+            
+            // Escape to clear search
+            if (e.key === 'Escape') {
+                $('.search-input').val('');
+                $('.search-input').closest('form').submit();
+            }
+        });
+
+        // Real-time stock updates (WebSocket simulation)
+        function simulateRealTimeUpdates() {
+            setInterval(function() {
+                // This would be replaced with actual WebSocket implementation
+                // For now, we'll just update the page every 5 minutes
+                if (document.visibilityState === 'visible') {
+                    // Only refresh if page is visible
+                    // location.reload();
+                }
+            }, 300000); // 5 minutes
+        }
+
+        // Initialize real-time updates
+        simulateRealTimeUpdates();
+
+        // Export functions
+        function exportToExcel() {
+            const exportUrl = '{% url "production:export_textile_stock" %}?' + 
+                             '{{ request.GET.urlencode }}';
+            exportData(exportUrl, 'textile_stock.xlsx');
+        }
+
+        function exportToPDF() {
+            const exportUrl = '{% url "production:export_textile_stock" %}?' + 
+                             'format=pdf&{{ request.GET.urlencode }}';
+            exportData(exportUrl, 'textile_stock.pdf');
+        }
+
+        // Utility functions
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('ar-EG', {
+                style: 'currency',
+                currency: 'EGP'
+            }).format(amount);
+        }
+
+        function formatNumber(num) {
+            return new Intl.NumberFormat('ar-EG').format(num);
+        }
+
+        // Toast notifications
+        function showSuccessToast(message) {
+            const toast = `
+                <div class="toast align-items-center text-white bg-success border-0" role="alert">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            <i class="fas fa-check-circle me-2"></i>
+                            ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>
+            `;
+            
+            $('.toast-container').append(toast);
+            $('.toast:last').toast('show');
+        }
+
+        function showErrorToast(message) {
+            const toast = `
+                <div class="toast align-items-center text-white bg-danger border-0" role="alert">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>
+            `;
+            
+            $('.toast-container').append(toast);
+            $('.toast:last').toast('show');
+        }
+    </script>
+{% endblock %}
+
+{% block production_extra_css %}
+    <style>
+        /* Additional styles for textile stock list */
+        .max-height-200 {
+            max-height: 200px;
+        }
+        
+        .table td {
+            vertical-align: middle;
+        }
+        
+        .row-checkbox {
+            cursor: pointer;
+        }
+        
+        .btn-group-sm .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+        
+        .production-metric {
+            transition: transform 0.2s ease;
+        }
+        
+        .production-metric:hover {
+            transform: translateY(-2px);
+        }
+        
+        .search-input:focus {
+            border-color: var(--production-primary);
+            box-shadow: 0 0 0 0.2rem rgba(44, 90, 160, 0.25);
+        }
+        
+        .table-responsive {
+            border-radius: 0.5rem;
+        }
+        
+        .pagination .page-link {
+            color: var(--production-primary);
+            border-color: #dee2e6;
+        }
+        
+        .pagination .page-item.active .page-link {
+            background-color: var(--production-primary);
+            border-color: var(--production-primary);
+        }
+        
+        .pagination .page-link:hover {
+            color: var(--production-secondary);
+            background-color: var(--production-light);
+        }
+        
+        /* Stock level indicators */
+        .stock-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-left: 5px;
+        }
+        
+        .stock-indicator.high {
+            background-color: #28a745;
+        }
+        
+        .stock-indicator.medium {
+            background-color: #ffc107;
+        }
+        
+        .stock-indicator.low {
+            background-color: #dc3545;
+        }
+        
+        /* Responsive improvements */
+        @media (max-width: 768px) {
+            .production-filters .row > div {
+                margin-bottom: 1rem;
+            }
+            
+            .btn-group-sm {
+                flex-direction: column;
+            }
+            
+            .btn-group-sm .btn {
+                margin-bottom: 2px;
+                border-radius: 0.25rem !important;
+            }
+            
+            .table-responsive {
+                font-size: 0.875rem;
+            }
+        }
+        
+        /* Print styles */
+        @media print {
+            .production-header,
+            .production-filters,
+            .no-print,
+            .btn,
+            .pagination {
+                display: none !important;
+            }
+            
+            .production-card {
+                box-shadow: none !important;
+                border: 1px solid #dee2e6 !important;
+            }
+            
+            .table {
+                font-size: 12px !important;
+            }
+        }
+    </style>
+{% endblock %}

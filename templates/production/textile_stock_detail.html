@@ -1,0 +1,1218 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+{% load production_extras %}
+{% csrf_token %}
+
+{% block production_title %}تفاصيل مخزون القماش - {{ textile_stock.name }}{% endblock %}
+
+{% block production_breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item">
+            <a href="{% url 'production:dashboard' %}">
+                <i class="fas fa-home"></i>
+                الرئيسية
+            </a>
+        </li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'production:textile_stock_list' %}">
+                <i class="fas fa-cut"></i>
+                مخزون الأقمشة
+            </a>
+        </li>
+        <li class="breadcrumb-item active" aria-current="page">
+            {{ textile_stock.name }}
+        </li>
+    </ol>
+</nav>
+{% endblock %}
+{% block production_content %}
+    <!-- Header Section -->
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <h1 class="production-page-title">
+                <i class="fas fa-cut me-2"></i>
+                {{ textile_stock.name }}
+            </h1>
+            <p class="text-muted mb-0">
+                <i class="fas fa-info-circle me-1"></i>
+                تفاصيل وإحصائيات مخزون القماش
+            </p>
+        </div>
+        
+        <div class="d-flex gap-2">
+            <!-- Stock Update Button -->
+            <button type="button" class="btn btn-production" data-bs-toggle="modal" data-bs-target="#updateStockModal">
+                <i class="fas fa-plus-minus me-2"></i>
+                تحديث المخزون
+            </button>
+            
+            <!-- Edit Button -->
+            <a href="{% url 'production:textile_stock_update' textile_stock.pk %}" class="btn btn-outline-primary">
+                <i class="fas fa-edit me-2"></i>
+                تعديل
+            </a>
+            
+            <!-- Print Button -->
+            <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
+                <i class="fas fa-print me-2"></i>
+                طباعة
+            </button>
+            
+            <!-- More Actions Dropdown -->
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
+                <ul class="dropdown-menu">
+                    <li>
+                        <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#stockHistoryModal">
+                            <i class="fas fa-history me-2"></i>
+                            تاريخ الحركات
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" href="#" onclick="exportStockData()">
+                            <i class="fas fa-download me-2"></i>
+                            تصدير البيانات
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                            <i class="fas fa-trash me-2"></i>
+                            حذف
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Alert -->
+    {% if not textile_stock.is_active %}
+    <div class="alert alert-warning mb-4">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <strong>تنبيه:</strong> هذا القماش غير نشط حالياً
+    </div>
+    {% endif %}
+
+    {% if textile_stock.length_available < 50 %}
+    <div class="alert alert-danger mb-4">
+        <i class="fas fa-exclamation-circle me-2"></i>
+        <strong>تحذير:</strong> مخزون القماش منخفض (أقل من 50 متر)
+    </div>
+    {% endif %}
+
+    <!-- Main Information Cards -->
+    <div class="row g-4 mb-4">
+        <!-- Stock Overview -->
+        <div class="col-lg-3 col-md-6">
+            <div class="production-metric">
+                <div class="production-metric-icon primary">
+                    <i class="fas fa-ruler"></i>
+                </div>
+                <div class="production-metric-value">{{ textile_stock.length_available|floatformat:2 }}</div>
+                <div class="production-metric-label">متر متاح</div>
+                <div class="production-metric-change">
+                    {% if textile_stock.stock_item %}
+                        <small class="text-muted">
+                            من إجمالي {{ textile_stock.stock_item.quantity|floatformat:2 }} متر
+                        </small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Cost Information -->
+        <div class="col-lg-3 col-md-6">
+            <div class="production-metric">
+                <div class="production-metric-icon success">
+                    <i class="fas fa-dollar-sign"></i>
+                </div>
+                <div class="production-metric-value">{{ textile_stock.cost_per_meter|floatformat:2 }}</div>
+                <div class="production-metric-label">جنيه/متر</div>
+                <div class="production-metric-change">
+                    <small class="text-success">
+                        إجمالي القيمة: {{ textile_stock.total_value|floatformat:2 }} جنيه
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fabric Width -->
+        <div class="col-lg-3 col-md-6">
+            <div class="production-metric">
+                <div class="production-metric-icon warning">
+                    <i class="fas fa-expand-arrows-alt"></i>
+                </div>
+                <div class="production-metric-value">{{ textile_stock.width|floatformat:0 }}</div>
+                <div class="production-metric-label">سم عرض</div>
+                <div class="production-metric-change">
+                    <small class="text-muted">
+                        {{ textile_stock.get_fabric_type_display }}
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quality Grade -->
+        <div class="col-lg-3 col-md-6">
+            <div class="production-metric">
+                <div class="production-metric-icon info">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div class="production-metric-value">{{ textile_stock.quality_grade }}</div>
+                <div class="production-metric-label">درجة الجودة</div>
+                <div class="production-metric-change">
+                    <small class="text-muted">
+                        {{ textile_stock.color }}
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Information -->
+    <div class="row g-4 mb-4">
+        <!-- Basic Information -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        المعلومات الأساسية
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="info-item">
+                                <span class="info-label">اسم القماش:</span>
+                                <span class="info-value">{{ textile_stock.name }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-item">
+                                <span class="info-label">نوع القماش:</span>
+                                <span class="info-value">{{ textile_stock.get_fabric_type_display }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-item">
+                                <span class="info-label">اللون:</span>
+                                <span class="info-value">
+                                    <span class="color-indicator" style="background-color: {{ textile_stock.color|lower }}"></span>
+                                    {{ textile_stock.color }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-item">
+                                <span class="info-label">العرض:</span>
+                                <span class="info-value">{{ textile_stock.width }} سم</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-item">
+                                <span class="info-label">درجة الجودة:</span>
+                                <span class="info-value">
+                                    <span class="badge bg-{{ textile_stock.quality_grade|lower }}">
+                                        {{ textile_stock.quality_grade }}
+                                    </span>
+                                </span>
+                            </div>
+                        </div>
+                        {% if textile_stock.batch_number %}
+                        <div class="col-12">
+                            <div class="info-item">
+                                <span class="info-label">رقم الباتش:</span>
+                                <span class="info-value">{{ textile_stock.batch_number }}</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if textile_stock.notes %}
+                        <div class="col-12">
+                            <div class="info-item">
+                                <span class="info-label">ملاحظات:</span>
+                                <span class="info-value">{{ textile_stock.notes }}</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Warehouse & Supplier Information -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-warehouse me-2"></i>
+                        معلومات المخزن والمورد
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="info-item">
+                                <span class="info-label">المخزن:</span>
+                                <span class="info-value">
+                                    <i class="fas fa-warehouse me-1"></i>
+                                    {{ textile_stock.warehouse.name }}
+                                </span>
+                            </div>
+                        </div>
+                        {% if textile_stock.supplier %}
+                        <div class="col-12">
+                            <div class="info-item">
+                                <span class="info-label">المورد:</span>
+                                <span class="info-value">
+                                    <i class="fas fa-truck me-1"></i>
+                                    {{ textile_stock.supplier.name }}
+                                </span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div class="col-md-6">
+                            <div class="info-item">
+                                <span class="info-label">تاريخ الإضافة:</span>
+                                <span class="info-value">{{ textile_stock.created_at|date:"d/m/Y" }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-item">
+                                <span class="info-label">آخر تحديث:</span>
+                                <span class="info-value">{{ textile_stock.updated_at|date:"d/m/Y H:i" }}</span>
+                            </div>
+                        </div>
+                        {% if textile_stock.warehouse_product %}
+                        <div class="col-12">
+                            <div class="alert alert-info mb-0">
+                                <i class="fas fa-link me-2"></i>
+                                <strong>مرتبط بالمخزن العام:</strong>
+                                {{ textile_stock.warehouse_product.name }}
+                                <small class="d-block mt-1">
+                                    كود المنتج: {{ textile_stock.warehouse_product.code }}
+                                </small>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Usage Statistics -->
+    <div class="row g-4 mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        إحصائيات الاستخدام
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-lg-3 col-md-6">
+                            <div class="stat-card">
+                                <div class="stat-icon bg-primary">
+                                    <i class="fas fa-shopping-cart"></i>
+                                </div>
+                                <div class="stat-content">
+                                    <div class="stat-value">{{ usage_stats.total_allocated|floatformat:2 }}</div>
+                                    <div class="stat-label">متر مخصص</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <div class="stat-card">
+                                <div class="stat-icon bg-success">
+                                    <i class="fas fa-list-ol"></i>
+                                </div>
+                                <div class="stat-content">
+                                    <div class="stat-value">{{ usage_stats.orders_count }}</div>
+                                    <div class="stat-label">أمر إنتاج</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <div class="stat-card">
+                                <div class="stat-icon bg-warning">
+                                    <i class="fas fa-percentage"></i>
+                                </div>
+                                <div class="stat-content">
+                                    <div class="stat-value">{{ usage_stats.utilization_rate|floatformat:1 }}%
+                                    </div>
+                                    <div class="stat-label">معدل الاستخدام</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <div class="stat-card">
+                                <div class="stat-icon bg-info">
+                                    <i class="fas fa-calculator"></i>
+                                </div>
+                                <div class="stat-content">
+                                    <div class="stat-value">{{ usage_stats.avg_cost_per_order|floatformat:2 }}</div>
+                                    <div class="stat-label">متوسط التكلفة/أمر</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Related Production Orders -->
+    <div class="row g-4 mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-clipboard-list me-2"></i>
+                        أوامر الإنتاج المرتبطة
+                        <span class="badge bg-primary ms-2">{{ related_orders.count }}</span>
+                    </h5>
+                    <a href="{% url 'production:order_list' %}?textile_stock={{ textile_stock.id }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-external-link-alt me-1"></i>
+                        عرض الكل
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if related_orders %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>رقم الأمر</th>
+                                        <th>المنتج</th>
+                                        <th>الكمية</th>
+                                        <th>المتر المخصص</th>
+                                        <th>الحالة</th>
+                                        <th>تاريخ الإنشاء</th>
+                                        <th>الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for order in related_orders %}
+                                    <tr>
+                                        <td>
+                                            <a href="{% url 'production:order_detail' order.pk %}" class="fw-bold text-decoration-none">
+                                                {{ order.order_number }}
+                                            </a>
+                                        </td>
+                                        <td>{{ order.product.name }}</td>
+                                        <td>{{ order.quantity_ordered }} قطعة</td>
+                                        <td>{{ order.fabric_meters_allocated|floatformat:2 }} متر</td>
+                                        <td>
+                                            <span class="badge bg-{{ order.status|status_color }}">
+                                                {{ order.get_status_display }}
+                                            </span>
+                                        </td>
+                                        <td>{{ order.created_at|date:"d/m/Y" }}</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{% url 'production:order_detail' order.pk %}" class="btn btn-outline-primary btn-sm">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                {% if order.status == 'pending' %}
+                                                <a href="{% url 'production:order_update' order.pk %}" class="btn btn-outline-secondary btn-sm">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">لا توجد أوامر إنتاج مرتبطة</h5>
+                            <p class="text-muted">لم يتم استخدام هذا القماش في أي أمر إنتاج بعد</p>
+                            <a href="{% url 'production:order_create' %}" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i>
+                                إنشاء أمر إنتاج جديد
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stock Movement History -->
+    {% if textile_stock.stock_item %}
+    <div class="row g-4 mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-history me-2"></i>
+                        تاريخ حركات المخزون
+                        <span class="badge bg-secondary ms-2">{{ textile_stock.stock_item.movements.count }}</span>
+                    </h5>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#stockHistoryModal">
+                        <i class="fas fa-list me-1"></i>
+                        عرض التفاصيل
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if textile_stock.stock_item.movements.all %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>التاريخ</th>
+                                        <th>نوع الحركة</th>
+                                        <th>الكمية</th>
+                                        <th>المرجع</th>
+                                        <th>المستخدم</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for movement in textile_stock.stock_item.movements.all|slice:":5" %}
+                                    <tr>
+                                        <td>{{ movement.created_at|date:"d/m/Y H:i" }}</td>
+                                        <td>
+                                            <span class="badge bg-{{ movement.movement_type|movement_color }}">
+                                                {{ movement.get_movement_type_display }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if movement.movement_type == 'out' %}-{% endif %}{{ movement.quantity|floatformat:2 }} متر
+                                        </td>
+                                        <td>{{ movement.reference_number|default:"-" }}</td>
+                                        <td>{{ movement.created_by.username|default:"-" }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% if textile_stock.stock_item.movements.count > 5 %}
+                        <div class="text-center mt-3">
+                            <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#stockHistoryModal">
+                                <i class="fas fa-plus me-1"></i>
+                                عرض {{ textile_stock.stock_item.movements.count|add:"-5" }} حركة أخرى
+                            </button>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-3">
+                            <i class="fas fa-history fa-2x text-muted mb-2"></i>
+                            <p class="text-muted mb-0">لا توجد حركات مخزون مسجلة</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Quick Actions -->
+    <div class="row g-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-bolt me-2"></i>
+                        إجراءات سريعة
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-lg-3 col-md-6">
+                            <button type="button" class="btn btn-outline-primary w-100" data-bs-toggle="modal" data-bs-target="#createOrderModal">
+                                <i class="fas fa-plus-circle me-2"></i>
+                                إنشاء أمر إنتاج
+                            </button>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <button type="button" class="btn btn-outline-success w-100" data-bs-toggle="modal" data-bs-target="#updateStockModal">
+                                <i class="fas fa-plus-minus me-2"></i>
+                                تحديث المخزون
+                            </button>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <button type="button" class="btn btn-outline-info w-100" onclick="calculateFabricUsage()">
+                                <i class="fas fa-calculator me-2"></i>
+                                حساب الاستخدام
+                            </button>
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <button type="button" class="btn btn-outline-warning w-100" onclick="generateReport()">
+                                <i class="fas fa-file-alt me-2"></i>
+                                تقرير مفصل
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block production_modals %}
+    {{ block.super }}
+    
+    <!-- Update Stock Modal -->
+    <div class="modal fade" id="updateStockModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-plus-minus me-2"></i>
+                        تحديث مخزون القماش
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="post" action="{% url 'production:update_textile_stock' textile_stock.pk %}">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong>الكمية الحالية:</strong> {{ textile_stock.length_available|floatformat:2 }} متر
+                                </div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <label class="form-label">نوع العملية</label>
+                                <select name="action" class="form-select" required>
+                                    <option value="">اختر نوع العملية</option>
+                                    <option value="add">إضافة كمية</option>
+                                    <option value="subtract">خصم كمية</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-12">
+                                <label class="form-label">الكمية (متر)</label>
+                                <input type="number" name="quantity" class="form-control" step="0.01" min="0.01" required>
+                            </div>
+                            
+                            <div class="col-12">
+                                <label class="form-label">رقم المرجع</label>
+                                <input type="text" name="reference" class="form-control" placeholder="رقم الفاتورة أو المرجع">
+                            </div>
+                            
+                            <div class="col-12">
+                                <label class="form-label">ملاحظات</label>
+                                <textarea name="notes" class="form-control" rows="3" placeholder="أدخل ملاحظات إضافية"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>
+                            إلغاء
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>
+                            تحديث المخزون
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stock History Modal -->
+    <div class="modal fade" id="stockHistoryModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-history me-2"></i>
+                        تاريخ حركات المخزون - {{ textile_stock.name }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    {% if textile_stock.stock_item.movements.all %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>التاريخ والوقت</th>
+                                        <th>نوع الحركة</th>
+                                        <th>الكمية</th>
+                                        <th>رقم المرجع</th>
+                                        <th>المستخدم</th>
+                                        <th>ملاحظات</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for movement in textile_stock.stock_item.movements.all %}
+                                    <tr>
+                                        <td>{{ movement.created_at|date:"d/m/Y H:i:s" }}</td>
+                                        <td>
+                                            <span class="badge bg-{{ movement.movement_type|movement_color }}">
+                                                {{ movement.get_movement_type_display }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="{% if movement.movement_type == 'out' %}text-danger{% else %}text-success{% endif %}">
+                                                {% if movement.movement_type == 'out' %}-{% else %}+{% endif %}{{ movement.quantity|floatformat:2 }} متر
+                                            </span>
+                                        </td>
+                                        <td>{{ movement.reference_number|default:"-" }}</td>
+                                        <td>
+                                            {% if movement.created_by %}
+                                                <i class="fas fa-user me-1"></i>
+                                                {{ movement.created_by.username }}
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if movement.notes %}
+                                                <span class="text-truncate" title="{{ movement.notes }}">
+                                                    {{ movement.notes|truncatechars:50 }}
+                                                </span>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">لا توجد حركات مخزون</h5>
+                            <p class="text-muted">لم يتم تسجيل أي حركات لهذا القماش بعد</p>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>
+                        إغلاق
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="exportMovements()">
+                        <i class="fas fa-download me-1"></i>
+                        تصدير الحركات
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Production Order Modal -->
+    <div class="modal fade" id="createOrderModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-plus-circle me-2"></i>
+                        إنشاء أمر إنتاج جديد
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        سيتم إنشاء أمر إنتاج جديد باستخدام هذا القماش: <strong>{{ textile_stock.name }}</strong>
+                    </div>
+                    
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">المنتج المطلوب إنتاجه</label>
+                            <select class="form-select" id="productSelect" required>
+                                <option value="">اختر المنتج</option>
+                                <!-- Will be populated via AJAX -->
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">الكمية المطلوبة</label>
+                            <input type="number" class="form-control" id="orderQuantity" min="1" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">الأولوية</label>
+                            <select class="form-select" id="orderPriority">
+                                <option value="normal">عادية</option>
+                                <option value="high">عالية</option>
+                                <option value="urgent">عاجلة</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-12">
+                            <label class="form-label">تاريخ التسليم المطلوب</label>
+                            <input type="date" class="form-control" id="deliveryDate" required>
+                        </div>
+                        
+                        <div class="col-12">
+                            <label class="form-label">ملاحظات</label>
+                            <textarea class="form-control" id="orderNotes" rows="3" placeholder="أدخل أي ملاحظات خاصة بالأمر"></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Fabric Calculation Preview -->
+                    <div id="fabricCalculation" class="mt-4" style="display: none;">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    <i class="fas fa-calculator me-2"></i>
+                                    حساب القماش المطلوب
+                                </h6>
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <small class="text-muted">القماش المطلوب:</small>
+                                        <div class="fw-bold" id="requiredFabric">-</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <small class="text-muted">المتاح:</small>
+                                        <div class="fw-bold text-success" id="availableFabric">{{ textile_stock.length_available|floatformat:2 }} متر</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <small class="text-muted">الباقي بعد الاستخدام:</small>
+                                        <div class="fw-bold" id="remainingFabric">-</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>
+                        إلغاء
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="createProductionOrder()">
+                        <i class="fas fa-plus me-1"></i>
+                        إنشاء الأمر
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        تأكيد الحذف
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        <strong>تحذير:</strong> هذا الإجراء لا يمكن التراجع عنه!
+                    </div>
+                    
+                    <p>هل أنت متأكد من حذف قماش <strong>{{ textile_stock.name }}</strong>؟</p>
+                    
+                    {% if related_orders.exists %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>تنبيه:</strong> يوجد {{ related_orders.count }} أمر إنتاج مرتبط بهذا القماش.
+                        حذف القماش قد يؤثر على هذه الأوامر.
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>
+                        إلغاء
+                    </button>
+                    <a href="{% url 'production:textile_stock_delete' textile_stock.pk %}" class="btn btn-danger">
+                        <i class="fas fa-trash me-1"></i>
+                        حذف نهائياً
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block production_extra_css %}
+    {{ block.super }}
+    <style>
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .info-item:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #6c757d;
+            min-width: 120px;
+        }
+        
+        .info-value {
+            font-weight: 500;
+            color: #212529;
+            text-align: left;
+        }
+        
+        .color-indicator {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #dee2e6;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+        
+        .stat-card {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 0.5rem;
+            border: 1px solid #e9ecef;
+        }
+        
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            margin-left: 1rem;
+        }
+        
+        .stat-content {
+            flex: 1;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #212529;
+            line-height: 1.2;
+        }
+        
+        .stat-label {
+            font-size: 0.875rem;
+            color: #6c757d;
+            margin-top: 0.25rem;
+        }
+        
+        .production-metric {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .production-metric-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            color: white;
+            font-size: 1.5rem;
+        }
+        
+        .production-metric-icon.primary { background: #0d6efd; }
+        .production-metric-icon.success { background: #198754; }
+        .production-metric-icon.warning { background: #ffc107; color: #212529; }
+        .production-metric-icon.info { background: #0dcaf0; }
+        
+        .production-metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #212529;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+        
+        .production-metric-label {
+            font-size: 0.875rem;
+            color: #6c757d;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+        
+        .production-metric-change {
+            font-size: 0.75rem;
+        }
+        
+        @media print {
+            .btn, .dropdown, .modal {
+                display: none !important;
+            }
+            
+            .card {
+                border: 1px solid #000 !important;
+                box-shadow: none !important;
+            }
+            
+            .production-metric {
+                border: 1px solid #000 !important;
+            }
+        }
+        
+        .badge.bg-a { background-color: #198754 !important; }
+        .badge.bg-b { background-color: #0dcaf0 !important; }
+        .badge.bg-c { background-color: #ffc107 !important; color: #212529 !important; }
+        .badge.bg-d { background-color: #dc3545 !important; }
+    </style>
+{% endblock %}
+
+{% block production_extra_js %}
+    {{ block.super }}
+    <script>
+        $(document).ready(function() {
+            // Initialize tooltips
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+            
+            // Load products for create order modal
+            $('#createOrderModal').on('show.bs.modal', function() {
+                loadProducts();
+            });
+            
+            // Calculate fabric requirements when inputs change
+            $('#productSelect, #orderQuantity').on('change', function() {
+                calculateFabricRequirements();
+            });
+            
+            // Set minimum date for delivery date
+            const today = new Date().toISOString().split('T')[0];
+            $('#deliveryDate').attr('min', today);
+        });
+        
+        function loadProducts() {
+            $.ajax({
+                url: '{% url "production:get_finished_products_ajax" %}',
+                method: 'GET',
+                success: function(response) {
+                    if (response.success) {
+                        const select = $('#productSelect');
+                        select.empty().append('<option value="">اختر المنتج</option>');
+                        
+                        response.products.forEach(function(product) {
+                            select.append(`<option value="${product.id}" data-fabric-requirement="${product.fabric_requirement}">${product.name}</option>`);
+                        });
+                    }
+                },
+                error: function() {
+                    showAlert('حدث خطأ في تحميل المنتجات', 'danger');
+                }
+            });
+        }
+        
+        function calculateFabricRequirements() {
+            const productSelect = $('#productSelect');
+            const quantity = parseInt($('#orderQuantity').val()) || 0;
+            const selectedOption = productSelect.find('option:selected');
+            const fabricRequirement = parseFloat(selectedOption.data('fabric-requirement')) || 0;
+            
+            if (quantity > 0 && fabricRequirement > 0) {
+                const requiredFabric = quantity * fabricRequirement;
+                const availableFabric = {{ textile_stock.length_available|floatformat:2 }};
+                const remainingFabric = availableFabric - requiredFabric;
+                
+                $('#requiredFabric').text(requiredFabric.toFixed(2) + ' متر');
+                $('#remainingFabric').text(remainingFabric.toFixed(2) + ' متر');
+                    .removeClass('text-success text-danger text-warning')
+                    .addClass(remainingFabric >= 0 ? 'text-success' : 'text-danger');
+                
+                $('#fabricCalculation').show();
+                
+                // Show warning if not enough fabric
+                if (remainingFabric < 0) {
+                    showAlert('تحذير: الكمية المطلوبة من القماش أكبر من المتاح في المخزون', 'warning');
+                }
+            } else {
+                $('#fabricCalculation').hide();
+            }
+        }
+        
+        function createProductionOrder() {
+            const productId = $('#productSelect').val();
+            const quantity = $('#orderQuantity').val();
+            const priority = $('#orderPriority').val();
+            const deliveryDate = $('#deliveryDate').val();
+            const notes = $('#orderNotes').val();
+            
+            if (!productId || !quantity || !deliveryDate) {
+                showAlert('يرجى ملء جميع الحقول المطلوبة', 'danger');
+                return;
+            }
+            
+            // Create form data
+            const formData = {
+                product: productId,
+                quantity_ordered: quantity,
+                priority: priority,
+                expected_completion_date: deliveryDate,
+                textile_stock: {{ textile_stock.id }},
+                notes: notes,
+                csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').val()
+            };
+            
+            // Submit to create order endpoint
+            $.ajax({
+                url: '{% url "production:order_create" %}',
+                method: 'POST',
+                data: formData,
+                success: function(response) {
+                    if (response.success) {
+                        showAlert('تم إنشاء أمر الإنتاج بنجاح', 'success');
+                        $('#createOrderModal').modal('hide');
+                        // Redirect to order detail
+                        window.location.href = response.redirect_url;
+                    } else {
+                        showAlert('حدث خطأ في إنشاء الأمر: ' + response.error, 'danger');
+                    }
+                },
+                error: function() {
+                    showAlert('حدث خطأ في إنشاء أمر الإنتاج', 'danger');
+                }
+            });
+        }
+        
+        function calculateFabricUsage() {
+            // Open fabric usage calculator
+            const modal = new bootstrap.Modal(document.getElementById('fabricCalculatorModal'));
+            modal.show();
+        }
+        
+        function generateReport() {
+            const reportData = {
+                textile_stock_id: {{ textile_stock.id }},
+                include_movements: true,
+                include_orders: true,
+                include_statistics: true,
+                csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').val()
+            };
+            
+            $.ajax({
+                url: '{% url "production:generate_textile_report" %}',
+                method: 'POST',
+                data: reportData,
+                success: function(response) {
+                    if (response.success) {
+                        window.open(response.report_url, '_blank');
+                    } else {
+                        showAlert('حدث خطأ في إنشاء التقرير', 'danger');
+                    }
+                },
+                error: function() {
+                    showAlert('حدث خطأ في إنشاء التقرير', 'danger');
+                }
+            });
+        }
+        
+        
+        function exportStockData() {
+            // Export stock data to Excel
+            window.location.href = '{% url "production:export_textile_stock_detail" textile_stock.id %}';
+        }
+        
+        function exportMovements() {
+            // Export stock movements to Excel
+            {% if textile_stock.stock_item %}
+window.location.href = '{% url "production:export_stock_movements" textile_stock.stock_item.id %}';
+{% else %}
+showAlert('لا توجد حركات مخزون لهذا الصنف', 'warning');
+{% endif %}
+        }
+        
+        function showAlert(message, type) {
+            const alertHtml = `
+                <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : 'info-circle'} me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            
+            // Insert alert at the top of the content
+            $('.production-content').prepend(alertHtml);
+            
+            // Auto-dismiss after 5 seconds
+            setTimeout(function() {
+                $('.alert').fadeOut();
+            }, 5000);
+        }
+        
+        // Print functionality
+        function printStockDetails() {
+            window.print();
+        }
+        
+        // Refresh stock data
+        function refreshStockData() {
+            location.reload();
+        }
+        
+        // Auto-refresh every 5 minutes for stock levels
+        setInterval(function() {
+            $.ajax({
+                url: '{% url "production:get_textile_stock_ajax" %}',
+                data: { fabric_id: {{ textile_stock.id }} },
+                success: function(response) {
+                    if (response.length_available !== undefined) {
+                        // Update displayed values
+                        $('.production-metric-value').first().text(response.length_available.toFixed(2));
+                        $('#availableFabric').text(response.length_available.toFixed(2) + ' متر');
+                        
+                        // Update progress bars or indicators if needed
+                        updateStockIndicators(response.length_available);
+                    }
+                }
+            });
+        }, 300000); // 5 minutes
+        
+        function updateStockIndicators(availableQuantity) {
+            // Update stock level indicators
+            const minLevel = 50; // Minimum stock level
+            
+            if (availableQuantity < minLevel) {
+                // Show low stock warning
+                if (!$('.alert-danger').length) {
+                    const warningHtml = `
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            <strong>تحذير:</strong> مخزون القماش منخفض (أقل من ${minLevel} متر)
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    `;
+                    $('.production-content').prepend(warningHtml);
+                }
+            }
+        }
+    </script>
+{% endblock %}
+
+
+

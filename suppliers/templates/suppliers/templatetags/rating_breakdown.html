@@ -1,0 +1,32 @@
+<div class="rating-breakdown">
+    <div class="row">
+        <div class="col-md-6">
+            <h6>التقييم العام</h6>
+            {% load rating_tags %}
+            {% star_rating rating_summary.average_rating %}
+            <small class="text-muted d-block">
+                ({{ rating_summary.total_ratings }} تقييم)
+            </small>
+        </div>
+        <div class="col-md-6">
+            <h6>تفصيل المعايير</h6>
+            {% for criterion, avg in rating_summary.criteria_averages.items %}
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <small>
+                    {% if criterion == 'quality' %}الجودة
+                    {% elif criterion == 'delivery' %}التسليم
+                    {% elif criterion == 'price' %}السعر
+                    {% elif criterion == 'service' %}الخدمة
+                    {% elif criterion == 'communication' %}التواصل
+                    {% endif %}
+                </small>
+                <div class="progress flex-grow-1 mx-2" style="height: 8px;">
+                    <div class="progress-bar bg-{% rating_color avg %}" 
+                         style="width: {% multiply avg 20 %}%"></div>
+                </div>
+                <small class="text-muted">{{ avg|floatformat:1 }}</small>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>

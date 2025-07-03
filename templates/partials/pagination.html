@@ -1,0 +1,298 @@
+{% if is_paginated %}
+<nav aria-label="تنقل الصفحات">
+    <ul class="pagination justify-content-center">
+        <!-- First Page -->
+        {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?{% if request.GET.search %}search={{ request.GET.search }}&{% endif %}page=1" aria-label="الصفحة الأولى">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+            </li>
+        {% endif %}
+
+        <!-- Previous Page -->
+        {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?{% if request.GET.search %}search={{ request.GET.search }}&{% endif %}page={{ page_obj.previous_page_number }}" aria-label="السابق">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+            </li>
+        {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">
+                    <i class="fas fa-angle-right"></i>
+                </span>
+            </li>
+        {% endif %}
+
+        <!-- Page Numbers -->
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+                <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                </li>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link" href="?{% if request.GET.search %}search={{ request.GET.search }}&{% endif %}page={{ num }}">{{ num }}</a>
+                </li>
+            {% elif num == 1 or num == page_obj.paginator.num_pages %}
+                <li class="page-item">
+                    <a class="page-link" href="?{% if request.GET.search %}search={{ request.GET.search }}&{% endif %}page={{ num }}">{{ num }}</a>
+                </li>
+            {% elif num == page_obj.number|add:'-4' or num == page_obj.number|add:'4' %}
+                <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                </li>
+            {% endif %}
+        {% endfor %}
+
+        <!-- Next Page -->
+        {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?{% if request.GET.search %}search={{ request.GET.search }}&{% endif %}page={{ page_obj.next_page_number }}" aria-label="التالي">
+                    <i class="fas fa-angle-left"></i>
+                </a>
+            </li>
+        {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">
+                    <i class="fas fa-angle-left"></i>
+                </span>
+            </li>
+        {% endif %}
+
+        <!-- Last Page -->
+        {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?{% if request.GET.search %}search={{ request.GET.search }}&{% endif %}page={{ page_obj.paginator.num_pages }}" aria-label="الصفحة الأخيرة">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+            </li>
+        {% endif %}
+    </ul>
+
+    <!-- Pagination Info -->
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        <div class="pagination-info">
+            <small class="text-muted">
+                عرض {{ page_obj.start_index }} إلى {{ page_obj.end_index }} من أصل {{ page_obj.paginator.count }} نتيجة
+            </small>
+        </div>
+        
+        <!-- Items per page selector -->
+        <div class="pagination-controls">
+            <form method="get" class="d-inline-block">
+                {% for key, value in request.GET.items %}
+                    {% if key != 'per_page' and key != 'page' %}
+                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                    {% endif %}
+                {% endfor %}
+                <div class="input-group input-group-sm" style="width: 200px;">
+                    <span class="input-group-text">عرض</span>
+                    <select name="per_page" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option value="10" {% if request.GET.per_page == '10' %}selected{% endif %}>10</option>
+                        <option value="25" {% if request.GET.per_page == '25' or not request.GET.per_page %}selected{% endif %}>25</option>
+                        <option value="50" {% if request.GET.per_page == '50' %}selected{% endif %}>50</option>
+                        <option value="100" {% if request.GET.per_page == '100' %}selected{% endif %}>100</option>
+                    </select>
+                    <span class="input-group-text">عنصر</span>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Quick Jump to Page -->
+    {% if page_obj.paginator.num_pages > 10 %}
+    <div class="text-center mt-3">
+        <form method="get" class="d-inline-block">
+            {% for key, value in request.GET.items %}
+                {% if key != 'page' %}
+                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endif %}
+            {% endfor %}
+            <div class="input-group input-group-sm d-inline-flex" style="width: 250px;">
+                <span class="input-group-text">الانتقال إلى الصفحة</span>
+                <input type="number" name="page" class="form-control" 
+                       min="1" max="{{ page_obj.paginator.num_pages }}" 
+                       value="{{ page_obj.number }}" 
+                       placeholder="رقم الصفحة">
+                <button class="btn btn-outline-primary" type="submit">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+</nav>
+
+<style>
+.pagination {
+    margin-bottom: 0;
+}
+
+.pagination .page-link {
+    color: var(--primary-color);
+    border: 1px solid #dee2e6;
+    padding: 0.5rem 0.75rem;
+    margin: 0 2px;
+    border-radius: 0.375rem;
+    transition: all 0.2s ease-in-out;
+}
+
+.pagination .page-link:hover {
+    color: #fff;
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.pagination .page-item.active .page-link {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(78, 115, 223, 0.3);
+}
+
+.pagination .page-item.disabled .page-link {
+    color: #6c757d;
+    background-color: #fff;
+    border-color: #dee2e6;
+    cursor: not-allowed;
+}
+
+.pagination-info {
+    font-size: 0.875rem;
+}
+
+.pagination-controls .input-group {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border-radius: 0.375rem;
+    overflow: hidden;
+}
+
+.pagination-controls .form-select {
+    border: none;
+    background-color: #fff;
+}
+
+.pagination-controls .input-group-text {
+    background-color: #f8f9fa;
+    border: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .pagination {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .pagination .page-link {
+        padding: 0.375rem 0.5rem;
+        font-size: 0.875rem;
+        margin: 1px;
+    }
+    
+    .d-flex.justify-content-between {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+    
+    .pagination-controls {
+        align-self: center;
+    }
+    
+    .pagination-info {
+        order: 2;
+    }
+}
+
+@media (max-width: 576px) {
+    .pagination .page-item:not(.active):not(:first-child):not(:last-child):not(.disabled) {
+        display: none;
+    }
+    
+    .pagination .page-item:nth-child(2),
+    .pagination .page-item:nth-last-child(2) {
+        display: block;
+    }
+}
+
+/* Animation for page transitions */
+.pagination .page-link {
+    position: relative;
+    overflow: hidden;
+}
+
+.pagination .page-link::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.pagination .page-link:hover::before {
+    left: 100%;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Smooth scroll to top when changing pages
+    const pageLinks = document.querySelectorAll('.pagination .page-link');
+    pageLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            // Add loading state
+            const icon = this.querySelector('i');
+            if (icon) {
+                icon.className = 'fas fa-spinner fa-spin';
+            }
+            
+            // Smooth scroll to top
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        });
+    });
+    
+    // Auto-submit form when items per page changes
+    const perPageSelect = document.querySelector('select[name="per_page"]');
+    if (perPageSelect) {
+        perPageSelect.addEventListener('change', function() {
+            // Show loading state
+            this.style.opacity = '0.6';
+            this.disabled = true;
+            
+            // Submit form
+            this.form.submit();
+        });
+    }
+    
+    // Validate page jump input
+    const pageJumpInput = document.querySelector('input[name="page"]');
+    if (pageJumpInput) {
+        pageJumpInput.addEventListener('input', function() {
+            const value = parseInt(this.value);
+            const max = parseInt(this.max);
+            const min = parseInt(this.min);
+            
+            if (value > max) {
+                this.value = max;
+            } else if (value < min) {
+                this.value = min;
+            }
+        });
+    }
+});
+</script>
+{% endif %}

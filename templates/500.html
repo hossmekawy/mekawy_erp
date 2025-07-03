@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Server Error - Mekawy ERP{% endblock %}
+
+{% block content %}
+<div class="container text-center py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <img src="https://static.vecteezy.com/system/resources/previews/007/872/980/non_2x/flat-illustration-500-internal-server-error-concept-can-t-connect-to-server-or-internet-website-error-500-can-be-used-for-web-landing-page-animation-promotion-etc-vector.jpg" class="img-fluid mb-4" alt="500 Server Error" style="max-height: 250px;">
+            <h1 class="display-1 fw-bold text-danger">500</h1>
+            <p class="h2 text-dark fw-bold mb-3">خطأ في الخادم</p>
+            <p class="text-muted mb-4">
+                عذراً، حدث خطأ غير متوقع. فريقنا يعمل على إصلاحه.
+            </p>
+            <div class="d-flex justify-content-center gap-3">
+                <a href="{% url 'dashboard:index' %}" class="btn btn-primary">
+                    <i class="fas fa-home me-2"></i>العودة للرئيسية
+                </a>
+                <a href="javascript:location.reload()" class="btn btn-outline-secondary">
+                    <i class="fas fa-sync-alt me-2"></i>تحديث الصفحة
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

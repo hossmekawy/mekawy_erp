@@ -1,0 +1,380 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+{% load production_extras %}
+
+{% block production_title %}تفاصيل أمر الإنتاج {{ order.order_number }}{% endblock %}
+
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item"><a href="{% url 'production:order_list' %}">أوامر الإنتاج</a></li>
+    <li class="breadcrumb-item active" aria-current="page">تفاصيل أمر الإنتاج {{ order.order_number }}</li>
+{% endblock %}
+
+{% block production_page_title %}تفاصيل أمر الإنتاج{% endblock %}
+
+{% block production_header_actions %}
+    <div class="d-flex justify-content-end align-items-center gap-2">
+        {% if order.status == 'draft' %}
+        <a href="{% url 'production:order_update' order.pk %}" class="btn btn-production-outline">
+            <i class="fas fa-edit me-1"></i> تعديل
+        </a>
+        {% endif %}
+        <div class="dropdown">
+            <button class="btn btn-production dropdown-toggle" type="button" id="orderActionsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fas fa-cogs me-1"></i> إجراءات
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="orderActionsDropdown">
+                <li><a class="dropdown-item" href="{% url 'production:print_production_order' order.pk %}" target="_blank"><i class="fas fa-print me-2 text-info"></i> طباعة الأمر</a></li>
+                {% if order.status == 'draft' %}
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#deleteConfirmationModal" data-delete-url="{% url 'production:order_delete' order.pk %}" data-item-name="أمر الإنتاج رقم {{ order.order_number }}"><i class="fas fa-trash-alt me-2"></i> حذف الأمر</a></li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+{% endblock %}
+
+{% block production_extra_css %}
+<style>
+/* Main panel for the workflow */
+.workflow-panel {
+    border: 1px solid #dee2e6;
+    border-radius: .75rem;
+    margin-bottom: 2rem;
+    overflow: hidden;
+    background-color: #fff;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+.workflow-header {
+    padding: 1rem 1.5rem;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* The horizontal tracker bar */
+.workflow-tracker {
+    list-style: none;
+    padding: 1.5rem 1rem 1rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    position: relative;
+}
+.workflow-tracker::before {
+    content: '';
+    position: absolute;
+    top: 2.2rem;
+    left: 5%;
+    right: 5%;
+    height: 4px;
+    background-color: #e9ecef;
+    z-index: 1;
+}
+
+/* Individual step in the workflow */
+.workflow-step {
+    text-align: center;
+    position: relative;
+    z-index: 2;
+    flex: 1;
+}
+
+/* The circle icon for each step */
+.workflow-step .step-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: #e9ecef;
+    color: #adb5bd;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+/* The text label below the icon */
+.workflow-step .step-label {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+/* Styling for a step that is COMPLETED */
+.workflow-step.completed .step-icon {
+    background-color: #198754;
+    border-color: #198754;
+    color: white;
+}
+.workflow-step.completed .step-label {
+    color: #198754;
+}
+
+
+/* Styling for a step that is currently ACTIVE */
+.workflow-step.active .step-icon {
+    background-color: #0dcaf0;
+    border-color: #0dcaf0;
+    color: white;
+    transform: scale(1.2);
+    box-shadow: 0 0 10px rgba(13, 202, 240, 0.5);
+}
+.workflow-step.active .step-label {
+    color: #0d6efd;
+    font-weight: 700;
+}
+
+/* Box for the main call-to-action button */
+.workflow-action-box {
+    padding: 1.5rem;
+    text-align: center;
+    border-top: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+}
+
+/* NEW: Styling for the clickable links on workflow steps */
+.workflow-step .step-link {
+    text-decoration: none;
+    display: inline-block;
+    cursor: pointer;
+}
+
+.workflow-step .step-link .step-label {
+    color: #0d6efd; /* Blue to indicate it's a link */
+    font-weight: 700;
+}
+
+/* Add a hover effect to the icon when the step is a link */
+.workflow-step .step-link:hover .step-icon {
+    transform: scale(1.25);
+    box-shadow: 0 0 15px rgba(13, 202, 240, 0.7);
+}
+
+</style>
+{% endblock %}
+
+
+{% block production_content %}
+    <!-- ============================================= -->
+    <!-- === Master Production Workflow Panel      === -->
+    <!-- ============================================= -->
+    <div class="workflow-panel">
+        <div class="workflow-header">
+            <h4><i class="fas fa-project-diagram me-2"></i>مراحل سير عمل الأمر</h4>
+        </div>
+
+        {% with status_list="draft,approved,in_cutting,in_assembly,in_dyeing,in_finishing,completed"|split:"," %}
+        {% with current_index=status_list|index_of:order.status %}
+
+        <div class="workflow-tracker">
+            <!-- Step: Approved -->
+            <div class="workflow-step {% if current_index >= 2 %}completed{% endif %} {% if order.status == 'approved' %}active{% endif %}">
+                <div class="step-icon"><i class="fas fa-check-double"></i></div>
+                <div class="step-label">معتمد</div>
+            </div>
+
+            <!-- Step: Cutting -->
+            <div class="workflow-step {% if current_index >= 3 %}completed{% endif %} {% if order.status == 'in_cutting' %}active{% endif %}">
+                {% if order.status == 'approved' %}
+                    <a href="{% url 'production:cutting_create' %}?order_id={{ order.pk }}" class="step-link" title="بدء عملية القص">
+                        <div class="step-icon"><i class="fas fa-cut"></i></div>
+                        <div class="step-label">البدء في القص</div>
+                    </a>
+                {% elif order.cutting_process %}
+                    <a href="{% url 'production:cutting_detail' order.cutting_process.pk %}" class="step-link" title="عرض تفاصيل القص">
+                        <div class="step-icon"><i class="fas fa-cut"></i></div>
+                        <div class="step-label">قص</div>
+                    </a>
+                {% else %}
+                    <div class="step-icon"><i class="fas fa-cut"></i></div>
+                    <div class="step-label">قص</div>
+                {% endif %}
+            </div>
+
+            <!-- Step: Assembly -->
+            <div class="workflow-step {% if current_index >= 4 %}completed{% endif %} {% if order.status == 'in_assembly' %}active{% endif %}">
+                {% if order.status == 'in_assembly' and not order.assembly_processes.exists %}
+                     <a href="{% url 'production:assembly_create' %}?order_id={{ order.pk }}" class="step-link" title="بدء عملية التجميع">
+                        <div class="step-icon"><i class="fas fa-users-cog"></i></div>
+                        <div class="step-label">البدء في التجميع</div>
+                    </a>
+                {% elif order.assembly_processes.exists %}
+                     <a href="{% url 'production:assembly_detail' order.assembly_processes.first.pk %}" class="step-link" title="عرض تفاصيل التجميع">
+                        <div class="step-icon"><i class="fas fa-users-cog"></i></div>
+                        <div class="step-label">تجميع</div>
+                    </a>
+                {% else %}
+                    <div class="step-icon"><i class="fas fa-users-cog"></i></div>
+                    <div class="step-label">تجميع</div>
+                {% endif %}
+            </div>
+            
+            <!-- Step: Dyeing -->
+            <div class="workflow-step {% if current_index >= 5 %}completed{% endif %} {% if order.status == 'in_dyeing' %}active{% endif %}">
+                {% with assembly_process=order.assembly_processes.first %}
+                    {% if order.status == 'in_dyeing' and assembly_process and not assembly_process.dyeing_processes.exists %}
+                        <a href="{% url 'production:dyeing_create' %}?assembly_id={{ assembly_process.pk }}" class="step-link" title="بدء عملية الصباغة">
+                            <div class="step-icon"><i class="fas fa-palette"></i></div>
+                            <div class="step-label">البدء في الصباغة</div>
+                        </a>
+                    {% elif assembly_process and assembly_process.dyeing_processes.exists %}
+                        <a href="{% url 'production:dyeing_detail' assembly_process.dyeing_processes.first.pk %}" class="step-link" title="عرض تفاصيل الصباغة">
+                            <div class="step-icon"><i class="fas fa-palette"></i></div>
+                            <div class="step-label">صباغة</div>
+                        </a>
+                    {% else %}
+                        <div class="step-icon"><i class="fas fa-palette"></i></div>
+                        <div class="step-label">صباغة</div>
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            <!-- Step: Finishing -->
+            <div class="workflow-step {% if current_index >= 6 %}completed{% endif %} {% if order.status == 'in_finishing' %}active{% endif %}">
+                {% with dyeing_process=order.assembly_processes.first.dyeing_processes.first %}
+                    {% if order.status == 'in_finishing' and dyeing_process and not dyeing_process.finishing_process %}
+                        <a href="{% url 'production:finishing_create' %}?dyeing_id={{ dyeing_process.pk }}" class="step-link" title="بدء عملية التشطيب">
+                            <div class="step-icon"><i class="fas fa-tshirt"></i></div>
+                            <div class="step-label">البدء في التشطيب</div>
+                        </a>
+                    {% elif dyeing_process.finishing_process %}
+                        <a href="{% url 'production:finishing_detail' dyeing_process.finishing_process.pk %}" class="step-link" title="عرض تفاصيل التشطيب">
+                            <div class="step-icon"><i class="fas fa-tshirt"></i></div>
+                            <div class="step-label">تشطيب</div>
+                        </a>
+                    {% else %}
+                        <div class="step-icon"><i class="fas fa-tshirt"></i></div>
+                        <div class="step-label">تشطيب</div>
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            <!-- Step: Completed -->
+            <div class="workflow-step {% if order.status == 'completed' %}completed active{% endif %}">
+                <div class="step-icon"><i class="fas fa-star"></i></div>
+                <div class="step-label">مكتمل</div>
+            </div>
+        </div>
+        
+        <div class="workflow-action-box">
+            {% if order.status == 'draft' %}
+                <h5 class="mb-2"><i class="fas fa-file-alt me-2"></i>الحالة الحالية: مسودة</h5>
+                <p class="text-muted">هذا الأمر جاهز للاعتماد. بالضغط على الزر سيتم حجز المواد والبدء في تجهيز الإنتاج.</p>
+                <form action="{% url 'production:order_approve' order.pk %}" method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-lg btn-success">
+                        <i class="fas fa-check-circle me-2"></i>اعتماد الأمر الآن
+                    </button>
+                </form>
+            {% elif order.status == 'approved' %}
+                <h5 class="mb-2"><i class="fas fa-check-double me-2 text-success"></i>الحالة الحالية: معتمد</h5>
+                <p class="text-muted">تم اعتماد هذا الأمر بنجاح. الخطوة التالية هي بدء عملية القص. اضغط على أيقونة "البدء في القص" أعلاه للمتابعة.</p>
+            {% elif order.status == 'completed' %}
+                <h5 class="mb-2"><i class="fas fa-star me-2 text-warning"></i>الحالة الحالية: مكتمل</h5>
+                <p class="text-muted">تم إكمال جميع مراحل الإنتاج لهذا الأمر بنجاح.</p>
+            {% else %}
+                <h5 class="mb-2"><i class="fas fa-tasks me-2"></i>الحالة الحالية: <span class="text-primary">{{ order.get_status_display }}</span></h5>
+                <p class="text-muted">الأمر قيد التنفيذ حالياً. اضغط على أيقونة المرحلة الحالية لعرض تفاصيلها، أو أيقونة المرحلة التالية لبدء العمل عليها.</p>
+            {% endif %}
+        </div>
+        {% endwith %}
+        {% endwith %}
+    </div>
+
+
+    <div class="row">
+        <!-- Main Details Column -->
+        <div class="col-lg-8">
+            <div class="production-card mb-4">
+                <div class="production-card-header d-flex justify-content-between">
+                    <span>المعلومات الأساسية</span>
+                </div>
+                <div class="production-card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3"><strong>رقم الأمر:</strong><p>{{ order.order_number }}</p></div>
+                        <div class="col-md-4 mb-3"><strong>رقم الباتش:</strong><p>{{ order.batch_number }}</p></div>
+                        <div class="col-md-4 mb-3"><strong>الأولوية:</strong><p><span class="badge bg-{{ order.priority|status_color }}">{{ order.get_priority_display }}</span></p></div>
+                        <div class="col-md-4 mb-3"><strong>المنتج:</strong><p><a href="#">{{ order.product.name }}</a></p></div>
+                        <div class="col-md-4 mb-3"><strong>الكمية المطلوبة:</strong><p>{{ order.quantity_ordered }} قطعة</p></div>
+                        <div class="col-md-4 mb-3"><strong>القماش المخصص:</strong><p>{{ order.fabric_meters_allocated }} متر</p></div>
+                        <div class="col-md-4 mb-3"><strong>تاريخ البدء:</strong><p>{{ order.start_date|date:"Y-m-d" }}</p></div>
+                        <div class="col-md-4 mb-3"><strong>الإنجاز المتوقع:</strong><p>{{ order.expected_completion_date|date:"Y-m-d" }}</p></div>
+                         {% if order.actual_completion_date %}
+                        <div class="col-md-4 mb-3"><strong>الإنجاز الفعلي:</strong><p class="text-success">{{ order.actual_completion_date|date:"Y-m-d" }}</p></div>
+                        {% endif %}
+                    </div>
+                    {% if order.notes %}
+                    <hr>
+                    <strong>ملاحظات:</strong>
+                    <p>{{ order.notes }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Bill of Materials Used -->
+            <div class="production-card mb-4">
+                <div class="production-card-header">
+                    <i class="fas fa-cogs me-2"></i>
+                    قائمة المواد المستخدمة (BOM)
+                </div>
+                <div class="production-card-body">
+                    {% if order.bom_version %}
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                             <h6 class="mb-0">
+                                تم استخدام الإصدار: 
+                                <strong class="text-primary">v{{ order.bom_version.version }}</strong>
+                            </h6>
+                            <a href="{% url 'production:bom_detail' order.bom_version.pk %}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-external-link-alt me-2"></i>عرض تفاصيل BOM
+                            </a>
+                        </div>
+                       
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th>المادة الخام</th>
+                                    <th>الكمية للقطعة</th>
+                                    <th>الإجمالي المطلوب</th>
+                                    <th>الوحدة</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in order.bom_version.items.all %}
+                                <tr>
+                                    <td>{{ item.material.name }}</td>
+                                    <td>{{ item.quantity|floatformat:3 }}</td>
+                                    <td>{{ item.quantity|multiply:order.quantity_ordered|floatformat:2 }}</td>
+                                    <td>{{ item.material.unit|default:'قطعة' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <div class="alert alert-secondary text-center">
+                            <i class="fas fa-info-circle fa-2x mb-2"></i>
+                            <h5 class="alert-heading">لم يتم ربط BOM بعد</h5>
+                            <p>سيتم ربط قائمة المواد تلقائياً عند اعتماد هذا الأمر.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Column -->
+        <div class="col-lg-4">
+            <div class="production-card mb-4">
+                 <div class="production-card-header">
+                    معلومات إدارية
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><strong>تم الإنشاء بواسطة:</strong> {{ order.created_by.username }}</li>
+                    <li class="list-group-item"><strong>تاريخ الإنشاء:</strong> {{ order.created_at|date:"Y-m-d H:i" }}</li>
+                    {% if order.approved_by %}
+                    <li class="list-group-item"><strong>تم الاعتماد بواسطة:</strong> {{ order.approved_by.username }}</li>
+                    <li class="list-group-item"><strong>تاريخ الاعتماد:</strong> {{ order.approved_at|date:"Y-m-d H:i" }}</li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+{% endblock %}

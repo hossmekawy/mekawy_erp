@@ -1,0 +1,134 @@
+{% extends 'warehouses/base.html' %}
+{% load static %}
+
+{% block title %}جرد المخزون{% endblock %}
+
+{% block warehouse_content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-clipboard-check text-primary me-2"></i>
+            جرد المخزون
+        </h1>
+    </div>
+
+    <!-- Step 1: Warehouse Selection -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">الخطوة 1: اختر المخزن</h6>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-8">
+                    <label for="warehouse-select" class="form-label">اختر المخزن لبدء عملية الجرد:</label>
+                    <select name="warehouse" id="warehouse-select" class="form-select form-select-lg">
+                        <option value="">---</option>
+                        {% for wh in warehouses %}
+                        <option value="{{ wh.pk }}" {% if selected_warehouse.pk == wh.pk %}selected{% endif %}>
+                            {{ wh.name }} ({{ wh.code }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary btn-lg w-100">
+                        <i class="fas fa-search me-2"></i>عرض الأصناف
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Step 2: Stock Count Sheet -->
+    {% if selected_warehouse %}
+    <div class="card shadow-sm">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">الخطوة 2: أدخل الكميات الفعلية لمخزن "{{ selected_warehouse.name }}"</h6>
+            <button type="submit" form="inventoryCountForm" class="btn btn-success">
+                <i class="fas fa-save me-2"></i>حفظ نتائج الجرد
+            </button>
+        </div>
+        <div class="card-body">
+            <form method="post" id="inventoryCountForm">
+                {% csrf_token %}
+                <input type="hidden" name="warehouse_id" value="{{ selected_warehouse.pk }}">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover" id="inventory-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 40%;">المنتج</th>
+                                <th class="text-center" style="width: 20%;">الكمية المسجلة بالنظام</th>
+                                <th class="text-center" style="width: 20%;">الكمية الفعلية (المجرودة)</th>
+                                <th class="text-center" style="width: 20%;">الفرق</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in stock_items %}
+                            <tr class="align-middle" data-item-id="{{ item.pk }}">
+                                <td>
+                                    <strong>{{ item.product.name }}</strong>
+                                    <small class="d-block text-muted">{{ item.product.code }}</small>
+                                </td>
+                                <td class="text-center fs-5">
+                                    <span class="system-quantity">{{ item.quantity|floatformat:2 }}</span>
+                                </td>
+                                <td>
+                                    <input type="number" name="quantity_{{ item.pk }}" class="form-control form-control-lg text-center counted-quantity" step="0.01" value="{{ item.quantity|floatformat:2 }}">
+                                </td>
+                                <td class="text-center fs-5 fw-bold">
+                                    <span class="difference text-muted">0.00</span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center py-5">
+                                    <p class="text-muted">هذا المخزن لا يحتوي على أي أصناف.</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById('inventory-table');
+    if (table) {
+        table.addEventListener('input', function(e) {
+            if (e.target.classList.contains('counted-quantity')) {
+                const row = e.target.closest('tr');
+                const systemQuantityEl = row.querySelector('.system-quantity');
+                const differenceEl = row.querySelector('.difference');
+                
+                const systemQty = parseFloat(systemQuantityEl.textContent);
+                const countedQty = parseFloat(e.target.value) || 0;
+                
+                const difference = countedQty - systemQty;
+                
+                differenceEl.textContent = difference.toFixed(2);
+                
+                differenceEl.classList.remove('text-success', 'text-danger', 'text-muted');
+                
+                if (difference > 0) {
+                    differenceEl.classList.add('text-success');
+                    differenceEl.textContent = '+' + difference.toFixed(2);
+                } else if (difference < 0) {
+                    differenceEl.classList.add('text-danger');
+                } else {
+                    differenceEl.classList.add('text-muted');
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
+

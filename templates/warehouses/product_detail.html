@@ -1,0 +1,354 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}{{ product.name }} - تفاصيل المنتج{% endblock %}
+
+{% block extra_css %}
+<style>
+    .details-card .card-header {
+        background-color: #f8f9fc;
+        border-bottom: 1px solid #e3e6f0;
+        font-weight: bold;
+        color: #4e73df;
+    }
+    .details-card .list-group-item {
+        border: none;
+        padding: .75rem 1.25rem;
+    }
+    .details-card .list-group-item strong {
+        color: #5a5c69;
+    }
+    .stock-table th {
+        background-color: #f2f2f2;
+    }
+    .nav-tabs .nav-link.active {
+        color: #4e73df;
+        border-color: #dddfeb #dddfeb #fff;
+        font-weight: bold;
+    }
+    .timeline {
+        list-style: none;
+        padding: 0;
+        position: relative;
+    }
+    .timeline:before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: #e9ecef;
+        right: 31px;
+        margin: 0;
+        border-radius: 2px;
+    }
+    .timeline-item {
+        margin-bottom: 20px;
+        position: relative;
+    }
+    .timeline-item:after {
+        content: "";
+        display: table;
+        clear: both;
+    }
+    .timeline-icon {
+        position: absolute;
+        top: 0;
+        right: 18px;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: #4e73df;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1;
+    }
+    .timeline-body {
+        margin-right: 60px;
+        background: #f8f9fc;
+        border-radius: .25rem;
+        padding: 15px;
+        position: relative;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-box text-primary"></i>
+            تفاصيل المنتج: <span class="text-dark">{{ product.name }}</span>
+        </h1>
+        <div>
+            <a href="{% url 'warehouses:product_detail_pdf' product.pk %}" class="btn btn-sm btn-info shadow-sm" target="_blank">
+                <i class="fas fa-print fa-sm text-white-50"></i> طباعة
+            </a>
+            <a href="{% url 'warehouses:product_edit' product.pk %}" class="btn btn-sm btn-warning shadow-sm">
+                <i class="fas fa-edit fa-sm text-white-50"></i> تعديل
+            </a>
+            <a href="{% url 'warehouses:product_delete' product.pk %}" class="btn btn-sm btn-danger shadow-sm">
+                <i class="fas fa-trash fa-sm text-white-50"></i> حذف
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Product Details Column -->
+        <div class="col-lg-5">
+            <div class="card shadow mb-4 details-card">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">البيانات الأساسية</h6>
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item"><strong>الكود:</strong> {{ product.code }}</li>
+                        <li class="list-group-item"><strong>الباركود:</strong> {{ product.barcode|default:"-" }}</li>
+                        <li class="list-group-item"><strong>الفئة:</strong> {{ product.category.name|default:"-" }}</li>
+                        <li class="list-group-item"><strong>نوع المنتج:</strong> {{ product.get_product_type_display }}</li>
+                        <li class="list-group-item"><strong>الحالة:</strong>
+                            {% if product.is_active %}
+                                <span class="badge bg-success">نشط</span>
+                            {% else %}
+                                <span class="badge bg-danger">غير نشط</span>
+                            {% endif %}
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card shadow mb-4 details-card">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">التسعير والمخزون</h6>
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item"><strong>سعر التكلفة:</strong> {{ product.cost_price|intcomma }} جنيه</li>
+                        <li class="list-group-item"><strong>سعر البيع:</strong> {{ product.selling_price|intcomma|default:"-" }} جنيه</li>
+                        <li class="list-group-item"><strong>وحدة القياس:</strong> {{ product.get_unit_display }}</li>
+                        <li class="list-group-item"><strong>الحد الأدنى للمخزون:</strong> {{ product.min_stock_level }}</li>
+                         <li class="list-group-item"><strong>إجمالي المخزون:</strong> <span class="fw-bold text-info">{{ product.total_stock|intcomma }}</span> {{ product.get_unit_display }}</li>
+                    </ul>
+                </div>
+            </div>
+            
+            {% if product.product_type == 'fabric' %}
+            <div class="card shadow mb-4 details-card">
+                <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">بيانات القماش</h6></div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item"><strong>العرض:</strong> {{ product.width }} سم</li>
+                        <li class="list-group-item"><strong>درجة الجودة:</strong> {{ product.quality_grade }}</li>
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if product.product_type == 'finished' %}
+            <div class="card shadow mb-4 details-card">
+                <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">بيانات المنتج النهائي</h6></div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item"><strong>الألوان:</strong> {{ product.colors|default:"-" }}</li>
+                        <li class="list-group-item">
+                            <strong>مجموعة المقاسات:</strong> {{ product.size_group.name|default:"-" }}
+                            {% if product.size_group and product.size_group.sizes.all %}
+                                <div class="mt-2">
+                                    {% for size in product.size_group.sizes.all %}
+                                        <span class="badge bg-secondary me-1">{{ size.name }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </li>
+                        <li class="list-group-item"><strong>كمية القماش للقطعة:</strong> {{ product.fabric_quantity_per_piece|default:"-" }}</li>
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Stock and Movements Column -->
+        <div class="col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">أرصدة المخزون</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped stock-table" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>المخزن</th>
+                                    <th>الكمية الإجمالية</th>
+                                    <th>الكمية المحجوزة</th>
+                                    <th>الكمية المتاحة</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in stock_items %}
+                                    <tr class="{% if item.is_low_stock %}table-warning{% endif %}">
+                                        <td>{{ item.warehouse.name }}</td>
+                                        <td>{{ item.quantity|intcomma }}</td>
+                                        <td>{{ item.reserved_quantity|intcomma }}</td>
+                                        <td>{{ item.available_quantity|intcomma }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center">لا يوجد أرصدة لهذا المنتج في أي مخزن.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow mb-4">
+                <div class="card-header">
+                     <ul class="nav nav-tabs card-header-tabs" id="myTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="movements-tab" data-bs-toggle="tab" data-bs-target="#movements" type="button" role="tab">أحدث الحركات</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab">سجل المخزون</button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-body">
+                    <div class="tab-content" id="myTabContent">
+                        <div class="tab-pane fade show active" id="movements" role="tabpanel">
+                            <ul class="timeline">
+                                {% for movement in recent_movements %}
+                                <li class="timeline-item">
+                                    <div class="timeline-icon">
+                                        {% if movement.quantity > 0 %}
+                                            <i class="fas fa-arrow-down"></i>
+                                        {% else %}
+                                            <i class="fas fa-arrow-up"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div class="timeline-body">
+                                        <div class="d-flex justify-content-between">
+                                            <h6 class="mb-1">{{ movement.get_movement_type_display }}</h6>
+                                            <small class="text-muted">{{ movement.created_at|date:"d-m-Y H:i" }}</small>
+                                        </div>
+                                        <p class="mb-1">
+                                            الكمية: <span class="fw-bold">{{ movement.quantity|intcomma }}</span> في مخزن <span class="text-info">{{ movement.stock_item.warehouse.name }}</span>
+                                        </p>
+                                        <small class="text-muted">بواسطة: {{ movement.created_by.username|default:"-" }}</small>
+                                    </div>
+                                </li>
+                                {% empty %}
+                                    <p>لا توجد حركات مخزون لهذا المنتج.</p>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        <div class="tab-pane fade" id="history" role="tabpanel">
+                            <canvas id="stockHistoryChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Data passed safely from Django to JavaScript -->
+<script id="chart-data" type="application/json">
+{
+    "total_stock": {{ product.total_stock|floatformat:"-10" }},
+    "movements": [
+        {% for movement in recent_movements %}
+        {
+            "created_at": "{{ movement.created_at.isoformat }}",
+            "quantity_delta": {{ movement.quantity|floatformat:"-10" }}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ]
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0/dist/chartjs-adapter-moment.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const chartCanvas = document.getElementById('stockHistoryChart');
+    const chartDataEl = document.getElementById('chart-data');
+
+    // Exit if chart elements are not on the page
+    if (!chartCanvas || !chartDataEl) {
+        return;
+    }
+
+    try {
+        const chartData = JSON.parse(chartDataEl.textContent);
+        let currentStock = parseFloat(chartData.total_stock);
+        const historyData = [];
+
+        // Add the current stock level as the last point in time
+        historyData.push({ x: new Date().toISOString(), y: currentStock });
+
+        // Reconstruct history by iterating backwards from the present
+        for (const movement of chartData.movements) {
+            // The stock level *before* this movement
+            const stockBeforeMovement = currentStock - parseFloat(movement.quantity_delta);
+            historyData.push({ x: movement.created_at, y: stockBeforeMovement });
+            currentStock = stockBeforeMovement;
+        }
+        
+        // Reverse the array to have it in chronological order for the chart
+        historyData.reverse();
+
+        new Chart(chartCanvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'رصيد المخزون',
+                    data: historyData,
+                    borderColor: '#4e73df',
+                    backgroundColor: 'rgba(78, 115, 223, 0.1)',
+                    fill: true,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'day',
+                            tooltipFormat: 'll',
+                            displayFormats: {
+                                day: 'MMM D'
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'التاريخ'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'الكمية'
+                        }
+                    }
+                }
+            }
+        });
+    } catch (e) {
+        console.error("Failed to parse chart data or render chart:", e);
+        chartCanvas.parentElement.innerHTML = '<p class="text-danger">حدث خطأ أثناء تحميل الرسم البياني.</p>';
+    }
+});
+</script>
+{% endblock %}

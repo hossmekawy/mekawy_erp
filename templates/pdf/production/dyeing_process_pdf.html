@@ -1,0 +1,108 @@
+{% extends 'pdf/base_pdf.html' %}
+{% load i18n %}
+
+{% block pdf_title %}
+    تفاصيل عملية الصباغة - {{ dyeing_process.pk }}
+{% endblock %}
+
+{% block pdf_header %}
+    <h1>تقرير عملية الصباغة</h1>
+    <div class="meta-info">
+        أمر الإنتاج: {{ dyeing_process.assembly_process.production_order.order_number }} |
+        تاريخ الطباعة: {{ timestamp|date:"d-m-Y H:i" }}
+    </div>
+{% endblock %}
+
+{% block pdf_content %}
+    <h2>تفاصيل العملية</h2>
+    <table>
+        <tbody>
+            <tr>
+                <th>أمر الإنتاج</th>
+                <td>{{ dyeing_process.assembly_process.production_order.order_number }}</td>
+                <th>المنتج</th>
+                <td>{{ dyeing_process.assembly_process.production_order.product.name }}</td>
+            </tr>
+            <tr>
+                <th>مصنع الصباغة</th>
+                <td>{{ dyeing_process.dyeing_facility.name }}</td>
+                <th>مواصفات اللون</th>
+                <td>{{ dyeing_process.color_specification }}</td>
+            </tr>
+            <tr>
+                <th>تاريخ الإرسال</th>
+                <td>{{ dyeing_process.sent_date|date:"d-m-Y H:i" }}</td>
+                <th>تاريخ العودة المتوقع</th>
+                <td>{{ dyeing_process.expected_return_date|date:"d-m-Y" }}</td>
+            </tr>
+             <tr>
+                <th>الحالة</th>
+                <td colspan="3">{% if dyeing_process.is_completed %}مكتمل{% else %}قيد التنفيذ{% endif %}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>الكميات</h2>
+    <table>
+        <tbody>
+            <tr>
+                <th>الكمية المرسلة</th>
+                <td>{{ dyeing_process.quantity_sent }} قطعة</td>
+                <th>الكمية المستلمة</th>
+                <td>{% if dyeing_process.is_completed %}{{ dyeing_process.quantity_received }} قطعة{% else %}---{% endif %}</td>
+            </tr>
+            <tr>
+                <th>الفاقد</th>
+                <td>{% if dyeing_process.is_completed %}{{ dyeing_process.losses_count }} قطعة{% else %}---{% endif %}</td>
+                <th>معدل الفاقد</th>
+                <td>{% if dyeing_process.is_completed %}{{ dyeing_process.loss_rate|floatformat:2 }}%{% else %}---{% endif %}</td>
+            </tr>
+             <tr>
+                <th>تاريخ العودة الفعلي</th>
+                <td colspan="3">{% if dyeing_process.is_completed %}{{ dyeing_process.actual_return_date|date:"d-m-Y H:i" }}{% else %}---{% endif %}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>التكاليف</h2>
+     <table>
+        <tbody>
+            <tr>
+                <th>تكلفة الصباغة للقطعة</th>
+                <td>{{ dyeing_process.dyeing_cost_per_piece|floatformat:2 }} جنيه</td>
+                <th>إجمالي تكلفة الصباغة</th>
+                <td>{{ dyeing_process.total_dyeing_cost|floatformat:2 }} جنيه</td>
+            </tr>
+        </tbody>
+    </table>
+    
+    {% if exit_permit %}
+        <h2>بيانات تصريح الخروج</h2>
+        <table>
+            <tbody>
+                <tr>
+                    <th>رقم التصريح</th>
+                    <td>{{ exit_permit.permit_number }}</td>
+                    <th>الحالة</th>
+                    <td>{{ exit_permit.get_status_display }}</td>
+                </tr>
+                <tr>
+                    <th>صالح حتى</th>
+                    <td colspan="3">{{ exit_permit.valid_until|date:"d-m-Y H:i" }}</td>
+                </tr>
+                <tr>
+                    <th>وصف المواد</th>
+                    <td colspan="3" style="white-space: pre-wrap;">{{ exit_permit.items_description }}</td>
+                </tr>
+            </tbody>
+        </table>
+    {% endif %}
+
+    {% if dyeing_process.notes %}
+        <h2>ملاحظات</h2>
+        <div class="notes-box">
+            <p>{{ dyeing_process.notes|linebreaksbr }}</p>
+        </div>
+    {% endif %}
+
+{% endblock %}

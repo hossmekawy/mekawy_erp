@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}قائمة التصنيفات - Mekawy ERP{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-tags text-primary"></i> إدارة التصنيفات
+        </h1>
+        {% if user.role != 'viewer' %}
+        <a href="{% url 'warehouses:category_add' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> إضافة تصنيف جديد
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Filters Card -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">البحث والفلترة</h6>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">البحث</label>
+                    <input type="text" name="search" class="form-control" 
+                           placeholder="البحث في اسم التصنيف أو الوصف..." 
+                           value="{{ request.GET.search }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">الحالة</label>
+                    <select name="status" class="form-select">
+                        <option value="">جميع الحالات</option>
+                        <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>نشط</option>
+                        <option value="inactive" {% if request.GET.status == 'inactive' %}selected{% endif %}>غير نشط</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fas fa-search"></i> بحث
+                    </button>
+                    <a href="{% url 'warehouses:category_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> مسح
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Categories Table -->
+    <div class="card shadow">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">
+                قائمة التصنيفات ({{ categories|length }} تصنيف)
+            </h6>
+        </div>
+        <div class="card-body">
+            {% if categories %}
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>اسم التصنيف</th>
+                            <th>الوصف</th>
+                            <th>عدد المنتجات</th>
+                            <th>الحالة</th>
+                            <th>الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for category in categories %}
+                        <tr>
+                            <td>
+                                <strong>{{ category.name }}</strong>
+                            </td>
+                            <td>{{ category.description|truncatechars:50|default:"لا يوجد وصف" }}</td>
+                            <td>
+                                <span class="badge bg-info">{{ category.product_set.count }}</span>
+                            </td>
+                            <td>
+                                {% if category.is_active %}
+                                    <span class="badge bg-success">نشط</span>
+                                {% else %}
+                                    <span class="badge bg-danger">غير نشط</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'warehouses:category_detail' category.pk %}" 
+                                       class="btn btn-sm btn-outline-info" title="عرض">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if user.role != 'viewer' %}
+                                    <a href="{% url 'warehouses:category_edit' category.pk %}" 
+                                       class="btn btn-sm btn-outline-primary" title="تعديل">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if user.role == 'admin' %}
+                                    <a href="{% url 'warehouses:category_delete' category.pk %}" 
+                                       class="btn btn-sm btn-outline-danger" title="حذف"
+                                       onclick="return confirm('هل أنت متأكد من حذف هذا التصنيف؟')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if is_paginated %}
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">الأولى</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">السابقة</a>
+                        </li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">{{ page_obj.number }} من {{ page_obj.paginator.num_pages }}</span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">التالية</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}">الأخيرة</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-tags fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">لا توجد تصنيفات</h5>
+                <p class="text-muted">لم يتم العثور على أي تصنيفات.</p>
+                {% if user.role != 'viewer' %}
+                <a href="{% url 'warehouses:category_add' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> إضافة تصنيف جديد
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

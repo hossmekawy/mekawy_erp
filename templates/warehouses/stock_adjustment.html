@@ -1,0 +1,209 @@
+{% extends 'warehouses/base.html' %}
+{% load static i18n %}
+
+{% block title %}{% trans "تسوية المخزون" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Mobile First Styles */
+    @media (max-width: 767.98px) {
+        #adjustment-table thead {
+            display: none; /* Hide table headers on mobile */
+        }
+
+        #adjustment-table tbody, #adjustment-table tr, #adjustment-table td {
+            display: block;
+            width: 100%;
+        }
+
+        #adjustment-table tr {
+            margin-bottom: 1.5rem;
+            border: 1px solid #e3e6f0;
+            border-radius: 0.55rem;
+            padding: 1rem;
+            background-color: #fff;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1);
+        }
+
+        #adjustment-table td {
+            position: relative;
+            padding-left: 50%;
+            text-align: right;
+            border: none;
+            padding-bottom: 0.75rem;
+            margin-bottom: 0.75rem;
+            min-height: 38px; /* Ensure alignment with inputs */
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+        }
+        
+        #adjustment-table td:not(:last-child) {
+            border-bottom: 1px solid #f8f9fc;
+        }
+
+        #adjustment-table td::before {
+            content: attr(data-label);
+            position: absolute;
+            left: 0.75rem;
+            width: 45%;
+            padding-right: 10px;
+            white-space: nowrap;
+            text-align: left;
+            font-weight: bold;
+            color: #5a5c69;
+        }
+
+        #adjustment-table .form-select, #adjustment-table .form-control {
+            font-size: 0.9rem;
+        }
+    }
+</style>
+{% endblock %}
+
+
+{% block warehouse_content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-tasks text-primary me-2"></i>
+            {% trans "تسوية المخزون" %}
+        </h1>
+    </div>
+
+    <!-- Step 1: Warehouse Selection -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">{% trans "الخطوة 1: اختر المخزن" %}</h6>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-8 mb-2 mb-md-0">
+                    <label for="warehouse-select" class="form-label">{% trans "اختر المخزن لعرض الأصناف:" %}</label>
+                    <select name="warehouse" id="warehouse-select" class="form-select form-select-lg">
+                        <option value="">--- {% trans "اختر مخزن" %} ---</option>
+                        {% for wh in warehouses %}
+                        <option value="{{ wh.pk }}" {% if selected_warehouse.pk == wh.pk %}selected{% endif %}>
+                            {{ wh.name }} ({{ wh.code }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary btn-lg w-100">
+                        <i class="fas fa-eye me-2"></i>{% trans "عرض الأصناف" %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Step 2: Stock Adjustment Sheet -->
+    {% if selected_warehouse %}
+    <div class="card shadow-sm">
+        <div class="card-header py-3 d-flex flex-column flex-md-row justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary mb-3 mb-md-0">{% trans "الخطوة 2: أدخل التسويات لمخزن" %} "{{ selected_warehouse.name }}"</h6>
+            <div class="d-flex w-100 w-md-auto">
+                <div class="input-group me-2">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" id="product-search" class="form-control" placeholder="{% trans 'ابحث عن منتج...' %}">
+                </div>
+                <button type="submit" form="stockAdjustmentForm" class="btn btn-success">
+                    <i class="fas fa-save me-2"></i>{% trans "حفظ" %}
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-2 p-md-3">
+            <form method="post" id="stockAdjustmentForm">
+                {% csrf_token %}
+                <input type="hidden" name="warehouse_id" value="{{ selected_warehouse.pk }}">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover" id="adjustment-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 35%;">{% trans "المنتج" %}</th>
+                                <th class="text-center">{% trans "الوحدة" %}</th>
+                                <th class="text-center">{% trans "الكمية بالنظام" %}</th>
+                                <th class="text-center" style="width: 15%;">{% trans "نوع التسوية" %}</th>
+                                <th class="text-center" style="width: 15%;">{% trans "الكمية" %}</th>
+                                <th style="width: 20%;">{% trans "ملاحظات/مرجع" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in stock_items %}
+                            <tr class="align-middle" data-product-name="{{ item.product.name|lower }}" data-product-code="{{ item.product.code|lower }}">
+                                <td data-label="{% trans 'المنتج' %}">
+                                    <div>
+                                        <strong>{{ item.product.name }}</strong>
+                                        <small class="d-block text-muted">{% trans "الكود:" %} {{ item.product.code }}</small>
+                                    </div>
+                                </td>
+                                <td data-label="{% trans 'الوحدة' %}" class="text-center">
+                                    <span class="badge bg-secondary">{{ item.product.unit_new.name|default:item.product.get_unit_display }}</span>
+                                </td>
+                                <td data-label="{% trans 'الكمية بالنظام' %}" class="text-center fs-5">
+                                    <span>{{ item.quantity|floatformat:2 }}</span>
+                                </td>
+                                <td data-label="{% trans 'نوع التسوية' %}">
+                                    <select name="movement_type_{{ item.pk }}" class="form-select">
+                                        <option value="adjustment">{% trans "كمية جديدة" %}</option>
+                                        <option value="in">{% trans "إضافة (+)" %}</option>
+                                        <option value="out">{% trans "خصم (-)" %}</option>
+                                    </select>
+                                </td>
+                                <td data-label="{% trans 'الكمية' %}">
+                                    <input type="number" name="quantity_{{ item.pk }}" class="form-control text-center" step="0.01" placeholder="0.00">
+                                </td>
+                                <td data-label="{% trans 'ملاحظات/مرجع' %}">
+                                    <input type="text" name="notes_{{ item.pk }}" class="form-control" placeholder="{% trans 'سبب التسوية...' %}">
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-5">
+                                    <div class="production-empty">
+                                        <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+                                        <h5>{% trans "لا توجد أصناف" %}</h5>
+                                        <p>{% trans "هذا المخزن لا يحتوي على أي أصناف حالياً." %}</p>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('product-search');
+    const table = document.getElementById('adjustment-table');
+
+    if (searchInput && table) {
+        const tableRows = table.querySelectorAll('tbody tr');
+
+        searchInput.addEventListener('keyup', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+
+            tableRows.forEach(row => {
+                const productName = row.dataset.productName || '';
+                const productCode = row.dataset.productCode || '';
+                
+                if (productName.includes(searchTerm) || productCode.includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

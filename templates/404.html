@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Page Not Found - Mekawy ERP{% endblock %}
+
+{% block content %}
+<div class="container text-center py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <img src="https://i.imgur.com/qIufhof.png" class="img-fluid mb-4" alt="404 Not Found" style="max-height: 250px;">
+            <h1 class="display-1 fw-bold text-primary">404</h1>
+            <p class="h2 text-dark fw-bold mb-3">الصفحة غير موجودة</p>
+            <p class="text-muted mb-4">
+                عذراً، الصفحة التي تبحث عنها غير موجودة أو تم نقلها.
+            </p>
+            <div class="d-flex justify-content-center gap-3">
+                <a href="{% url 'dashboard:index' %}" class="btn btn-primary">
+                    <i class="fas fa-home me-2"></i>العودة للرئيسية
+                </a>
+                <a href="javascript:history.back()" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-right me-2"></i>الرجوع للخلف
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block title %}حذف المستخدم - Mekawy ERP{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow border-danger">
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-exclamation-triangle"></i> تأكيد حذف المستخدم
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-warning"></i>
+                    <strong>تحذير:</strong> هذا الإجراء لا يمكن التراجع عنه!
+                </div>
+
+                <p>هل أنت متأكد من حذف المستخدم التالي؟</p>
+                
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            {% if object.profile_picture %}
+                                <img src="{{ object.profile_picture.url }}" alt="{{ object.full_name }}" 
+                                     class="rounded-circle me-3" width="60" height="60">
+                            {% else %}
+                                <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                     style="width: 60px; height: 60px;">
+                                    <i class="fas fa-user text-white fa-2x"></i>
+                                </div>
+                            {% endif %}
+                            <div>
+                                <h5 class="mb-1">{{ object.full_name }}</h5>
+                                <p class="mb-1"><strong>البريد الإلكتروني:</strong> {{ object.email }}</p>
+                                <p class="mb-1"><strong>الدور:</strong> {{ object.get_role_display }}</p>
+                                <p class="mb-0"><strong>القسم:</strong> {{ object.department|default:"غير محدد" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <form method="post" class="mt-3">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'users:manage' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> إلغاء
+                        </a>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> تأكيد الحذف
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

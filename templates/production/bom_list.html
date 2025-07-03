@@ -1,0 +1,135 @@
+{% extends 'production/production_base.html' %}
+{% load i18n %}
+
+{% block production_title %}{% trans "قائمة المواد (BOM)" %}{% endblock %}
+
+{% block production_breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% trans "قائمة المواد" %}</li>
+{% endblock %}
+
+{% block production_header_actions %}
+<div class="d-flex justify-content-end align-items-center">
+    <a href="{% url 'production:bom_create' %}" class="btn btn-production">
+        <i class="fas fa-plus me-2"></i> {% trans "إنشاء قائمة مواد جديدة" %}
+    </a>
+</div>
+{% endblock %}
+
+{% block production_content %}
+<div class="production-card">
+    <div class="production-card-header">
+        <i class="fas fa-filter me-2"></i> {% trans "عوامل التصفية" %}
+    </div>
+    <div class="production-card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-6">
+                <label for="product_filter" class="form-label">{% trans "المنتج" %}</label>
+                <select name="product" id="product_filter" class="form-select">
+                    <option value="">{% trans "كل المنتجات" %}</option>
+                    {% for product in products %}
+                        <option value="{{ product.pk }}" {% if request.GET.product == product.pk|stringformat:"s" %}selected{% endif %}>{{ product.name }} ({{ product.code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6 d-flex align-items-end">
+                <button type="submit" class="btn btn-production">
+                    <i class="fas fa-search me-2"></i> {% trans "بحث" %}
+                </button>
+                <a href="{% url 'production:bom_list' %}" class="btn btn-production-outline ms-2">
+                    <i class="fas fa-times me-2"></i> {% trans "مسح" %}
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="production-card mt-4">
+    <div class="production-card-header d-flex justify-content-between align-items-center">
+        <div>
+            <i class="fas fa-list-alt me-2"></i> {% trans "قائمة المواد" %}
+        </div>
+        <span class="badge bg-secondary">{{ bom_items.paginator.count }} {% trans "عنصر" %}</span>
+    </div>
+    <div class="production-card-body p-0">
+        <div class="table-responsive">
+            <table class="table production-table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>{% trans "المنتج" %}</th>
+                        <th>{% trans "مجموعة المقاسات" %}</th>
+                        <th class="text-center">{% trans "الإصدار" %}</th>
+                        <th>{% trans "إجمالي تكلفة المواد" %}</th>
+                        <th>{% trans "تاريخ الإنشاء" %}</th>
+                        <th class="text-center">{% trans "الإجراءات" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for bom in bom_items %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'production:bom_detail' bom.pk %}">
+                                <strong>{{ bom.product.name }}</strong>
+                                <small class="d-block text-muted">{{ bom.product.code }}</small>
+                            </a>
+                        </td>
+                        <td>
+                            {% if bom.size_group %}
+                                {{ bom.size_group.name }}
+                            {% else %}
+                                <span class="text-muted">{% trans "بدون مجموعة" %}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center"><span class="badge bg-info">v{{ bom.version }}</span></td>
+                        <td><strong>{{ bom.total_cost|floatformat:2 }} {% trans "جنيه" %}</strong></td>
+                        <td>{{ bom.created_at|date:"Y-m-d" }}</td>
+                        <td class="text-center">
+                            <a href="{% url 'production:bom_detail' bom.pk %}" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="{% trans 'عرض التفاصيل' %}"><i class="fas fa-eye"></i></a>
+                            <a href="{% url 'production:bom_update' bom.pk %}" class="btn btn-sm btn-outline-success" data-bs-toggle="tooltip" title="{% trans 'إنشاء إصدار جديد' %}"><i class="fas fa-code-branch"></i></a>
+                            <a href="{% url 'production:bom_copy' bom.pk %}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="{% trans 'نسخ' %}"><i class="fas fa-copy"></i></a>
+                            <a href="{% url 'production:bom_delete' bom.pk %}" class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" title="{% trans 'حذف' %}"><i class="fas fa-trash"></i></a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="production-empty text-center py-5">
+                                <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+                                <h5>{% trans "لم يتم العثور على قوائم مواد" %}</h5>
+                                <p class="text-muted">{% trans "ابدأ بإنشاء قائمة مواد جديدة." %}</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% if bom_items.has_other_pages %}
+    <div class="production-card-footer">
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center mb-0">
+                {% if bom_items.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page={{ bom_items.previous_page_number }}{% if request.GET.product %}&product={{ request.GET.product }}{% endif %}">{% trans "السابق" %}</a></li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">{% trans "السابق" %}</span></li>
+                {% endif %}
+
+                {% for i in bom_items.paginator.page_range %}
+                    {% if bom_items.number == i %}
+                        <li class="page-item active" aria-current="page"><span class="page-link">{{ i }}</span></li>
+                    {% else %}
+                        <li class="page-item"><a class="page-link" href="?page={{ i }}{% if request.GET.product %}&product={{ request.GET.product }}{% endif %}">{{ i }}</a></li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if bom_items.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page={{ bom_items.next_page_number }}{% if request.GET.product %}&product={{ request.GET.product }}{% endif %}">{% trans "التالي" %}</a></li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">{% trans "التالي" %}</span></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,51 @@
+<!-- Production Card Component -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-300 {{ card_class }}">
+    {% if card_type == 'metric' %}
+    <!-- Metric Card -->
+    <div class="p-6 text-center">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center {{ icon_bg|default:'bg-blue-100' }}">
+            <i class="{{ icon }} text-2xl {{ icon_color|default:'text-blue-600' }}"></i>
+        </div>
+        <div class="text-3xl font-bold text-gray-900 mb-2">{{ value|default:0 }}</div>
+        <div class="text-sm font-medium text-gray-600">{{ title }}</div>
+        {% if subtitle %}
+        <div class="text-xs text-gray-500 mt-1">{{ subtitle }}</div>
+        {% endif %}
+    </div>
+    
+    {% elif card_type == 'info' %}
+    <!-- Info Card -->
+    <div class="p-6">
+        <div class="flex items-center mb-4">
+            {% if icon %}
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center {{ icon_bg|default:'bg-gray-100' }} mr-3">
+                <i class="{{ icon }} {{ icon_color|default:'text-gray-600' }}"></i>
+            </div>
+            {% endif %}
+            <h3 class="text-lg font-semibold text-gray-900">{{ title }}</h3>
+        </div>
+        {% if content %}
+        <div class="text-gray-600">{{ content }}</div>
+        {% endif %}
+        {% if actions %}
+        <div class="mt-4 flex space-x-2 space-x-reverse">
+            {% for action in actions %}
+            <a href="{{ action.url }}" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                <i class="{{ action.icon }} mr-1"></i>
+                {{ action.label }}
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    
+    {% else %}
+    <!-- Default Card -->
+    <div class="p-6">
+        {% if title %}
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ title }}</h3>
+        {% endif %}
+        {{ content }}
+    </div>
+    {% endif %}
+</div>

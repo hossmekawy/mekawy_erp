@@ -1,0 +1,216 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+
+{% block production_title %}رسومات القص{% endblock %}
+
+{% block production_breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">رسومات القص</li>
+{% endblock %}
+
+{% block production_header_actions %}
+<div class="d-flex gap-2">
+    <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#bulkPrintModal">
+        <i class="fas fa-print me-2"></i> طباعة مخصصة
+    </button>
+    <a href="{% url 'production:draws:draw_create' %}" class="btn btn-production">
+        <i class="fas fa-plus me-2"></i> إضافة رسمة قص جديدة
+    </a>
+</div>
+{% endblock %}
+
+{% block production_content %}
+<div class="production-card">
+    <div class="production-card-header">
+        <i class="fas fa-drafting-compass me-2"></i>
+        قائمة رسومات القص ({{ paginator.count }})
+    </div>
+    <div class="table-responsive">
+        <table class="table production-table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>المنتج (BOM)</th>
+                    <th>المقاس</th>
+                    <th>عدد القطع بالرسمة</th>
+                    <th>تم إنشاؤها بواسطة</th>
+                    <th>تاريخ الإنشاء</th>
+                    <th>الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for draw in draws %}
+                <tr>
+                    <td>
+                        <a href="{{ draw.get_absolute_url }}">
+                            <strong>{{ draw.bom.product.name }}</strong> (BOM v{{ draw.bom.version }})
+                        </a>
+                    </td>
+                    <td><span class="badge bg-secondary">{{ draw.size }}</span></td>
+                    <td>{{ draw.pieces.count }}</td>
+                    <td>{{ draw.created_by.username|default:'-' }}</td>
+                    <td>{{ draw.created_at|date:"Y-m-d" }}</td>
+                    <td>
+                        <a href="{{ draw.get_absolute_url }}" class="btn btn-sm btn-secondary" title="عرض التفاصيل">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        <a href="{% url 'production:draws:draw_update' draw.pk %}" class="btn btn-sm btn-info" title="تعديل">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <a href="{% url 'production:draws:draw_print_pdf' draw.pk %}" class="btn btn-sm btn-dark" title="طباعة هذه الرسمة فقط" target="_blank">
+                            <i class="fas fa-print"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center p-5">
+                        <div class="production-empty">
+                            <i class="fas fa-drafting-compass fa-3x text-muted mb-3"></i>
+                            <h5>لا توجد رسومات قص معرفة</h5>
+                            <p class="text-muted">ابدأ بإضافة رسمة جديدة لتحديد مكونات القطع لكل مقاس.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include 'partials/pagination.html' %}
+</div>
+
+<!-- Bulk Print Modal -->
+<div class="modal fade" id="bulkPrintModal" tabindex="-1" aria-labelledby="bulkPrintModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form id="bulk-print-form" action="{% url 'production:draws:draw_bulk_print_pdf' %}" method="post" target="_blank">
+        {% csrf_token %}
+        <input type="hidden" name="selected_draw_ids" id="selected-draw-ids-input">
+        <div class="modal-header">
+          <h5 class="modal-title" id="bulkPrintModalLabel">طباعة مخصصة لرسومات القص</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <div class="mb-3">
+                <label for="bom-select" class="form-label">1. اختر المنتج (BOM):</label>
+                <select id="bom-select" class="form-select">
+                    <option value="" selected>-- اختر المنتج --</option>
+                    {% for bom in all_boms %}
+                        <option value="{{ bom.pk }}">{{ bom.product.name }} (BOM v{{ bom.version }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div id="sizes-selection-area" class="d-none">
+                <hr>
+                <label class="form-label">2. اختر المقاسات للطباعة (انقر للإضافة):</label>
+                <div id="available-sizes-container" class="d-flex flex-wrap gap-2 mb-3">
+                    <!-- Sizes will be loaded here via JS -->
+                </div>
+            </div>
+
+            <hr>
+            <label class="form-label">3. القائمة النهائية للطباعة (يمكن تكرار المقاسات):</label>
+            <div id="selected-sizes-container" class="p-3 border rounded min-vh-10 d-flex flex-wrap gap-2 align-items-center bg-light">
+                <small class="text-muted">لم يتم اختيار مقاسات بعد.</small>
+            </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+          <button type="submit" class="btn btn-production" id="submit-bulk-print-btn" disabled>
+              <i class="fas fa-print me-2"></i> طباعة القائمة
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block production_extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const bomSelect = document.getElementById('bom-select');
+    const sizesSelectionArea = document.getElementById('sizes-selection-area');
+    const availableSizesContainer = document.getElementById('available-sizes-container');
+    const selectedSizesContainer = document.getElementById('selected-sizes-container');
+    const hiddenInput = document.getElementById('selected-draw-ids-input');
+    const submitBtn = document.getElementById('submit-bulk-print-btn');
+    
+    let availableDraws = {}; // To store {size: draw_id}
+    let selectedDraws = []; // To store an array of draw_ids
+
+    function updateSelectedDrawsDisplay() {
+        selectedSizesContainer.innerHTML = '';
+        if (selectedDraws.length === 0) {
+            selectedSizesContainer.innerHTML = '<small class="text-muted">لم يتم اختيار مقاسات بعد.</small>';
+            submitBtn.disabled = true;
+        } else {
+            selectedDraws.forEach((drawId, index) => {
+                const draw = Object.entries(availableDraws).find(([_, id]) => id === drawId);
+                if (draw) {
+                    const size = draw[0];
+                    const tag = document.createElement('span');
+                    tag.className = 'badge bg-primary fs-6 d-flex align-items-center';
+                    tag.innerHTML = `${size} <i class="fas fa-times-circle ms-2" style="cursor:pointer;" data-index="${index}"></i>`;
+                    selectedSizesContainer.appendChild(tag);
+                }
+            });
+            submitBtn.disabled = false;
+        }
+        hiddenInput.value = selectedDraws.join(',');
+    }
+
+    bomSelect.addEventListener('change', function() {
+        const bomId = this.value;
+        availableSizesContainer.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        sizesSelectionArea.classList.remove('d-none');
+        selectedDraws = []; // Clear selection when BOM changes
+        
+        if (!bomId) {
+            sizesSelectionArea.classList.add('d-none');
+            availableSizesContainer.innerHTML = '';
+            updateSelectedDrawsDisplay();
+            return;
+        }
+
+        fetch(`{% url 'production:draws:ajax_get_draws_for_bom' %}?bom_id=${bomId}`)
+            .then(response => response.json())
+            .then(data => {
+                availableSizesContainer.innerHTML = '';
+                availableDraws = data.draws;
+                if (Object.keys(availableDraws).length > 0) {
+                    for (const size in availableDraws) {
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'btn btn-sm btn-outline-primary';
+                        btn.textContent = size;
+                        btn.dataset.size = size;
+                        availableSizesContainer.appendChild(btn);
+                    }
+                } else {
+                    availableSizesContainer.innerHTML = '<small class="text-muted">لا توجد رسومات قص معرفة لهذا المنتج.</small>';
+                }
+                updateSelectedDrawsDisplay();
+            });
+    });
+
+    availableSizesContainer.addEventListener('click', function(e) {
+        if (e.target.tagName === 'BUTTON') {
+            const size = e.target.dataset.size;
+            const drawId = availableDraws[size];
+            if (drawId) {
+                selectedDraws.push(drawId);
+                updateSelectedDrawsDisplay();
+            }
+        }
+    });
+
+    selectedSizesContainer.addEventListener('click', function(e) {
+        if (e.target.classList.contains('fa-times-circle')) {
+            const indexToRemove = parseInt(e.target.dataset.index, 10);
+            selectedDraws.splice(indexToRemove, 1);
+            updateSelectedDrawsDisplay();
+        }
+    });
+});
+</script>
+{% endblock %}

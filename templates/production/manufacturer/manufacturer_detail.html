@@ -1,0 +1,380 @@
+{% extends 'production/production_base.html' %}
+{% load static i18n humanize %}
+
+{% block production_title %}
+    تفاصيل المصنع - {{ manufacturer.name }}
+{% endblock %}
+
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item"><a href="{% url 'production:manufacturers:manufacturer_list' %}">المصانع الخارجية</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ manufacturer.name }}</li>
+{% endblock %}
+
+{% block extra_css %}
+    {{ block.super }}
+    <style>
+        .profile-header-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: none;
+        }
+        .metric-box {
+            padding: 1rem;
+            text-align: center;
+        }
+        .metric-box .metric-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+        .metric-box .metric-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        .contact-info .info-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            font-size: 1.1rem;
+        }
+        .contact-info .info-icon {
+            width: 30px;
+            text-align: center;
+            color: var(--bs-primary);
+        }
+        .nav-tabs-underlined {
+            border-bottom: 2px solid #dee2e6;
+        }
+        .nav-tabs-underlined .nav-link {
+            border: none;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            font-weight: 500;
+        }
+        .nav-tabs-underlined .nav-link.active,
+        .nav-tabs-underlined .nav-link:hover {
+            border-color: var(--bs-primary);
+            color: var(--bs-primary);
+        }
+    </style>
+{% endblock %}
+
+
+{% block production_content %}
+<div class="card shadow-sm mb-4 profile-header-card">
+    <div class="card-body p-4">
+        <div class="row align-items-center g-4">
+            <div class="col-lg-6 col-md-12">
+                <h2 class="mb-3">{{ manufacturer.name }}</h2>
+                <div class="contact-info">
+                    <div class="info-item">
+                        <i class="fas fa-user-tie fa-fw info-icon me-3"></i>
+                        <span>{{ manufacturer.contact_person }}</span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-phone-alt fa-fw info-icon me-3"></i>
+                        <span dir="ltr">{{ manufacturer.phone }}</span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-map-marker-alt fa-fw info-icon me-3"></i>
+                        <span>{{ manufacturer.address }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6 col-md-12">
+                <div class="row">
+                    <div class="col-lg-4 col-md-6 mb-2">
+                        <div class="metric-box">
+                            <div class="metric-value text-success">{{ manufacturer.total_value_of_completed_jobs|intcomma }}</div>
+                            <div class="metric-label">قيمة الأعمال المكتملة (جنيه)</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 col-md-6 mb-2">
+                        <div class="metric-box">
+                             <div class="metric-value text-warning">{{ manufacturer.total_value_of_active_jobs|intcomma }}</div>
+                            <div class="metric-label">قيمة الأعمال النشطة (جنيه)</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 col-md-12 mb-2">
+                        <div class="metric-box">
+                            <div class="metric-value text-info">{{ manufacturer.total_pieces_completed|intcomma }}</div>
+                            <div class="metric-label">إجمالي القطع المنجزة</div>
+                            <small class="text-muted d-block" style="font-size: 0.75rem;">(تم ازالة عدد القطع المفقودة من الحسبة)</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
+                     <a href="{% url 'production:manufacturers:manufacturer_update' manufacturer.pk %}" class="btn btn-primary">
+                        <i class="fas fa-edit me-2"></i>تعديل بيانات المصنع
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<ul class="nav nav-tabs nav-tabs-underlined mb-0" id="manufacturerTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="active-jobs-tab" data-bs-toggle="tab" data-bs-target="#active-jobs-pane" type="button" role="tab">
+            <i class="fas fa-tasks me-2"></i>المهام النشطة <span class="badge bg-primary rounded-pill ms-1">{{ active_jobs.count }}</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab">
+            <i class="fas fa-history me-2"></i>سجل المهام <span class="badge bg-secondary rounded-pill ms-1">{{ job_history.count }}</span>
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content bg-white" id="manufacturerTabsContent">
+    <div class="tab-pane fade show active" id="active-jobs-pane" role="tabpanel">
+        <div class="list-group list-group-flush">
+            {% for job in active_jobs %}
+                <div class="list-group-item p-3">
+                    <div class="d-flex w-100 justify-content-between">
+                        <a href="{% url 'production:assembly_detail' job.pk %}" class="text-decoration-none">
+                            <h6 class="mb-1 text-primary">أمر إنتاج: {{ job.production_order.order_number }}</h6>
+                        </a>
+                        <small class="text-muted">أرسل: {{ job.start_date|date:"d M Y" }}</small>
+                    </div>
+                    <p class="mb-2 text-muted">
+                        <strong>المنتج:</strong> {{ job.production_order.product.name }} | 
+                        <strong>الكمية:</strong> {{ job.quantity_sent }} قطعة
+                    </p>
+                    <button type="button" class="btn btn-sm btn-outline-primary send-materials-btn" 
+                            data-bs-toggle="modal" data-bs-target="#sendMaterialsModal"
+                            data-assembly-id="{{ job.pk }}"
+                            data-assembly-name="{{ job.production_order.order_number }}">
+                        <i class="fas fa-box-open me-2"></i>إرسال/سحب مواد
+                    </button>
+                </div>
+            {% empty %}
+                <div class="list-group-item text-center text-muted p-5">
+                    <i class="fas fa-check-circle fa-2x mb-2"></i>
+                    <p>لا توجد مهام نشطة حالياً.</p>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="history-pane" role="tabpanel">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">أمر الإنتاج</th>
+                        <th scope="col">المنتج</th>
+                        <th scope="col" class="text-center">التكلفة</th>
+                        <th scope="col" class="text-center">تاريخ الإكمال</th>
+                        <th scope="col"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for job in job_history %}
+                        <tr>
+                            <td><strong>{{ job.production_order.order_number }}</strong></td>
+                            <td>{{ job.production_order.product.name }}</td>
+                            <td class="text-center text-success fw-bold">{{ job.assembly_cost|intcomma }} جنيه</td>
+                            <td class="text-center">{{ job.actual_completion_date|date:"d M Y" }}</td>
+                            <td class="text-end">
+                                <a href="{% url 'production:assembly_detail' job.pk %}" class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted p-5">
+                                <i class="fas fa-history fa-2x mb-2"></i>
+                                <p>لا يوجد سجل للمهام المكتملة.</p>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="sendMaterialsModal" tabindex="-1" aria-labelledby="sendMaterialsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="sendMaterialsModalLabel">إرسال مواد خام إضافية</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>إرسال مواد إلى المصنع <strong>{{ manufacturer.name }}</strong> لعملية التشغيل <strong id="modal-assembly-name"></strong>.</p>
+                
+                <form id="sendMaterialsForm" method="POST" action="">
+                    {% csrf_token %}
+                    
+                    <div class="p-3 mb-3 bg-light rounded border">
+                        <label for="material-search" class="form-label fw-bold">إضافة مادة خام</label>
+                        <select class="form-control" id="material-search" data-placeholder="ابحث عن مادة خام بالاسم أو الكود..."></select>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>المادة الخام</th>
+                                    <th style="width: 25%;">المخزن المصدر</th>
+                                    <th style="width: 15%;">الكمية المتاحة</th>
+                                    <th style="width: 15%;">الكمية للإرسال</th>
+                                    <th style="width: 5%;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="selected-materials-list">
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div id="formset-management"></div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">إرسال المواد وإنشاء إذن خروج</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+<script>
+$(document).ready(function() {
+    const modalForm = $('#sendMaterialsForm');
+    const selectedMaterialsList = $('#selected-materials-list');
+    const formsetManagementContainer = $('#formset-management');
+    const modalAssemblyName = $('#modal-assembly-name');
+    const materialSearch = $('#material-search');
+    let bomMaterialIds = [];
+    let materialIndex = 0;
+
+    $('#sendMaterialsModal').on('show.bs.modal', async function(event) {
+        // Reset state
+        selectedMaterialsList.html('');
+        materialIndex = 0;
+        updateFormsetManagement();
+        bomMaterialIds = [];
+
+        const button = $(event.relatedTarget);
+        const assemblyId = button.data('assembly-id');
+        const assemblyName = button.data('assembly-name');
+
+        modalAssemblyName.text(assemblyName);
+        modalForm.attr('action', `/production/assembly/${assemblyId}/send-materials/`);
+
+        try {
+            const bomResponse = await fetch(`/production/ajax/get-bom-for-assembly/?assembly_id=${assemblyId}`);
+            const bomData = await bomResponse.json();
+            if (bomData.success) {
+                bomMaterialIds = bomData.components.map(c => c.material_id);
+            }
+        } catch (error) {
+            console.error('Could not fetch BOM IDs:', error);
+        }
+
+        materialSearch.select2({
+            dropdownParent: $('#sendMaterialsModal'),
+            width: '100%',
+            ajax: {
+                url: "{% url 'production:search_raw_materials_ajax' %}",
+                dataType: 'json',
+                delay: 250,
+                data: params => ({ term: params.term }),
+                processResults: data => ({
+                    results: data.results.map(item => ({ id: item.id, text: `${item.name} (${item.code})`, ...item }))
+                }),
+                cache: true
+            },
+            templateResult: formatRepo,
+            templateSelection: formatRepoSelection
+        });
+    });
+
+    function formatRepo(repo) {
+        if (repo.loading) return repo.text;
+        return $(`<div><strong>${repo.name}</strong> (${repo.code})<br><small class="text-muted">المتاح: ${repo.available} | التكلفة: ${repo.cost}</small></div>`);
+    }
+
+    function formatRepoSelection(repo) {
+        return repo.name || repo.text;
+    }
+
+    materialSearch.on('select2:select', function(e) {
+        addMaterialRow(e.params.data);
+        materialSearch.val(null).trigger('change');
+    });
+
+    function addMaterialRow(data) {
+        if ($(`#material-row-${data.id}`).length > 0) {
+            // This is a placeholder for a toast notification
+            alert('هذه المادة تم إضافتها بالفعل.');
+            return;
+        }
+
+        const isBomItem = bomMaterialIds.includes(data.id);
+        const hasStock = data.warehouses && data.warehouses.length > 0;
+        const warehouseOptions = hasStock
+            ? data.warehouses.map(wh => `<option value="${wh.id}" data-available="${wh.available_quantity}">${wh.name} (${wh.available_quantity})</option>`).join('')
+            : '<option value="">لا يوجد مخزون</option>';
+        
+        const newRowHTML = `
+            <tr id="material-row-${data.id}">
+                <td>
+                    <input type="hidden" name="materials-${materialIndex}-material" value="${data.id}">
+                    <strong>${data.name}</strong> <small class="text-muted">(${data.code})</small>
+                    ${isBomItem ? '<span class="badge bg-success-subtle text-success-emphasis ms-2">BOM</span>' : '<span class="badge bg-warning-subtle text-warning-emphasis ms-2" title="هذه المادة ليست في قائمة المواد الأصلية">ليست BOM</span>'}
+                </td>
+                <td>
+                    <select name="materials-${materialIndex}-source_warehouse" class="form-select form-select-sm source-warehouse-select" required ${!hasStock ? 'disabled' : ''}>
+                        <option value="">اختر مخزن...</option>
+                        ${warehouseOptions}
+                    </select>
+                </td>
+                <td><span class="available-qty-text text-muted">--</span></td>
+                <td><input type="number" name="materials-${materialIndex}-quantity_to_send" class="form-control form-control-sm" placeholder="الكمية" step="0.01" min="0" required ${!hasStock ? 'disabled' : ''}></td>
+                <td><button type="button" class="btn btn-sm btn-danger remove-material-btn">&times;</button></td>
+            </tr>
+        `;
+
+        selectedMaterialsList.append(newRowHTML);
+        materialIndex++;
+        updateFormsetManagement();
+    }
+
+    selectedMaterialsList.on('click', '.remove-material-btn', function() {
+        $(this).closest('tr').remove();
+    });
+    
+    selectedMaterialsList.on('change', '.source-warehouse-select', function() {
+        const selectedOption = $(this).find('option:selected');
+        const availableQty = selectedOption.data('available') || '--';
+        $(this).closest('tr').find('.available-qty-text').text(availableQty);
+    });
+
+    function updateFormsetManagement() {
+        formsetManagementContainer.html(`
+            <input type="hidden" name="materials-TOTAL_FORMS" value="${materialIndex}" id="id_materials-TOTAL_FORMS">
+            <input type="hidden" name="materials-INITIAL_FORMS" value="0" id="id_materials-INITIAL_FORMS">
+        `);
+    }
+
+    $('#sendMaterialsModal').on('hidden.bs.modal', function() {
+        if (materialSearch.data('select2')) {
+            materialSearch.select2('destroy');
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}تأكيد الحذف{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">تأكيد حذف المستخدم</h6>
+                </div>
+                <div class="card-body">
+                    <p>هل أنت متأكد أنك تريد حذف المستخدم <strong>{{ user.full_name }} ({{ user.email }})</strong>؟</p>
+                    <p class="text-danger">لا يمكن التراجع عن هذا الإجراء!</p>
+                    <form method="post">
+                        {% csrf_token %}
+                        <hr>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash-alt"></i> نعم، قم بالحذف
+                        </button>
+                        <a href="{% url 'users:manage' %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> إلغاء
+                        </a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

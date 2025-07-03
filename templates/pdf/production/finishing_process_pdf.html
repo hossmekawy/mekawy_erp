@@ -1,0 +1,63 @@
+{% extends 'pdf/base_pdf.html' %}
+{% block pdf_title %}تقرير عملية التشطيب - {{ finishing_process.pk }}{% endblock %}
+
+{% block pdf_header %}
+    <h1>تقرير عملية التشطيب</h1>
+    <div class="meta-info">
+        أمر الإنتاج: {{ finishing_process.dyeing_process.assembly_process.production_order.order_number }} |
+        تاريخ الطباعة: {{ timestamp|date:"d-m-Y H:i" }}
+    </div>
+{% endblock %}
+
+{% block pdf_content %}
+    <h2>تفاصيل العملية</h2>
+    <table>
+        <tbody>
+            <tr><th>نوع التشطيب</th><td>{{ finishing_process.get_finishing_type_display }}</td></tr>
+            {% if finishing_process.finishing_type == 'outsourced' %}
+            <tr><th>المصنع الخارجي</th><td>{{ finishing_process.external_manufacturer.name }}</td></tr>
+            {% else %}
+            <tr><th>المسؤول الداخلي</th><td>{{ finishing_process.finisher.username }}</td></tr>
+            {% endif %}
+            <tr><th>الكمية المدخلة</th><td>{{ finishing_process.quantity_input }} قطعة</td></tr>
+            <tr><th>الكمية النهائية (الصالحة)</th><td>{{ finishing_process.quantity_output }} قطعة</td></tr>
+            <tr><th>العيوب</th><td>{{ finishing_process.defects_in_finishing }} قطعة</td></tr>
+            <tr><th>المخزن النهائي</th><td>{% if finishing_process.destination_warehouse %}{{ finishing_process.destination_warehouse.name }}{% else %}---{% endif %}</td></tr>
+            <tr><th>تاريخ البدء</th><td>{{ finishing_process.start_date|date:"d-m-Y" }}</td></tr>
+            <tr><th>تاريخ الإكمال</th><td>{% if finishing_process.is_completed %}{{ finishing_process.actual_completion_date|date:"d-m-Y" }}{% else %}لم تكتمل بعد{% endif %}</td></tr>
+        </tbody>
+    </table>
+    
+    <h2 style="margin-top: 30px;">قائمة مهام التشطيب</h2>
+    <table class="checklist">
+        <tbody>
+            <tr>
+                <td>الكي: <strong>{% if finishing_process.ironing_completed %}مكتمل{% else %}غير مكتمل{% endif %}</strong></td>
+                <td>عراوي الحزام: <strong>{% if finishing_process.belt_loops_completed %}مكتمل{% else %}غير مكتمل{% endif %}</strong></td>
+            </tr>
+            <tr>
+                <td>الأزرار: <strong>{% if finishing_process.buttons_completed %}مكتمل{% else %}غير مكتمل{% endif %}</strong></td>
+                <td>التفاصيل الجلدية: <strong>{% if finishing_process.leather_details_completed %}مكتمل{% else %}غير مكتمل{% endif %}</strong></td>
+            </tr>
+            <tr>
+                <td>التنظيف: <strong>{% if finishing_process.cleaning_completed %}مكتمل{% else %}غير مكتمل{% endif %}</strong></td>
+                <td>الكبس: <strong>{% if finishing_process.pressing_completed %}مكتمل{% else %}غير مكتمل{% endif %}</strong></td>
+            </tr>
+            <tr>
+                <td>وضع التذاكر: <strong>{% if finishing_process.ticketing_completed %}مكتمل{% else %}غير مكتمل{% endif %}</strong></td>
+                <td>التعبئة: <strong>{% if finishing_process.bagging_completed %}مكتمل{% else %}غير مكتمل{% endif %}</strong></td>
+            </tr>
+             <tr>
+                <td colspan="2">التغليف النهائي: <strong>{% if finishing_process.packaging_completed %}مكتمل{% else %}غير مكتمل{% endif %}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+    
+    {% if finishing_process.notes %}
+        <h2 style="margin-top: 30px;">ملاحظات</h2>
+        <div class="notes-box">
+            <p>{{ finishing_process.notes|linebreaksbr }}</p>
+        </div>
+    {% endif %}
+
+{% endblock %}

@@ -1,0 +1,158 @@
+{% extends 'warehouses/base.html' %}
+{% load static %}
+
+{% block title %}
+    {% if object %}تعديل المخزون{% else %}إضافة مخزون جديد{% endif %} - المخازن
+{% endblock %}
+
+{% block warehouse_content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            {% if object %}
+                <i class="fas fa-edit text-primary"></i> تعديل المخزون
+            {% else %}
+                <i class="fas fa-plus text-success"></i> إضافة مخزون جديد
+            {% endif %}
+        </h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb bg-transparent p-0 m-0">
+                <li class="breadcrumb-item"><a href="{% url 'warehouses:stock_list' %}">المخزون</a></li>
+                <li class="breadcrumb-item active" aria-current="page">
+                    {% if object %}تعديل{% else %}إضافة{% endif %}
+                </li>
+            </ol>
+        </nav>
+    </div>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="row">
+            <!-- Right Column: Form for Editing -->
+            <div class="col-lg-8">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">
+                            {% if object %}
+                                تحديث بيانات المخزون
+                            {% else %}
+                                إدخال بيانات المخزون
+                            {% endif %}
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}
+                                    <p class="mb-0">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        {% if object %}
+                            {# EDIT MODE: Display static info and update form #}
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">الكمية الإجمالية</label>
+                                    {{ form.quantity }}
+                                    {% if form.quantity.errors %}<div class="invalid-feedback d-block">{{ form.quantity.errors.0 }}</div>{% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">الكمية المحجوزة</label>
+                                    {{ form.reserved_quantity }}
+                                    {% if form.reserved_quantity.errors %}<div class="invalid-feedback d-block">{{ form.reserved_quantity.errors.0 }}</div>{% endif %}
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">الموقع في المخزن</label>
+                                {{ form.location }}
+                                {% if form.location.errors %}<div class="invalid-feedback d-block">{{ form.location.errors.0 }}</div>{% endif %}
+                            </div>
+                        {% else %}
+                            {# CREATE MODE: Display full creation form #}
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">المخزن <span class="text-danger">*</span></label>
+                                    {{ form.warehouse }}
+                                    {% if form.warehouse.errors %}<div class="invalid-feedback d-block">{{ form.warehouse.errors.0 }}</div>{% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">المنتج <span class="text-danger">*</span></label>
+                                    {{ form.product }}
+                                    {% if form.product.errors %}<div class="invalid-feedback d-block">{{ form.product.errors.0 }}</div>{% endif %}
+                                </div>
+                            </div>
+                             <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">الكمية الإجمالية <span class="text-danger">*</span></label>
+                                    {{ form.quantity }}
+                                    {% if form.quantity.errors %}<div class="invalid-feedback d-block">{{ form.quantity.errors.0 }}</div>{% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">الكمية المحجوزة</label>
+                                    {{ form.reserved_quantity }}
+                                    {% if form.reserved_quantity.errors %}<div class="invalid-feedback d-block">{{ form.reserved_quantity.errors.0 }}</div>{% endif %}
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">الموقع في المخزن</label>
+                                {{ form.location }}
+                                {% if form.location.errors %}<div class="invalid-feedback d-block">{{ form.location.errors.0 }}</div>{% endif %}
+                            </div>
+                        {% endif %}
+
+                        <div class="mt-4 pt-3 border-top">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save me-2"></i>
+                                {% if object %}حفظ التعديلات{% else %}إضافة للمخزون{% endif %}
+                            </button>
+                            <a href="{% if object %}{% url 'warehouses:stock_detail' object.pk %}{% else %}{% url 'warehouses:stock_list' %}{% endif %}" class="btn btn-secondary btn-lg">
+                                <i class="fas fa-times me-2"></i>إلغاء
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Left Column: Info Card (only in edit mode) -->
+            {% if object %}
+            <div class="col-lg-4">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">معلومات العنصر</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-box fa-2x text-primary me-3"></i>
+                            <div>
+                                <h5 class="mb-0">{{ object.product.name }}</h5>
+                                <small class="text-muted">{{ object.product.code }}</small>
+                            </div>
+                        </div>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                المخزن
+                                <span class="badge bg-info rounded-pill">{{ object.warehouse.name }}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                الكمية الحالية
+                                <strong>{{ object.quantity|floatformat:2 }}</strong>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                الكمية المتاحة
+                                <strong class="text-success">{{ object.available_quantity|floatformat:2 }}</strong>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                قيمة المخزون
+                                <strong>{{ object.total_value|floatformat:2 }} ج.م</strong>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </form>
+</div>
+{% endblock %}

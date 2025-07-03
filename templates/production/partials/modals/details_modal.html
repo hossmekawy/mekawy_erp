@@ -1,0 +1,37 @@
+<!-- Details Modal -->
+<div id="detailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+    <div class="relative top-5 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-medium text-gray-900" id="detailsTitle">
+                تفاصيل العنصر
+            </h3>
+            <button type="button" id="closeDetailsBtn" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        
+        <!-- Tabs -->
+        <div class="border-b border-gray-200 mb-4">
+            <nav class="-mb-px flex space-x-8 space-x-reverse" id="detailsTabs">
+                <!-- Tabs will be dynamically generated -->
+            </nav>
+        </div>
+        
+        <!-- Tab Content -->
+        <div id="detailsContent" class="max-h-96 overflow-y-auto">
+            <!-- Content will be dynamically loaded -->
+        </div>
+        
+        <!-- Actions -->
+        <div class="flex items-center justify-end space-x-2 space-x-reverse pt-4 border-t border-gray-200">
+            <div id="detailsActions">
+                <!-- Action buttons will be dynamically generated -->
+            </div>
+            <button type="button" id="printDetailsBtn"
+                    class="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                <i class="fas fa-print mr-1"></i>
+                طباعة
+            </button>
+        </div>
+    </div>
+</div>

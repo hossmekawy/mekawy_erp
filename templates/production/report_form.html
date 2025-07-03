@@ -1,0 +1,213 @@
+{% extends 'production/production_base.html' %}
+{% load i18n %}
+
+{% block production_title %}
+    {% if form.instance.pk %}{% trans "تعديل تقرير" %}{% else %}{% trans "إنشاء تقرير جديد" %}{% endif %}
+{% endblock %}
+
+{% block production_breadcrumb_items %}
+<li class="breadcrumb-item">
+    <a href="{% url 'production:report_list' %}" class="text-black-50">
+        <i class="fas fa-file-alt"></i> {% trans "التقارير" %}
+    </a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">
+    {% if form.instance.pk %}{% trans "تعديل" %}{% else %}{% trans "إنشاء" %}{% endif %}
+</li>
+{% endblock %}
+
+{% block production_page_title %}
+    <i class="fas fa-file-signature me-2"></i>
+    {% if form.instance.pk %}
+        {% trans "تعديل تقرير الإنتاج" %}
+    {% else %}
+        {% trans "إنشاء تقرير إنتاج جديد" %}
+    {% endif %}
+{% endblock %}
+
+{% block production_header_actions %}
+<div class="d-flex justify-content-end">
+    <a href="{% url 'production:report_list' %}" class="btn btn-production-outline">
+        <i class="fas fa-arrow-left me-2"></i>{% trans "العودة إلى القائمة" %}
+    </a>
+</div>
+{% endblock %}
+
+{% block production_content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10 col-xl-8">
+        <form method="post" class="needs-validation" novalidate>
+            {% csrf_token %}
+            <div class="production-card">
+                <div class="card-body p-lg-4">
+                    
+                    <!-- Section 1: Basic Details -->
+                    <fieldset class="mb-4">
+                        <legend class="h5 mb-3 border-bottom pb-2">
+                            <i class="fas fa-info-circle text-primary me-2"></i>{% trans "التفاصيل الأساسية" %}
+                        </legend>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.title.id_for_label }}" class="form-label">{% trans "عنوان التقرير" %}</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-heading"></i></span>
+                                    {{ form.title }}
+                                </div>
+                                <div class="invalid-feedback">{% trans "هذا الحقل مطلوب." %}</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.report_type.id_for_label }}" class="form-label">{% trans "نوع التقرير" %}</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-file-alt"></i></span>
+                                    {{ form.report_type }}
+                                </div>
+                                <div class="invalid-feedback">{% trans "الرجاء اختيار نوع التقرير." %}</div>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <!-- Section 2: Report Period -->
+                    <fieldset class="mb-4">
+                        <legend class="h5 mb-3 border-bottom pb-2">
+                             <i class="fas fa-calendar-alt text-primary me-2"></i>{% trans "الفترة الزمنية للتقرير" %}
+                        </legend>
+                        <div class="production-alert alert-info">
+                            <i class="fas fa-info-circle me-1"></i>
+                            {% trans "سيتم حساب الإحصائيات تلقائيًا بناءً على تاريخ إنشاء أوامر الإنتاج خلال هذه الفترة." %}
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.period_start.id_for_label }}" class="form-label">{% trans "من تاريخ" %}</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-calendar-day"></i></span>
+                                    {{ form.period_start }}
+                                </div>
+                                <div class="invalid-feedback">{% trans "الرجاء تحديد تاريخ بدء صالح." %}</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.period_end.id_for_label }}" class="form-label">{% trans "إلى تاريخ" %}</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-calendar-day"></i></span>
+                                    {{ form.period_end }}
+                                </div>
+                                <div class="invalid-feedback">{% trans "الرجاء تحديد تاريخ انتهاء صالح." %}</div>
+                            </div>
+                        </div>
+                        <div id="date-range-feedback" class="form-text mt-2 ps-2" style="min-height: 20px;">
+                            <!-- Feedback from AJAX will appear here -->
+                        </div>
+                    </fieldset>
+                    
+                    <!-- Section 3: Content -->
+                    <fieldset>
+                        <legend class="h5 mb-3 border-bottom pb-2">
+                            <i class="fas fa-paragraph text-primary me-2"></i>{% trans "محتوى التقرير" %}
+                        </legend>
+                        <div class="mb-3">
+                            <label for="{{ form.report_content.id_for_label }}" class="form-label">{% trans "محتوى التقرير" %}</label>
+                             {{ form.report_content }}
+                             <div class="invalid-feedback">{% trans "هذا الحقل مطلوب." %}</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ form.recommendations.id_for_label }}" class="form-label">{% trans "التوصيات" %} (اختياري)</label>
+                            {{ form.recommendations }}
+                        </div>
+                    </fieldset>
+
+                </div>
+                <div class="card-footer bg-light text-end p-3">
+                    <a href="{% url 'production:report_list' %}" class="btn btn-secondary me-2">
+                        <i class="fas fa-times me-1"></i>{% trans "إلغاء" %}
+                    </a>
+                    <button type="submit" class="btn btn-production px-4">
+                        <i class="fas fa-save me-2"></i>{% trans "حفظ التقرير" %}
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block production_extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Apply Bootstrap classes to Django form fields
+    const form = document.querySelector('form.needs-validation');
+    if (form) {
+        form.querySelectorAll('input, textarea, select').forEach(function (field) {
+            if (field.tagName === 'SELECT') {
+                field.classList.add('form-select');
+            } else if (field.type !== 'hidden' && field.type !== 'checkbox' && field.type !== 'radio') {
+                field.classList.add('form-control');
+            }
+        });
+    }
+
+    const startDateInput = document.getElementById('{{ form.period_start.id_for_label }}');
+    const endDateInput = document.getElementById('{{ form.period_end.id_for_label }}');
+    const feedbackEl = document.getElementById('date-range-feedback');
+    
+    // This function will be called when date inputs change
+    const fetchOrderCount = () => {
+        // FIX: Ensure elements exist before proceeding
+        if (!startDateInput || !endDateInput) {
+            return;
+        }
+        const startDate = startDateInput.value;
+        const endDate = endDateInput.value;
+
+        if (startDate && endDate && startDate <= endDate) {
+            if(feedbackEl) {
+                feedbackEl.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> {% trans "جاري حساب عدد الأوامر..." %}`;
+            }
+            
+            // NOTE: This requires the 'ajax_get_order_count_for_period' URL and view to be created in your backend.
+            const url = `{% url 'production:ajax_get_order_count_for_period' %}?start_date=${startDate}&end_date=${endDate}`;
+
+            fetch(url)
+            .then(response => {
+                if(!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (feedbackEl) {
+                    if (data.success) {
+                        feedbackEl.innerHTML = `<i class="fas fa-check-circle text-success me-1"></i> {% trans "تم العثور على" %} <strong>${data.count}</strong> {% trans "أمر إنتاج في هذه الفترة." %}`;
+                    } else {
+                        feedbackEl.innerHTML = `<i class="fas fa-exclamation-triangle text-danger me-1"></i> ${data.error}`;
+                    }
+                }
+            })
+            .catch(error => {
+                if (feedbackEl) {
+                    feedbackEl.innerHTML = `<i class="fas fa-exclamation-triangle text-danger me-1"></i> {% trans "حدث خطأ أثناء جلب البيانات." %}`;
+                }
+                console.error('Error fetching order count:', error);
+            });
+        } else {
+            if (feedbackEl) {
+                feedbackEl.innerHTML = '';
+            }
+        }
+    };
+
+    // Use a debounce function to avoid firing AJAX calls on every input change
+    let debounceTimeout;
+    const debouncedFetch = () => {
+        clearTimeout(debounceTimeout);
+        debounceTimeout = setTimeout(fetchOrderCount, 500); // Wait 500ms after user stops typing
+    };
+
+    // FIX: Check if the elements exist before adding event listeners to prevent errors.
+    if (startDateInput) {
+        startDateInput.addEventListener('change', debouncedFetch);
+    }
+    if (endDateInput) {
+        endDateInput.addEventListener('change', debouncedFetch);
+    }
+});
+</script>
+{% endblock %}

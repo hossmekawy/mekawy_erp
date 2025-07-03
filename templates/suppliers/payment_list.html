@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}سجل الدفعات - Mekawy ERP{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filter-bar { background: white; padding: 1rem 1.5rem; border-radius: 12px; margin-bottom: 2rem; }
+    .payment-table { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-0 text-gray-800 fw-bold">سجل الدفعات</h1>
+            <p class="text-muted mb-0">إدارة وعرض جميع الدفعات الصادرة</p>
+        </div>
+    </div>
+
+    <div class="filter-bar">
+        <form method="get" class="row g-3 align-items-center">
+            <div class="col-lg-4">
+                <select name="supplier" class="form-select">
+                    <option value="">كل الموردين</option>
+                    {% for s in suppliers %}<option value="{{ s.id }}" {% if request.GET.supplier == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-lg-3">
+                <select name="status" class="form-select">
+                    <option value="">كل الحالات</option>
+                    {% for val, display in payments.model.PAYMENT_STATUS %}<option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ display }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-lg-3">
+                <select name="type" class="form-select">
+                    <option value="">كل الأنواع</option>
+                    {% for val, display in payments.model.PAYMENT_TYPES %}<option value="{{ val }}" {% if request.GET.type == val %}selected{% endif %}>{{ display }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-lg-2">
+                <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-1"></i> فلترة</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="payment-table">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">رقم الدفعة</th>
+                        <th>المورد</th>
+                        <th>أمر الشراء</th>
+                        <th>المبلغ</th>
+                        <th>طريقة الدفع</th>
+                        <th>التاريخ</th>
+                        <th>الحالة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payment in payments %}
+                    <tr>
+                        <td class="ps-4 fw-bold text-primary">{{ payment.payment_number }}</td>
+                        <td>
+                            <a href="{% url 'suppliers:detail' payment.supplier.pk %}" class="text-decoration-none text-dark">
+                                {{ payment.supplier.name }}
+                            </a>
+                        </td>
+                        <td>
+                            {% if payment.purchase_order %}
+                            <a href="{% url 'suppliers:purchase_order_detail' payment.purchase_order.pk %}" class="text-decoration-none">
+                                {{ payment.purchase_order.po_number }}
+                            </a>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td class="fw-bold">{{ payment.amount|floatformat:2 }} جنيه</td>
+                        <td>{{ payment.get_payment_method_display }}</td>
+                        <td>{{ payment.payment_date|date:"Y-m-d" }}</td>
+                        <td>
+                            <span class="badge rounded-pill 
+                                {% if payment.status == 'completed' %}bg-success-light text-success
+                                {% elif payment.status == 'pending' %}bg-warning-light text-warning
+                                {% elif payment.status == 'failed' %}bg-danger-light text-danger
+                                {% else %}bg-secondary-light text-secondary{% endif %}">
+                                {{ payment.get_status_display }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5">
+                            <p class="text-muted">لا توجد دفعات تطابق بحثك.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include 'partials/pagination.html' %}
+    </div>
+</div>
+{% endblock %}

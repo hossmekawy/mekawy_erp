@@ -1,0 +1,70 @@
+{% extends 'production/production_base.html' %}
+{% load i18n %}
+
+{% block production_title %}
+    تأكيد حذف المصنع: {{ object.name }}
+{% endblock %}
+
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item"><a href="{% url 'production:manufacturers:manufacturer_list' %}" class="text-black-50">المصانع الخارجية</a></li>
+    <li class="breadcrumb-item active" aria-current="page">تأكيد الحذف</li>
+{% endblock %}
+
+{% block production_content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="production-card text-center border-danger">
+            <div class="production-card-header bg-danger-subtle text-danger-emphasis">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                تأكيد حذف المصنع: {{ object.name }}
+            </div>
+            <div class="production-card-body">
+                <p class="lead">
+                    أنت على وشك حذف المصنع <strong class="text-danger">{{ object.name }}</strong> بشكل دائم.
+                </p>
+                <p>هذا الإجراء لا يمكن التراجع عنه وسيزيل جميع البيانات المرتبطة بهذا المصنع.</p>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="my-4">
+                        <p>للتأكيد، يرجى كتابة الجملة التالية بالضبط في الحقل أدناه:</p>
+                        <p class="fw-bold fs-5 text-primary user-select-all">
+                            {{ confirmation_phrase }}
+                        </p>
+                        <input type="text" id="confirmationInput" class="form-control form-control-lg text-center" autocomplete="off">
+                    </div>
+
+                    <div class="d-flex justify-content-center gap-2 mt-4">
+                        <a href="{% url 'production:manufacturers:manufacturer_list' %}" class="btn btn-secondary btn-lg">
+                            <i class="fas fa-times me-1"></i> إلغاء
+                        </a>
+                        <button type="submit" id="confirmDeleteBtn" class="btn btn-danger btn-lg" disabled>
+                            <i class="fas fa-trash-alt me-1"></i> نعم، قم بالحذف
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block production_extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const confirmationInput = document.getElementById('confirmationInput');
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    const confirmationPhrase = "{{ confirmation_phrase }}";
+
+    if (confirmationInput) {
+        confirmationInput.addEventListener('input', function() {
+            if (this.value === confirmationPhrase) {
+                confirmDeleteBtn.disabled = false;
+            } else {
+                confirmDeleteBtn.disabled = true;
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

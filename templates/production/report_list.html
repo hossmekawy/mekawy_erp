@@ -1,0 +1,102 @@
+{% extends 'production/production_base.html' %}
+{% load i18n %}
+
+{% block production_title %}قائمة التقارير{% endblock %}
+
+{% block production_page_title %}
+    <i class="fas fa-file-alt me-2"></i>
+    تقارير الإنتاج
+{% endblock %}
+
+{% block production_header_actions %}
+<div class="d-flex justify-content-end">
+    <a href="{% url 'production:report_create' %}" class="btn btn-production">
+        <i class="fas fa-plus me-2"></i>{% trans "إنشاء تقرير جديد" %}
+    </a>
+</div>
+{% endblock %}
+
+{% block production_content %}
+<div class="production-card">
+    <div class="card-header bg-light py-3">
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">{% trans "قائمة التقارير" %}</h6>
+            <span class="badge bg-secondary rounded-pill">{{ reports.paginator.count }} {% trans "تقرير" %}</span>
+        </div>
+    </div>
+    <div class="card-body">
+        <form method="get" class="mb-4">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label for="report_type_filter" class="form-label">{% trans "نوع التقرير" %}</label>
+                    <select name="report_type" id="report_type_filter" class="form-select" onchange="this.form.submit()">
+                        <option value="">{% trans "الكل" %}</option>
+                        {% for type_val, type_name in report_types %}
+                            <option value="{{ type_val }}" {% if report_type_filter == type_val %}selected{% endif %}>{{ type_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </form>
+
+        <div class="table-responsive">
+            <table class="table table-hover production-table">
+                <thead>
+                    <tr>
+                        <th>{% trans "عنوان التقرير" %}</th>
+                        <th>{% trans "النوع" %}</th>
+                        <th>{% trans "فترة التقرير" %}</th>
+                        <th>{% trans "أنشئ بواسطة" %}</th>
+                        <th>{% trans "تاريخ الإنشاء" %}</th>
+                        <th>{% trans "الإجراءات" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for report in reports %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'production:report_detail' report.pk %}" class="fw-bold">{{ report.title }}</a>
+                        </td>
+                        <td>
+                            <span class="badge bg-info-subtle text-info-emphasis">{{ report.get_report_type_display }}</span>
+                        </td>
+                        <td>{{ report.period_start|date:"Y-m-d" }} - {{ report.period_end|date:"Y-m-d" }}</td>
+                        <td>{{ report.generated_by.username|default:"N/A" }}</td>
+                        <td>{{ report.generated_at|date:"Y-m-d H:i" }}</td>
+                        <td>
+                            <a href="{% url 'production:report_detail' report.pk %}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5">
+                            <div class="production-empty">
+                                <i class="fas fa-file-excel"></i>
+                                <h5>{% trans "لا توجد تقارير" %}</h5>
+                                <p>{% trans "لم يتم العثور على تقارير تطابق معايير التصفية." %}</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if is_paginated %}
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center mt-4">
+                {% if page_obj.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.report_type %}&report_type={{ request.GET.report_type }}{% endif %}">{% trans "السابق" %}</a></li>
+                {% endif %}
+                <li class="page-item active" aria-current="page"><a class="page-link" href="#">{{ page_obj.number }}</a></li>
+                {% if page_obj.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.report_type %}&report_type={{ request.GET.report_type }}{% endif %}">{% trans "التالي" %}</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,121 @@
+{% extends 'pdf/base_pdf.html' %}
+{% load humanize %}
+
+{% block pdf_title %}تقرير المنتج: {{ product.name }}{% endblock %}
+
+{% block pdf_header %}
+    <h1>تقرير تفاصيل المنتج</h1>
+    <div class="meta-info">
+        {{ product.name }} ({{ product.code }}) | تاريخ الطباعة: {{ timestamp|date:"Y-m-d H:i" }}
+    </div>
+{% endblock %}
+
+{% block pdf_content %}
+    
+    <h2>ملخص المنتج</h2>
+    <table class="summary-table">
+        <tbody>
+            <tr>
+                <td><strong>الكود:</strong></td>
+                <td>{{ product.code }}</td>
+                <td><strong>الفئة:</strong></td>
+                <td>{{ product.category.name|default:"-" }}</td>
+            </tr>
+            <tr>
+                <td><strong>الباركود:</strong></td>
+                <td>{{ product.barcode|default:"-" }}</td>
+                <td><strong>نوع المنتج:</strong></td>
+                <td>{{ product.get_product_type_display }}</td>
+            </tr>
+             <tr>
+                <td><strong>سعر التكلفة:</strong></td>
+                <td>{{ product.cost_price|intcomma }} جنيه</td>
+                <td><strong>سعر البيع:</strong></td>
+                <td>{{ product.selling_price|intcomma|default:"-" }} جنيه</td>
+            </tr>
+            <tr>
+                <td><strong>وحدة القياس:</strong></td>
+                <td>{{ product.get_unit_display }}</td>
+                <td><strong>الحد الأدنى للمخزون:</strong></td>
+                <td>{{ product.min_stock_level|intcomma }}</td>
+            </tr>
+            <tr>
+                <td><strong>الحالة:</strong></td>
+                <td>{% if product.is_active %}نشط{% else %}غير نشط{% endif %}</td>
+                <td><strong>إجمالي المخزون:</strong></td>
+                <td style="font-weight: bold; color: #004a99;">{{ product.total_stock|intcomma }} {{ product.get_unit_display }}</td>
+            </tr>
+            {% if product.product_type == 'fabric' %}
+                <tr>
+                    <td><strong>العرض (سم):</strong></td>
+                    <td>{{ product.width }}</td>
+                    <td><strong>درجة الجودة:</strong></td>
+                    <td>{{ product.quality_grade }}</td>
+                </tr>
+            {% elif product.product_type == 'finished' %}
+                 <tr>
+                    <td><strong>الألوان:</strong></td>
+                    <td>{{ product.colors|default:"-" }}</td>
+                    <td><strong>مجموعة المقاسات:</strong></td>
+                    <td>{{ product.size_group.name|default:"-" }}</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <h2 style="margin-top: 30px;">أرصدة المخزون في المخازن</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>المخزن</th>
+                <th>الكمية الإجمالية</th>
+                <th>الكمية المتاحة</th>
+                <th>الموقع</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in stock_items %}
+                <tr>
+                    <td>{{ item.warehouse.name }}</td>
+                    <td>{{ item.quantity|intcomma }}</td>
+                    <td>{{ item.available_quantity|intcomma }}</td>
+                    <td>{{ item.location|default:"-" }}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 20px;">لا يوجد أرصدة لهذا المنتج.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2 style="margin-top: 30px;">أحدث حركات المخزون</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>التاريخ</th>
+                <th>النوع</th>
+                <th>الكمية</th>
+                <th>المخزن</th>
+                <th>المستخدم</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for movement in recent_movements %}
+            <tr>
+                <td>{{ movement.created_at|date:"Y-m-d H:i" }}</td>
+                <td>{{ movement.get_movement_type_display }}</td>
+                <td style="font-weight: bold; color: {% if movement.quantity > 0 %}#28a745{% else %}#dc3545{% endif %};">
+                    {% if movement.quantity > 0 %}+{% endif %}{{ movement.quantity|intcomma }}
+                </td>
+                <td>{{ movement.stock_item.warehouse.name }}</td>
+                <td>{{ movement.created_by.get_full_name|default:movement.created_by.username|default:"-" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 20px;">لا توجد حركات مسجلة لهذا المنتج.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

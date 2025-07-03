@@ -1,0 +1,705 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% load widget_tweaks %}
+{% load production_extras %} {# Add this line to load your custom filters #}
+
+{% block production_title %}
+    {% if form.instance.pk %}
+        تعديل عملية تشطيب
+    {% else %}
+        إضافة عملية تشطيب
+    {% endif %}
+{% endblock %}
+
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item">
+        <a href="{% url 'production:finishing_list' %}" class="text-black-50">
+            عمليات التشطيب
+        </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page">
+        {% if form.instance.pk %}
+            تعديل
+        {% else %}
+            إضافة
+        {% endif %}
+    </li>
+{% endblock %}
+
+{% block production_extra_css %}
+{{ block.super }}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<style>
+    .form-step-header {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--production-primary);
+        border-bottom: 2px solid var(--production-light);
+        padding-bottom: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+    .form-step-header .step-number {
+        background-color: var(--production-primary);
+        color: white;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        margin-left: 0.75rem;
+    }
+    .finishing-type-selector .btn-check + .btn {
+        transition: all 0.3s ease;
+        border-radius: 0.5rem !important;
+        border: 2px solid #e9ecef;
+        background-color: #f8f9fa;
+        color: var(--production-secondary);
+        font-weight: 500;
+        padding: 0.75rem 1.5rem;
+    }
+    .finishing-type-selector .btn-check:checked + .btn {
+        background-color: var(--production-primary);
+        color: white;
+        border-color: var(--production-primary);
+        box-shadow: 0 4px 12px rgba(44, 90, 160, 0.2);
+        transform: translateY(-2px);
+    }
+    .conditional-panel {
+        background-color: #f8f9fa;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        border: 1px solid #dee2e6;
+        transition: all 0.4s ease-in-out;
+        max-height: 0;
+        overflow: hidden;
+        opacity: 0;
+        margin-top: 0;
+    }
+    .conditional-panel.visible {
+        max-height: 500px; /* Adjust as needed */
+        opacity: 1;
+        margin-top: 1.5rem;
+    }
+    .conditional-panel.has-error {
+        border-color: var(--bs-danger);
+        background-color: #fff5f5;
+    }
+    .input-group-text {
+        background-color: #e9ecef;
+    }
+    .select2-container .select2-selection--single {
+        height: calc(1.5em + .75rem + 2px) !important;
+    }
+    .select2-container--default .select2-selection--single {
+        border: 1px solid #ced4da;
+    }
+    .select2-container .select2-selection--single .select2-selection__rendered {
+        line-height: calc(1.5em + .75rem);
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: calc(1.5em + .75rem);
+    }
+    .components-table th {
+        background-color: #f8f9fa;
+    }
+    #components-loader {
+        display: none;
+        text-align: center;
+        padding: 2rem;
+    }
+    .components-table th, .components-table td {
+        vertical-align: middle;
+    }
+    .warehouse-select-cell {
+        min-width: 220px;
+    }
+    .selected-warehouse-stock {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--bs-primary);
+        display: block;
+        margin-top: 0.3rem;
+        height: 1.2rem; /* Reserve space to prevent layout shift */
+    }
+    .selected-warehouse-stock .spinner-border-sm {
+        width: 0.8rem;
+        height: 0.8rem;
+    }
+    .quantity-input.is-invalid {
+        border-color: var(--bs-danger);
+        box-shadow: 0 0 0 0.25rem rgba(var(--bs-danger-rgb), .25);
+    }
+    /* Styles for the new details card */
+    #dyeing-process-details-card {
+        background-color: #f0f5ff;
+        border: 1px solid #cce5ff;
+        border-radius: .5rem;
+        transition: all 0.3s ease-in-out;
+    }
+</style>
+{% endblock %}
+
+{% block production_content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10 col-md-12">
+        <form method="post" class="needs-validation" novalidate id="finishing-form">
+            {% csrf_token %}
+            <div class="production-card">
+                <div class="production-card-header d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0">
+                        {% if form.instance.pk %}
+                            تعديل عملية تشطيب
+                        {% else %}
+                            إضافة عملية تشطيب جديدة
+                        {% endif %}
+                    </h3>
+                    <a href="{% url 'production:finishing_list' %}" class="btn btn-production-outline">
+                        <i class="fas fa-list me-2"></i>
+                        العودة للقائمة
+                    </a>
+                </div>
+                <div class="production-card-body">
+                    {% if form.non_field_errors or component_formset.non_form_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+                            {% for error in component_formset.non_form_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <!-- STEP 1: Select Dyeing Process -->
+                    <div class="mb-3">
+                        <h5 class="form-step-header"><span class="step-number">1</span>اختر عملية الصباغة</h5>
+                        {% render_field form.dyeing_process class+="form-select form-select-lg" id="id_dyeing_process" %}
+                        {% for error in form.dyeing_process.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                        <div id="dyeing-selection-error" class="text-danger mt-2" style="display: none;"></div>
+                    </div>
+                    
+                    <!-- Details Card - Populated by AJAX -->
+                    <div id="dyeing-process-details-card" class="card mb-4" style="display: none;">
+                        <div class="card-body">
+                            <h5 class="card-title text-primary"><i class="fas fa-info-circle me-2"></i>تفاصيل العملية المحددة</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-2"><strong>المنتج:</strong> <span id="detail-product-name"></span></p>
+                                    <p class="mb-2"><strong>رقم الأمر:</strong> <span id="detail-order-number"></span></p>
+                                    <p class="mb-2"><strong>الحالة:</strong> <span id="detail-status" class="badge"></span></p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-2"><strong>الكمية المستلمة:</strong> <span id="detail-quantity" class="fw-bold"></span></p>
+                                    <p class="mb-2"><strong>المقاسات:</strong></p>
+                                    <div id="detail-sizes"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <!-- STEP 2: Finishing Type -->
+                    <div class="mb-4">
+                        <h5 class="form-step-header"><span class="step-number">2</span>حدد نوع التشطيب</h5>
+                        <div class="d-flex gap-3 finishing-type-selector">
+                           <input type="radio" class="btn-check" name="{{ form.finishing_type.html_name }}" id="id_finishing_type_in_house" value="in_house" autocomplete="off" {% if form.finishing_type.value == 'in_house' or not form.instance.pk %}checked{% endif %} {% if form.instance.pk %}disabled{% endif %}>
+                           <label class="btn btn-outline-primary" for="id_finishing_type_in_house">
+                               <i class="fas fa-user-cog me-2"></i>داخلي
+                           </label>
+                           <input type="radio" class="btn-check" name="{{ form.finishing_type.html_name }}" id="id_finishing_type_outsourced" value="outsourced" autocomplete="off" {% if form.finishing_type.value == 'outsourced' %}checked{% endif %} {% if form.instance.pk %}disabled{% endif %}>
+                           <label class="btn btn-outline-primary" for="id_finishing_type_outsourced">
+                               <i class="fas fa-industry me-2"></i>خارجي
+                           </label>
+                        </div>
+                        {% for error in form.finishing_type.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                    </div>
+                    
+                    <div id="conditional-details-wrapper">
+                        <div id="finisher-info-wrapper" class="conditional-panel">
+                            <h6 class="mb-3 text-primary"><i class="fas fa-user-check me-2"></i>المسؤول عن التشطيب الداخلي</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.finisher.id_for_label }}" class="form-label">
+                                        مسؤول التشطيب الداخلي <span class="text-danger in-house-required-star" style="display: none;">*</span>
+                                    </label>
+                                    {% render_field form.finisher class="form-select" id=form.finisher.id_for_label %}
+                                    {% for error in form.finisher.errors %}
+                                        <div class="invalid-feedback d-block">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.supervisor.id_for_label }}" class="form-label">
+                                        المشرف <span class="text-danger in-house-required-star" style="display: none;">*</span>
+                                    </label>
+                                    {% render_field form.supervisor class="form-select" id=form.supervisor.id_for_label %}
+                                    {% for error in form.supervisor.errors %}
+                                        <div class="invalid-feedback d-block">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        <div id="manufacturer-wrapper" class="conditional-panel {% if form.external_manufacturer.errors %}has-error{% endif %}">
+                            <div class="mb-3">
+                                <label for="{{ form.external_manufacturer.id_for_label }}" class="form-label fw-bold">{{ form.external_manufacturer.label }}</label>
+                                {% render_field form.external_manufacturer class+="form-select" %}
+                                {% for error in form.external_manufacturer.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                                {% if form.external_manufacturer.help_text %}
+                                    <div class="form-text text-info-emphasis mt-2">{{ form.external_manufacturer.help_text|safe }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 3: Finishing Components -->
+                    <div class="mt-4">
+                        <h5 class="form-step-header"><span class="step-number">3</span>حدد المكونات المرسلة (إكسسوارات، بطاقات، إلخ)</h5>
+                        <div id="components-loader" class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">جاري جلب مكونات قائمة المواد...</p>
+                        </div>
+                        <div id="components-section" style="display: none;">
+                            {{ component_formset.management_form }}
+                            <div class="table-responsive">
+                                <table class="table table-bordered components-table">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>المكون</th>
+                                            <th class="text-center" style="width: 140px;">الكمية المطلوبة</th>
+                                            <th class="text-center" style="width: 140px;">إجمالي المتاح</th>
+                                            <th class="text-center" style="width: 280px;">المخزن والكمية المرسلة</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="components-tbody">
+                                        {# Existing forms for update view #}
+                                        {% for formset_form in component_formset %}
+                                            {% if formset_form.instance.pk %}
+                                                <tr data-material-id="{{ formset_form.instance.material.pk }}">
+                                                    <td>
+                                                        {{ formset_form.id }}
+                                                        {{ formset_form.material.as_hidden }}
+                                                        {{ formset_form.source_warehouse.as_hidden }}
+                                                        <strong>{{ formset_form.instance.material.name }}</strong>
+                                                        <div class="text-muted small">{{ formset_form.instance.material.unit_new.symbol }}</div>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <span class="badge bg-secondary">{{ formset_form.instance.material.bom_items.first.quantity|mul:finishing_process.quantity_input|floatformat:2 }}</span>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        {% with total_required_qty=formset_form.instance.material.bom_items.first.quantity|mul:finishing_process.quantity_input %}
+                                                        <span class="badge {% if formset_form.instance.available_stock_in_selected_warehouse >= total_required_qty %}bg-success{% else %}bg-danger{% endif %}">
+                                                            {{ formset_form.instance.available_stock_in_selected_warehouse|floatformat:2 }}
+                                                        </span>
+                                                        {% endwith %}
+                                                    </td>
+                                                    <td class="warehouse-select-cell">
+                                                        <select class="form-select form-select-sm component-warehouse-select" data-material-id="{{ formset_form.instance.material.pk }}">
+                                                            <option value="">--- اختر مخزن ---</option>
+                                                            {% for wh in formset_form.instance.material.stock_items.all %}
+                                                                {% if wh.warehouse.type == 'raw_materials' %}
+                                                                    <option value="{{ wh.warehouse.pk }}" {% if wh.warehouse.pk == formset_form.instance.source_warehouse.pk %}selected{% endif %}>
+                                                                        {{ wh.warehouse.name }}
+                                                                    </option>
+                                                                {% endif %}
+                                                            {% endfor %}
+                                                        </select>
+                                                        <div class="selected-warehouse-stock">
+                                                            المتاح بهذا المخزن: {{ formset_form.instance.available_stock_in_selected_warehouse|floatformat:2 }}
+                                                        </div>
+                                                        <div class="input-group input-group-sm mt-2">
+                                                            {% render_field formset_form.quantity_sent class+="form-control quantity-input" placeholder="0.00" data-max-stock="{{ formset_form.instance.available_stock_in_selected_warehouse|floatformat:2 }}" %}
+                                                            <button type="button" class="btn btn-outline-secondary copy-required-qty-btn" title="استخدام الكمية المطلوبة" data-required-qty="{{ formset_form.instance.material.bom_items.first.quantity|mul:finishing_process.quantity_input|floatformat:2 }}">
+                                                                <i class="fas fa-copy"></i>
+                                                            </button>
+                                                        </div>
+                                                        {% for error in formset_form.quantity_sent.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                                                        {{ formset_form.DELETE }}
+                                                    </td>
+                                                </tr>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="alert alert-info mt-3">
+                                <i class="fas fa-info-circle me-2"></i>
+                                يتم جلب المكونات تلقائياً من قائمة المواد (BOM) باستثناء القماش. حدد المخزن لكل مكون ليتم الصرف منه.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 4: Sending Details -->
+                    <div class="mt-4">
+                        <h5 class="form-step-header"><span class="step-number">{% if form.instance.pk %}4{% else %}4{% endif %}</span>أدخل تفاصيل الإرسال</h5>
+                        <div class="row">
+                           <div class="col-md-6 mb-4">
+                               <label for="{{ form.start_date.id_for_label }}" class="form-label">{{ form.start_date.label }}</label>
+                               <div class="input-group">
+                                   <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                                  {% render_field form.start_date class+="form-control" %}
+                               </div>
+                               {% for error in form.start_date.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                           </div>
+                           <div class="col-md-6 mb-4">
+                               <label for="{{ form.expected_completion_date.id_for_label }}" class="form-label">{{ form.expected_completion_date.label }}</label>
+                               <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                                   {% render_field form.expected_completion_date class+="form-control" %}
+                               </div>
+                               {% for error in form.expected_completion_date.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                           </div>
+                           <div class="col-12 mb-4">
+                               <label for="{{ form.destination_warehouse.id_for_label }}" class="form-label">
+                                   {{ form.destination_warehouse.label }} <span class="text-danger">*</span>
+                               </label>
+                               {% render_field form.destination_warehouse class="form-select" id=form.destination_warehouse.id_for_label %}
+                               {% if form.destination_warehouse.help_text %}
+                                   <div class="form-text">{{ form.destination_warehouse.help_text }}</div>
+                               {% endif %}
+                               {% for error in form.destination_warehouse.errors %}
+                                   <div class="invalid-feedback d-block">{{ error }}</div>
+                               {% endfor %}
+                           </div>
+                           <div class="col-12 mb-4">
+                                <label for="{{ form.notes.id_for_label }}" class="form-label">{{ form.notes.label }}</label>
+                               {% render_field form.notes class+="form-control" rows="3" placeholder="أضف أي ملاحظات خاصة بعملية الإرسال..." %}
+                           </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end mt-4">
+                        <button type="submit" class="btn btn-production btn-lg px-5" id="submit-button">
+                            <i class="fas fa-paper-plane me-2"></i>حفظ وإرسال
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# Hidden template for the component formset #}
+<div style="display:none;" id="component-form-template">
+    {{ component_formset.empty_form|safe }}
+</div>
+{% endblock %}
+
+{% block production_extra_js %}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // --- Global DOM Elements ---
+    const dyeingProcessSelect = $('#id_dyeing_process');
+    const detailsCard = $('#dyeing-process-details-card');
+    const componentsTbody = document.getElementById('components-tbody');
+    const formTemplate = document.getElementById('component-form-template');
+    const dyeingSelectionError = document.getElementById('dyeing-selection-error');
+    const componentsSection = document.getElementById('components-section');
+    const componentsLoader = document.getElementById('components-loader');
+    const finishingTypeRadios = document.querySelectorAll("input[name='{{ form.finishing_type.html_name }}']");
+    const finisherInfoWrapper = document.getElementById('finisher-info-wrapper');
+    const manufacturerWrapper = document.getElementById('manufacturer-wrapper');
+
+    // --- Initial Setup ---
+    dyeingProcessSelect.select2({
+        placeholder: '--- اختر عملية صباغة ---',
+        allowClear: true,
+        language: "ar"
+    });
+
+    const toggleConditionalPanels = () => {
+        const selectedRadio = document.querySelector("input[name='{{ form.finishing_type.html_name }}']:checked");
+        if (finisherInfoWrapper) finisherInfoWrapper.classList.remove('visible');
+        if (manufacturerWrapper) manufacturerWrapper.classList.remove('visible');
+        
+        if (selectedRadio) {
+            if (selectedRadio.value === 'in_house' && finisherInfoWrapper) finisherInfoWrapper.classList.add('visible');
+            else if (selectedRadio.value === 'outsourced' && manufacturerWrapper) manufacturerWrapper.classList.add('visible');
+        }
+    };
+    
+    const showPanelWithErrorsOnLoad = () => {
+        if (manufacturerWrapper && manufacturerWrapper.classList.contains('has-error')) {
+            const outsourcedRadio = document.getElementById('id_finishing_type_outsourced');
+            if(outsourcedRadio) outsourcedRadio.checked = true;
+        }
+        if (finisherInfoWrapper && finisherInfoWrapper.classList.contains('has-error')) {
+            const inHouseRadio = document.getElementById('id_finishing_type_in_house');
+            if(inHouseRadio) inHouseRadio.checked = true;
+        }
+    };
+
+    showPanelWithErrorsOnLoad();
+    toggleConditionalPanels();
+
+    // --- Core Logic Functions ---
+    const fetchDyeingProcessDetails = async (processId) => {
+        if (!processId) {
+            detailsCard.slideUp();
+            return;
+        }
+
+        // Show a loading state
+        detailsCard.slideDown();
+        $('#detail-product-name').text('Loading...');
+        $('#detail-order-number').text('...');
+        $('#detail-quantity').text('...');
+        $('#detail-status').text('...').removeClass().addClass('badge bg-secondary');
+        $('#detail-sizes').html('<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div>');
+
+        try {
+            const url = `{% url 'production:ajax_get_dyeing_process_details' %}?dyeing_process_id=${processId}`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`Network response was not ok, status: ${response.status}`);
+            const result = await response.json();
+
+            if (result.success) {
+                const data = result.data;
+                $('#detail-product-name').text(data.product_name);
+                $('#detail-order-number').text(data.order_number);
+                $('#detail-quantity').text(data.quantity);
+
+                let statusBadgeClass = 'bg-secondary';
+                if (data.status.includes('مكتمل')) statusBadgeClass = 'bg-success';
+                if (data.status.includes('قيد')) statusBadgeClass = 'bg-warning text-dark';
+                if (data.status.includes('ملغي')) statusBadgeClass = 'bg-danger';
+                $('#detail-status').text(data.status).removeClass().addClass('badge ' + statusBadgeClass);
+
+                let sizesHtml = '';
+                if (data.sizes && data.sizes.length > 0) {
+                    data.sizes.forEach(function(size) {
+                        sizesHtml += `<span class="badge bg-info me-1">${size}</span>`;
+                    });
+                } else {
+                    sizesHtml = '<span class="text-muted">No sizes defined</span>';
+                }
+                $('#detail-sizes').html(sizesHtml);
+            } else {
+                detailsCard.slideUp();
+                console.error("Error fetching details:", result.error);
+            }
+        } catch (error) {
+            detailsCard.slideUp();
+            console.error("AJAX Error:", error);
+        }
+    };
+
+    const fetchComponents = async (dyeingProcessId) => {
+        if (!dyeingProcessId) {
+            if(componentsSection) componentsSection.style.display = 'none';
+            if(componentsTbody) componentsTbody.innerHTML = '';
+            if(dyeingSelectionError) dyeingSelectionError.style.display = 'none';
+            return;
+        }
+
+        if(componentsLoader) componentsLoader.style.display = 'block';
+        if(componentsSection) componentsSection.style.display = 'none';
+        if(dyeingSelectionError) dyeingSelectionError.style.display = 'none';
+
+        try {
+            const url = `{% url 'production:ajax_get_finishing_bom_components_for_dyeing' %}?dyeing_process_id=${dyeingProcessId}`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`Network response was not ok, status: ${response.status}`);
+            
+            const data = await response.json();
+
+            if (data.error) {
+                 if(dyeingSelectionError) { dyeingSelectionError.textContent = data.error; dyeingSelectionError.style.display = 'block'; }
+                 if(componentsTbody) componentsTbody.innerHTML = '';
+            } else if (data.components.length === 0) {
+                 if(dyeingSelectionError) { dyeingSelectionError.textContent = data.message || 'لا توجد مكونات إضافية (غير قماش) في قائمة المواد لهذا المنتج.'; dyeingSelectionError.style.display = 'block'; }
+                 if(componentsTbody) componentsTbody.innerHTML = '';
+            } else {
+                populateComponentsTable(data.components);
+                if(componentsSection) componentsSection.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Fetch error:', error);
+            if(dyeingSelectionError) { dyeingSelectionError.textContent = 'حدث خطأ أثناء جلب المكونات.'; dyeingSelectionError.style.display = 'block'; }
+            if(componentsTbody) componentsTbody.innerHTML = '';
+        } finally {
+            if(componentsLoader) componentsLoader.style.display = 'none';
+        }
+    };
+
+    const populateComponentsTable = (components) => {
+        if (!componentsTbody || !formTemplate) return;
+        
+        componentsTbody.innerHTML = ''; 
+        const totalFormsInput = document.querySelector('#id_components-TOTAL_FORMS');
+        let formIndex = 0;
+
+        components.forEach(comp => {
+            const newFormHtml = formTemplate.innerHTML.replace(/__prefix__/g, formIndex);
+            const newRow = document.createElement('tr');
+            newRow.dataset.materialId = comp.material_id;
+
+            const totalRequired = parseFloat(comp.total_required).toFixed(2);
+            const totalAvailableStock = parseFloat(comp.available_stock_total).toFixed(2);
+
+            newRow.innerHTML = `
+                <td>
+                    ${newFormHtml}
+                    <strong>${comp.name}</strong>
+                    <div class="text-muted small">${comp.unit}</div>
+                </td>
+                <td class="text-center">
+                    <span class="badge bg-secondary">${totalRequired}</span>
+                </td>
+                <td class="text-center">
+                   <span class="badge ${parseFloat(totalAvailableStock) >= parseFloat(totalRequired) ? 'bg-success' : 'bg-danger'}">
+                        ${totalAvailableStock}
+                    </span>
+                </td>
+                <td class="warehouse-select-cell"></td>
+            `;
+            
+            const formDiv = newRow.querySelector('div');
+            const materialInput = formDiv.querySelector('input[name$="-material"]');
+            const quantityInput = formDiv.querySelector('input[name$="-quantity_sent"]');
+            const warehouseInput = formDiv.querySelector('input[name$="-source_warehouse"]');
+            
+            if (materialInput) materialInput.value = comp.material_id;
+            
+            if (quantityInput && warehouseInput) {
+                quantityInput.value = '0.00';
+                quantityInput.classList.add('quantity-input');
+
+                const targetCell = newRow.querySelector('.warehouse-select-cell');
+                
+                const warehouseSelect = document.createElement('select');
+                warehouseSelect.className = 'form-select form-select-sm component-warehouse-select';
+                warehouseSelect.dataset.materialId = comp.material_id;
+                
+                let optionsHtml = '<option value="">--- اختر مخزن ---</option>';
+                comp.warehouses.forEach(wh => {
+                    optionsHtml += `<option value="${wh.id}">${wh.name}</option>`;
+                });
+                warehouseSelect.innerHTML = optionsHtml;
+                
+                const stockDisplay = document.createElement('div');
+                stockDisplay.className = 'selected-warehouse-stock';
+                stockDisplay.innerHTML = `&nbsp;`;
+
+                const inputGroup = document.createElement('div');
+                inputGroup.className = 'input-group input-group-sm mt-2';
+                
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'btn btn-outline-secondary copy-required-qty-btn';
+                copyBtn.type = 'button';
+                copyBtn.title = 'استخدام الكمية المطلوبة';
+                copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+                copyBtn.dataset.requiredQty = totalRequired;
+                
+                inputGroup.appendChild(quantityInput);
+                inputGroup.appendChild(copyBtn);
+                
+                targetCell.appendChild(warehouseSelect);
+                targetCell.appendChild(stockDisplay);
+                targetCell.appendChild(inputGroup);
+            }
+            
+            componentsTbody.appendChild(newRow);
+            formIndex++;
+        });
+
+        if(totalFormsInput) totalFormsInput.value = formIndex;
+    };
+
+    const updateWarehouseStockDisplay = async (selectEl) => {
+        const warehouseId = selectEl.value;
+        const materialId = selectEl.dataset.materialId;
+        const row = selectEl.closest('tr');
+        const stockDisplay = row.querySelector('.selected-warehouse-stock');
+        const warehouseInput = row.querySelector('input[name$="-source_warehouse"]');
+        const quantityInput = row.querySelector('.quantity-input');
+
+        if (warehouseInput) {
+            warehouseInput.value = warehouseId;
+        }
+
+        if (!warehouseId) {
+            stockDisplay.innerHTML = '&nbsp;';
+            quantityInput.dataset.maxStock = '0';
+            validateQuantity(quantityInput);
+            return;
+        }
+        
+        stockDisplay.innerHTML = `<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">...</span></div>`;
+
+        try {
+            const url = `{% url 'production:ajax_get_stock_for_material_in_warehouse' %}?material_id=${materialId}&warehouse_id=${warehouseId}`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Network error');
+            const data = await response.json();
+            const availableStock = parseFloat(data.available_stock || 0);
+
+            stockDisplay.textContent = `المتاح بهذا المخزن: ${availableStock.toFixed(2)}`;
+            quantityInput.dataset.maxStock = availableStock;
+            validateQuantity(quantityInput);
+        } catch (error) {
+            console.error("Stock fetch error:", error);
+            stockDisplay.textContent = 'خطأ في جلب المخزون';
+            stockDisplay.classList.add('text-danger');
+            quantityInput.dataset.maxStock = '0';
+            validateQuantity(quantityInput);
+        }
+    };
+    
+    const validateQuantity = (inputEl) => {
+        const quantitySent = parseFloat(inputEl.value || 0);
+        const maxStock = parseFloat(inputEl.dataset.maxStock || 0);
+
+        if (quantitySent > maxStock) {
+            inputEl.classList.add('is-invalid');
+        } else {
+            inputEl.classList.remove('is-invalid');
+        }
+    };
+
+    // --- Event Listeners ---
+    finishingTypeRadios.forEach(radio => radio.addEventListener('change', toggleConditionalPanels));
+    
+    dyeingProcessSelect.on('change', function() {
+        const processId = $(this).val();
+        fetchDyeingProcessDetails(processId);
+        fetchComponents(processId);
+    });
+
+    if (componentsTbody) {
+        componentsTbody.addEventListener('change', (e) => {
+            if (e.target.classList.contains('component-warehouse-select')) {
+                updateWarehouseStockDisplay(e.target);
+            }
+        });
+
+        componentsTbody.addEventListener('input', (e) => {
+             if (e.target.classList.contains('quantity-input')) {
+                validateQuantity(e.target);
+            }
+        });
+
+        componentsTbody.addEventListener('click', (e) => {
+            const copyBtn = e.target.closest('.copy-required-qty-btn');
+            if (copyBtn) {
+                const requiredQty = copyBtn.dataset.requiredQty;
+                const quantityInput = copyBtn.closest('.input-group').querySelector('.quantity-input');
+                if (quantityInput && requiredQty) {
+                    quantityInput.value = requiredQty;
+                    validateQuantity(quantityInput);
+                }
+            }
+        });
+    }
+
+    // --- Initial Load Trigger ---
+    if (dyeingProcessSelect.val()) {
+        const processId = dyeingProcessSelect.val();
+        fetchDyeingProcessDetails(processId);
+        fetchComponents(processId);
+    }
+});
+</script>
+{% endblock %}

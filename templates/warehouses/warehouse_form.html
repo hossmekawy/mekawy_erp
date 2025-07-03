@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block title %}
+    {% if object %}تعديل المخزن{% else %}إضافة مخزن جديد{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div class="sm:mx-auto sm:w-full sm:max-w-2xl">
+        <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            {% if object %}تعديل المخزن{% else %}إنشاء مخزن جديد{% endif %}
+        </h2>
+        <p class="mt-2 text-center text-sm text-gray-600">
+            املأ البيانات أدناه لإدارة المخازن الخاصة بك.
+        </p>
+    </div>
+
+    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-2xl">
+        <div class="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
+            <form method="post" id="warehouseForm" novalidate>
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                    <div class="rounded-md bg-red-50 p-4 mb-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-times-circle text-red-400"></i>
+                            </div>
+                            <div class="ml-3 rtl:mr-3">
+                                <h3 class="text-sm font-medium text-red-800">حدث خطأ</h3>
+                                <div class="mt-2 text-sm text-red-700">
+                                    <ul role="list" class="list-disc pl-5 rtl:pr-5 space-y-1">
+                                        {% for error in form.non_field_errors %}
+                                        <li>{{ error }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <div class="space-y-6">
+                    <div>
+                        <label for="{{ form.name.id_for_label }}" class="block text-sm font-medium text-gray-700">اسم المخزن</label>
+                        <div class="mt-1">
+                            {% render_field form.name class+="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" %}
+                        </div>
+                        {% if form.name.errors %}
+                            <p class="mt-2 text-sm text-red-600">{{ form.name.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="{{ form.code.id_for_label }}" class="block text-sm font-medium text-gray-700">كود المخزن</label>
+                            <div class="mt-1">
+                                <!-- FIX: The code field is now readonly and populated by the backend -->
+                                {% render_field form.code class+="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-gray-100" %}
+                            </div>
+                            {% if form.code.errors %}
+                                <p class="mt-2 text-sm text-red-600">{{ form.code.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+
+                        <div>
+                            <label for="{{ form.warehouse_type.id_for_label }}" class="block text-sm font-medium text-gray-700">نوع المخزن</label>
+                            <div class="mt-1">
+                                <!-- FIX: Changed from form.type to form.warehouse_type -->
+                                {% render_field form.warehouse_type class+="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" %}
+                            </div>
+                             {% if form.warehouse_type.errors %}
+                                <p class="mt-2 text-sm text-red-600">{{ form.warehouse_type.errors.0 }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="{{ form.manager.id_for_label }}" class="block text-sm font-medium text-gray-700">مدير المخزن (اختياري)</label>
+                        <div class="mt-1">
+                            {% render_field form.manager class+="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" %}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="{{ form.description.id_for_label }}" class="block text-sm font-medium text-gray-700">الوصف</label>
+                        <div class="mt-1">
+                            {% render_field form.description class+="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" rows="3" %}
+                        </div>
+                    </div>
+
+                    <div class="flex items-center">
+                        {% render_field form.is_active class+="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" %}
+                        <label for="{{ form.is_active.id_for_label }}" class="ml-2 rtl:mr-2 block text-sm text-gray-900">المخزن نشط</label>
+                    </div>
+
+                    <div class="flex justify-between items-center pt-5 border-t">
+                        <a href="{% url 'warehouses:warehouse_list' %}" class="text-sm font-medium text-gray-600 hover:text-indigo-500">إلغاء</a>
+                        <button type="submit" class="inline-flex justify-center py-2 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none">
+                            <i class="fas fa-save mr-2 rtl:ml-2"></i>
+                            {% if object %}حفظ التغييرات{% else %}إنشاء المخزن{% endif %}
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // FIX: Removed the javascript code generation logic.
+    // The code is now generated by the backend via a signal.
+    // The form field is readonly.
+});
+</script>
+{% endblock %}

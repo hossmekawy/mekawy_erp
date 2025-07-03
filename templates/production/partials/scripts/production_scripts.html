@@ -1,0 +1,179 @@
+<!-- Production JavaScript -->
+<script>
+    // Production Utilities
+    const ProductionUtils = {
+        // Modal Management
+        showModal: function(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+        },
+        
+        hideModal: function(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        },
+        
+        // Confirmation Dialog
+        confirm: function(message, callback) {
+            document.getElementById('confirmMessage').textContent = message;
+            this.showModal('confirmModal');
+            
+            document.getElementById('confirmBtn').onclick = function() {
+                callback();
+                ProductionUtils.hideModal('confirmModal');
+            };
+        },
+        
+        // Delete Confirmation
+        confirmDelete: function(message, deleteUrl) {
+            document.getElementById('deleteMessage').textContent = message;
+            this.showModal('deleteModal');
+            
+            document.getElementById('deleteBtn').onclick = function() {
+                window.location.href = deleteUrl;
+            };
+        },
+        
+        // Process Action
+        processAction: function(action, processId, processType) {
+            const formData = new FormData();
+            formData.append('process_type', processType);
+            formData.append('process_id', processId);
+            formData.append('action', action);
+            formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+            
+            fetch('{% url "production:update_process_status_ajax" %}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    this.showToast(data.message, 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    this.showToast(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                this.showToast('حدث خطأ في الاتصال', 'error');
+            });
+        },
+        
+        // Toast Notifications
+        showToast: function(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `fixed top-4 left-4 z-50 p-4 rounded-lg shadow-lg transition-all duration-300 ${
+                type === 'success' ? 'bg-green-500 text-white' :
+                type === 'error' ? 'bg-red-500 text-white' :
+                type === 'warning' ? 'bg-yellow-500 text-white' :
+                'bg-blue-500 text-white'
+            }`;
+            toast.textContent = message;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        },
+        
+        // Export Data
+        exportData: function(url, filename) {
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.click();
+            this.showToast('جاري تصدير البيانات...', 'info');
+        }
+    };
+    
+    // Initialize on DOM ready
+    document.addEventListener('DOMContentLoaded', function() {
+        // Close modals on cancel buttons
+        document.querySelectorAll('[id$="CancelBtn"], [id$="cancelBtn"]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const modal = this.closest('[id$="Modal"]');
+                if (modal) {
+                    modal.classList.add('hidden');
+                }
+            });
+        });
+        
+        // Close modals on outside click
+        document.querySelectorAll('[id$="Modal"]').forEach(modal => {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.classList.add('hidden');
+                }
+            });
+        });
+        
+        // Process action buttons
+        document.querySelectorAll('[data-process-action]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const action = this.dataset.processAction;
+                const processId = this.dataset.processId;
+                const processType = this.dataset.processType;
+                
+                ProductionUtils.confirm(
+                    `هل تريد ${action} هذه العملية؟`,
+                    () => ProductionUtils.processAction(action, processId, processType)
+                );
+            });
+        });
+        
+        // Delete buttons
+        document.querySelectorAll('[data-delete-url]').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const deleteUrl = this.dataset.deleteUrl;
+                const itemName = this.dataset.itemName || 'هذا العنصر';
+                
+                ProductionUtils.confirmDelete(
+                    `هل تريد حذف ${itemName}؟`,
+                    deleteUrl
+                );
+            });
+        });
+        
+        // Export buttons
+        document.querySelectorAll('[data-export]').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const exportType = this.dataset.export;
+                const exportUrl = this.href;
+                const filename = `export_${exportType}_${new Date().getTime()}.${exportType}`;
+                
+                ProductionUtils.exportData(exportUrl, filename);
+            });
+        });
+        
+        // Search form auto-submit
+        const searchForm = document.getElementById('search-form');
+        if (searchForm) {
+            let searchTimeout;
+            const searchInput = searchForm.querySelector('input[name="search"]');
+            
+            if (searchInput) {
+                searchInput.addEventListener('input', function() {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        searchForm.submit();
+                    }, 1000);
+                });
+            }
+        }
+        
+        // Bulk actions
+        const checkboxes = document.querySelectorAll('input[type="checkbox"][name="selected_items"]');
+        const bulkActions = document.getElementById('bulk-actions');
+        
+        if (checkboxes.length && bulkActions) {
+            checkboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const checkedCount = document.querySelectorAll('input[type="checkbox"][name="selected_items"]:checked').length;
+                    bulkActions.style.display = checkedCount > 0 ? 'flex' : 'none';
+                });
+            });
+        }
+    });
+    </script>

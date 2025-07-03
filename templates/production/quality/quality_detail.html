@@ -1,0 +1,117 @@
+{% extends 'production/production_base.html' %}
+{% load i18n %}
+
+{% block production_title %}تفاصيل فحص الجودة: {{ quality_check }}{% endblock %}
+
+{% block production_breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'production:quality:quality_list' %}" class="text-black-50">مراقبة الجودة</a></li>
+<li class="breadcrumb-item active" aria-current="page">تفاصيل الفحص</li>
+{% endblock %}
+
+{% block production_header_actions %}
+<div class="d-flex flex-wrap justify-content-end gap-2">
+    <a href="{% url 'production:quality:quality_update' quality_check.pk %}" class="btn btn-production-outline">
+        <i class="fas fa-edit me-2"></i> تعديل
+    </a>
+    {% if not quality_check.approved %}
+    <form method="post" action="{% url 'production:quality:quality_approve' quality_check.pk %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-success"><i class="fas fa-check-circle me-2"></i> اعتماد الفحص</button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block production_content %}
+<div class="row">
+    <div class="col-lg-7">
+        <div class="production-card mb-4">
+            <div class="production-card-header d-flex justify-content-between align-items-center">
+                <div><i class="fas fa-tasks me-2"></i>نتائج الفحص</div>
+                {% if quality_check.approved %}
+                    <span class="badge fs-6 rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle">
+                        <i class="fas fa-check me-1"></i> معتمد بواسطة {{ quality_check.approved_by.username }}
+                    </span>
+                {% else %}
+                    <span class="badge fs-6 rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle">
+                        <i class="fas fa-clock me-1"></i> في انتظار الموافقة
+                    </span>
+                {% endif %}
+            </div>
+            <div class="production-card-body">
+                <div class="row">
+                    <div class="col-md-4 text-center border-end">
+                        <h3 class="fw-bold text-primary">{{ quality_check.items_checked }}</h3>
+                        <p class="text-muted mb-0">العناصر المفحوصة</p>
+                    </div>
+                    <div class="col-md-4 text-center border-end">
+                        <h3 class="fw-bold text-success">{{ quality_check.items_passed }}</h3>
+                        <p class="text-muted mb-0">العناصر المقبولة ({{ quality_check.pass_rate|floatformat:2 }}%)</p>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <h3 class="fw-bold text-danger">{{ quality_check.items_failed }}</h3>
+                        <p class="text-muted mb-0">العناصر المرفوضة ({{ quality_check.failure_rate|floatformat:2 }}%)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="production-card">
+            <div class="production-card-header"><i class="fas fa-file-alt me-2"></i>التفاصيل والملاحظات</div>
+            <div class="production-card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">وصف العيوب</dt>
+                    <dd class="col-sm-8">{{ quality_check.defect_description|default:"-"|linebreaksbr }}</dd>
+                    <hr class="my-3">
+                    <dt class="col-sm-4">الإجراءات التصحيحية</dt>
+                    <dd class="col-sm-8">{{ quality_check.corrective_actions|default:"-"|linebreaksbr }}</dd>
+                    <hr class="my-3">
+                    <dt class="col-sm-4">ملاحظات إضافية</dt>
+                    <dd class="col-sm-8">{{ quality_check.notes|default:"-"|linebreaksbr }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="production-card">
+            <div class="production-card-header"><i class="fas fa-info-circle me-2"></i>معلومات الفحص</div>
+            <div class="list-group list-group-flush">
+                <div class="list-group-item d-flex justify-content-between">
+                    <strong>أمر الإنتاج</strong>
+                    <a href="{% url 'production:order_detail' quality_check.production_order.pk %}">{{ quality_check.production_order.order_number }}</a>
+                </div>
+                <div class="list-group-item d-flex justify-content-between">
+                    <strong>العملية المرتبطة</strong>
+                    {% if quality_check.related_process_url %}
+                        <a href="{{ quality_check.related_process_url }}">{{ quality_check.related_process }}</a>
+                    {% else %}
+                        <span>--</span>
+                    {% endif %}
+                </div>
+                <div class="list-group-item d-flex justify-content-between">
+                    <strong>نوع الفحص</strong>
+                    <span>{{ quality_check.get_check_type_display }}</span>
+                </div>
+                <div class="list-group-item d-flex justify-content-between">
+                    <strong>المفتش</strong>
+                    <span>{{ quality_check.inspector.username|default:"--" }}</span>
+                </div>
+                <div class="list-group-item d-flex justify-content-between">
+                    <strong>تاريخ الفحص</strong>
+                    <span>{{ quality_check.check_date|date:"d M Y, H:i" }}</span>
+                </div>
+                <div class="list-group-item d-flex justify-content-between">
+                    <strong>التقييم العام</strong>
+                    <span class="badge 
+                        {% if quality_check.overall_grade == 'A' %} bg-success
+                        {% elif quality_check.overall_grade == 'B' %} bg-primary
+                        {% elif quality_check.overall_grade == 'C' %} bg-warning text-dark
+                        {% else %} bg-danger {% endif %}">
+                        {{ quality_check.get_overall_grade_display }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

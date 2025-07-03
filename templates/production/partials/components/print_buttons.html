@@ -1,0 +1,11 @@
+<!-- Print Buttons Component -->
+<div class="inline-flex items-center space-x-1 space-x-reverse">
+    {% for print_option in print_options %}
+    <button type="button" 
+            onclick="{% if print_option.url %}window.open('{{ print_option.url }}', '_blank'){% else %}window.print(){% endif %}"
+            class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 transition-colors">
+        <i class="{{ print_option.icon|default:'fas fa-print' }} mr-1"></i>
+        {{ print_option.label }}
+    </button>
+    {% endfor %}
+</div>

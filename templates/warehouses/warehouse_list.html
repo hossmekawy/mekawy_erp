@@ -1,0 +1,243 @@
+{% extends 'warehouses/base.html' %}
+{% load static i18n %}
+
+{% block title %}قائمة المخازن - Mekawy ERP{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<style>
+    .warehouse-content {
+        padding: 2rem;
+    }
+    .card-hover:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    .clickable-card {
+        cursor: pointer;
+    }
+    
+    /* --- FIX: START --- */
+    /* This class will be toggled by JS to lift the active card and its menu */
+    .card-active {
+        position: relative;
+        z-index: 20;
+    }
+    /* --- FIX: END --- */
+
+</style>
+{% endblock %}
+
+{% block warehouse_content %}
+<div class="container mx-auto">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">إدارة المخازن</h1>
+            <p class="mt-1 text-sm text-gray-500">عرض، إضافة، وتعديل المخازن الخاصة بك.</p>
+        </div>
+        <div class="mt-4 sm:mt-0">
+            <a href="{% url 'warehouses:warehouse_add' %}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition ease-in-out duration-150">
+                <i class="fas fa-plus ml-2 rtl:mr-2"></i>
+                إضافة مخزن جديد
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-white p-4 rounded-lg shadow-sm mb-6">
+        <form method="get" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div class="md:col-span-2 lg:col-span-2">
+                <label for="search" class="block text-sm font-medium text-gray-700">بحث</label>
+                <input type="text" name="search" id="search" value="{{ request.GET.search|default:'' }}" placeholder="ابحث بالاسم أو الكود..." class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+            <div>
+                <label for="status" class="block text-sm font-medium text-gray-700">الحالة</label>
+                <select name="status" id="status" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                    <option value="">جميع الحالات</option>
+                    <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>نشط</option>
+                    <option value="inactive" {% if request.GET.status == 'inactive' %}selected{% endif %}>غير نشط</option>
+                </select>
+            </div>
+            <div class="flex items-end">
+                <button type="submit" class="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <i class="fas fa-search -ml-1 mr-2 h-5 w-5 rtl:ml-2 rtl:-mr-1"></i>
+                    بحث
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {% for warehouse in warehouses %}
+        <div class="bg-white rounded-lg shadow-md transition duration-300 card-hover clickable-card" data-detail-url="{% url 'warehouses:warehouse_detail' warehouse.pk %}">
+            <div class="p-5">
+                <div class="flex justify-between items-start">
+                    <div class="flex-shrink-0 h-12 w-12 flex items-center justify-center rounded-full 
+                        {% if warehouse.warehouse_type == 'components' %} bg-yellow-100 text-yellow-600
+                        {% elif warehouse.warehouse_type == 'textile' %} bg-blue-100 text-blue-600
+                        {% elif warehouse.warehouse_type == 'finished_goods' %} bg-green-100 text-green-600
+                        {% else %} bg-gray-100 text-gray-600 {% endif %}">
+                        <i class="fas text-xl
+                            {% if warehouse.warehouse_type == 'components' %} fa-cogs
+                            {% elif warehouse.warehouse_type == 'textile' %} fa-layer-group
+                            {% elif warehouse.warehouse_type == 'finished_goods' %} fa-box-open
+                            {% else %} fa-warehouse {% endif %}"></i>
+                    </div>
+                    <div class="relative inline-block text-left">
+                        <button type="button" class="action-menu-button p-1 rounded-full text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" data-warehouse-id="{{ warehouse.pk }}">
+                            <span class="sr-only">Open options</span>
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <div id="action-menu-{{ warehouse.pk }}" class="action-menu origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none hidden z-10" role="menu">
+                            <div class="py-1" role="none">
+                                <a href="{% url 'warehouses:warehouse_detail' warehouse.pk %}" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100" role="menuitem"><i class="fas fa-eye w-5 mr-2 rtl:ml-2"></i>عرض</a>
+                                <a href="{% url 'warehouses:warehouse_edit' warehouse.pk %}" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100" role="menuitem"><i class="fas fa-edit w-5 mr-2 rtl:ml-2"></i>تعديل</a>
+                                <a href="#" onclick="openDeleteModal({{ warehouse.pk }}, '{{ warehouse.name|escapejs }}')" class="text-red-700 block px-4 py-2 text-sm hover:bg-gray-100" role="menuitem"><i class="fas fa-trash w-5 mr-2 rtl:ml-2"></i>حذف</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <h3 class="text-lg font-bold text-gray-800 truncate">{{ warehouse.name }}</h3>
+                    <p class="text-sm text-gray-500 mt-1">{{ warehouse.get_warehouse_type_display }}</p>
+                    <div class="mt-3 flex justify-between items-center">
+                        <span class="bg-gray-200 text-gray-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded">{{ warehouse.code }}</span>
+                        {% if warehouse.is_active %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">نشط</span>
+                        {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">غير نشط</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+             <div class="border-t border-gray-200 bg-gray-50 px-5 py-3">
+                <div class="text-xs text-gray-500 flex items-center">
+                    <i class="fas fa-user-tie mr-2 rtl:ml-2"></i>
+                    المدير: <strong class="mr-1 rtl:ml-1">{{ warehouse.manager.get_full_name|default:"غير محدد" }}</strong>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="sm:col-span-2 lg:col-span-3 xl:col-span-4 text-center py-16">
+            <i class="fas fa-warehouse fa-4x text-gray-300"></i>
+            <h3 class="mt-4 text-lg font-medium text-gray-800">لا توجد مخازن</h3>
+            <p class="mt-1 text-sm text-gray-500">ابدأ بإضافة مخزن جديد لإدارة مخزونك.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if is_paginated %}
+    <div class="mt-8">
+        {% include 'partials/pagination.html' %}
+    </div>
+    {% endif %}
+</div>
+
+<div id="deleteModal" class="fixed z-50 inset-0 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                        <i class="fas fa-exclamation-triangle text-red-600"></i>
+                    </div>
+                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left rtl:sm:mr-4 rtl:sm:text-right">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                            تأكيد الحذف
+                        </h3>
+                        <div class="mt-2">
+                            <p class="text-sm text-gray-500">هل أنت متأكد من حذف المخزن <strong id="warehouseName"></strong>؟ سيتم حذف جميع البيانات المرتبطة به نهائياً.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <form id="deleteForm" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm">
+                        حذف
+                    </button>
+                </form>
+                <button type="button" onclick="closeDeleteModal()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:w-auto sm:text-sm">
+                    إلغاء
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // --- FIX: START ---
+    // More robust dropdown logic to handle the z-index bug
+    const actionMenuButtons = document.querySelectorAll('.action-menu-button');
+    const allCards = document.querySelectorAll('.clickable-card');
+
+    actionMenuButtons.forEach(button => {
+        button.addEventListener('click', function(event) {
+            event.stopPropagation();
+            const parentCard = this.closest('.clickable-card');
+            const warehouseId = this.dataset.warehouseId;
+            const menu = document.getElementById(`action-menu-${warehouseId}`);
+            const isAlreadyOpen = !menu.classList.contains('hidden');
+
+            // First, close all menus and deactivate all cards
+            document.querySelectorAll('.action-menu').forEach(m => m.classList.add('hidden'));
+            allCards.forEach(c => c.classList.remove('card-active'));
+
+            // If the menu was not already open, open it and activate its card
+            if (!isAlreadyOpen) {
+                menu.classList.remove('hidden');
+                if (parentCard) {
+                    parentCard.classList.add('card-active');
+                }
+            }
+        });
+    });
+
+    // Close dropdowns and deactivate cards when clicking outside
+    document.addEventListener('click', function(event) {
+        const isClickInsideMenu = event.target.closest('.action-menu');
+        const isClickOnMenuButton = event.target.closest('.action-menu-button');
+
+        if (!isClickInsideMenu && !isClickOnMenuButton) {
+            document.querySelectorAll('.action-menu').forEach(menu => menu.classList.add('hidden'));
+            allCards.forEach(c => c.classList.remove('card-active'));
+        }
+    });
+    // --- FIX: END ---
+
+
+    // Logic to make cards clickable (no changes here)
+    const clickableCards = document.querySelectorAll('.clickable-card');
+    clickableCards.forEach(card => {
+        card.addEventListener('click', function(event) {
+            if (event.target.closest('.action-menu-button, .action-menu')) {
+                return;
+            }
+            const detailUrl = this.dataset.detailUrl;
+            if (detailUrl) {
+                window.location.href = detailUrl;
+            }
+        });
+    });
+});
+
+
+// Modal logic (no changes needed)
+function openDeleteModal(id, name) {
+    document.getElementById('warehouseName').innerText = name;
+    document.getElementById('deleteForm').action = `/warehouses/warehouse/${id}/delete/`;
+    document.getElementById('deleteModal').classList.remove('hidden');
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.add('hidden');
+}
+</script>
+{% endblock %}

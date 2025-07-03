@@ -1,0 +1,19 @@
+<!-- Empty State Component -->
+<div class="text-center py-12">
+    <div class="mx-auto h-24 w-24 text-gray-300 mb-4">
+        <i class="{{ empty_icon|default:'fas fa-inbox' }} text-6xl"></i>
+    </div>
+    <h3 class="text-lg font-medium text-gray-900 mb-2">
+        {{ empty_title|default:'لا توجد بيانات' }}
+    </h3>
+    <p class="text-gray-500 mb-6">
+        {{ empty_message|default:'لم يتم العثور على أي عناصر' }}
+    </p>
+    {% if empty_action %}
+    <a href="{{ empty_action.url }}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+        <i class="{{ empty_action.icon }} mr-2"></i>
+        {{ empty_action.label }}
+    </a>
+    {% endif %}
+</div>
+

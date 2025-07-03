@@ -1,0 +1,895 @@
+{% extends 'base.html' %}
+
+{% block title %}أمر الشراء - {{ order.po_number }}{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2>أمر الشراء {{ order.po_number }}</h2>
+        <p class="text-muted mb-0">{{ order.supplier.name }} | {{ order.order_date|date:"Y-m-d" }}</p>
+    </div>
+    <div>
+        <span class="badge bg-{% if order.status == 'completed' %}success{% elif order.status == 'pending' %}warning{% elif order.status == 'cancelled' %}danger{% elif order.status == 'in_delivery' %}info{% else %}secondary{% endif %} fs-6 me-2">
+            {{ order.get_status_display }}
+        </span>
+        <div class="btn-group">
+            {% if order.status not in 'completed,cancelled' %}
+            <a href="{% url 'suppliers:purchase_order_edit' order.pk %}" class="btn btn-outline-primary">
+                <i class="fas fa-edit"></i> تعديل
+            </a>
+            {% endif %}
+            {% if order.status == 'approved' or order.status == 'in_delivery' %}
+            <a href="{% url 'suppliers:purchase_order_receive' order.pk %}" class="btn btn-success">
+                <i class="fas fa-truck"></i> 
+                {% if order.status == 'approved' %}استلام{% else %}استلام المتبقي{% endif %}
+            </a>
+            {% endif %}
+            {% if order.status == 'draft' %}
+            <button class="btn btn-success" onclick="approveOrder({{ order.pk }})">
+                <i class="fas fa-check"></i> موافقة
+            </button>
+            {% endif %}
+            {% if order.status in 'draft,pending' %}
+            <button class="btn btn-outline-danger" onclick="rejectOrder({{ order.pk }})">
+                <i class="fas fa-times"></i> رفض
+            </button>
+            {% endif %}
+            {% if order.status in 'draft,cancelled' %}
+            <button class="btn btn-outline-danger" onclick="deleteOrder({{ order.pk }})">
+                <i class="fas fa-trash"></i> حذف
+            </button>
+            {% endif %}
+            <div class="btn-group">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" onclick="printOrder()"><i class="fas fa-print me-2"></i>طباعة</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="exportOrder()"><i class="fas fa-download me-2"></i>تصدير</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="{% url 'suppliers:detail' order.supplier.pk %}"><i class="fas fa-user me-2"></i>عرض المورد</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Order Info -->
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>تفاصيل الأمر</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>المورد:</strong> {{ order.supplier.name }}</p>
+                        <p><strong>تاريخ الأمر:</strong> {{ order.order_date|date:"Y-m-d" }}</p>
+                        <p><strong>التسليم المتوقع:</strong> {{ order.expected_delivery_date|date:"Y-m-d" }}</p>
+                        {% if order.is_overdue %}
+                        <p><strong>حالة التأخير:</strong> 
+                            <span class="badge bg-danger">متأخر {{ order.days_overdue }} يوم</span>
+                        </p>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>الأولوية:</strong> 
+                            <span class="badge bg-{% if order.priority == 'urgent' %}danger{% elif order.priority == 'high' %}warning{% elif order.priority == 'medium' %}info{% else %}secondary{% endif %}">
+                                {{ order.get_priority_display }}
+                            </span>
+                        </p>
+                        <p><strong>أنشأ بواسطة:</strong> {{ order.created_by.username|default:"غير محدد" }}</p>
+                        {% if order.approved_by %}
+                        <p><strong>وافق عليه:</strong> {{ order.approved_by.username }} في {{ order.approved_at|date:"Y-m-d" }}</p>
+                        {% endif %}
+                        {% if order.actual_delivery_date %}
+                        <p><strong>التسليم الفعلي:</strong> {{ order.actual_delivery_date|date:"Y-m-d" }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if order.notes %}
+                <div class="mt-3">
+                    <strong>ملاحظات:</strong>
+                    <div class="text-muted mt-2 p-3 bg-light rounded" style="white-space: pre-line;">{{ order.notes }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Order Items -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-list me-2"></i>عناصر الأمر</h5>
+                <div>
+                    <span class="badge bg-primary">{{ items|length }} عنصر</span>
+                    <span class="badge bg-info">{{ order.completion_percentage|floatformat:0 }}% مكتمل</span>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                {% if items %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>المنتج</th>
+                                <th>الوحدة</th>
+                                <th>الكمية المطلوبة</th>
+                                <th>الكمية المستلمة</th>
+                                <th>الكمية المتبقية</th>
+                                <th>سعر الوحدة</th>
+                                <th>الإجمالي</th>
+                                <th>الحالة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items %}
+                            <tr class="{% if item.is_fully_received %}table-success{% elif item.quantity_received > 0 %}table-warning{% endif %}">
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div>
+                                            <strong>{{ item.product.name }}</strong>
+                                            {% if item.product.code %}
+                                                <br><small class="text-muted">كود: {{ item.product.code }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>{{ item.product.get_unit_display }}</td>
+                                <td>
+                                    <span class="fw-bold">{{ item.quantity_ordered|floatformat:2 }}</span>
+                                </td>
+                                <td>
+                                    <span class="text-success fw-bold">{{ item.quantity_received|floatformat:2 }}</span>
+                                    {% if item.is_fully_received %}
+                                        <i class="fas fa-check-circle text-success ms-1" title="مكتمل"></i>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.quantity_pending > 0 %}
+                                        <span class="badge bg-warning text-dark">{{ item.quantity_pending|floatformat:2 }}</span>
+                                    {% else %}
+                                        <span class="badge bg-success">0</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ item.unit_price|floatformat:2 }} ج.م</td>
+                                <td class="fw-bold">{{ item.total_price|floatformat:2 }} ج.م</td>
+                                <td>
+                                    {% if item.is_fully_received %}
+                                        <span class="badge bg-success"><i class="fas fa-check me-1"></i>مكتمل</span>
+                                    {% elif item.quantity_received > 0 %}
+                                        <span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>جزئي</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary"><i class="fas fa-hourglass me-1"></i>معلق</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <th colspan="6" class="text-end">الإجمالي:</th>
+                                <th>{{ order.total_amount|floatformat:2 }} ج.م</th>
+                                <th></th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">لا توجد عناصر في هذا الأمر</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Deliveries History -->
+        {% if deliveries %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-truck me-2"></i>سجل التسليمات</h5>
+            </div>
+            <div class="card-body">
+                {% for delivery in deliveries %}
+                <div class="border rounded p-3 mb-3">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>رقم التسليم:</strong> {{ delivery.delivery_number }}</p>
+                            <p><strong>تاريخ التسليم:</strong> {{ delivery.delivery_date|date:"Y-m-d H:i" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>استلم بواسطة:</strong> {{ delivery.received_by.username }}</p>
+                            <p><strong>المخزن:</strong> {{ delivery.warehouse.name }}</p>
+                        </div>
+                    </div>
+                    {% if delivery.delivery_notes %}
+                    <div class="mt-2">
+                        <strong>ملاحظات:</strong>
+                        <p class="text-muted mb-0">{{ delivery.delivery_notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Payments -->
+        {% if payments %}
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-credit-card me-2"></i>الدفعات</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>رقم الدفعة</th>
+                                <th>المبلغ</th>
+                                <th>طريقة الدفع</th>
+                                <th>التاريخ</th>
+                                <th>الحالة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for payment in payments %}
+                            <tr>
+                                <td>{{ payment.payment_number }}</td>
+                                <td>{{ payment.amount|floatformat:2 }} ج.م</td>
+                                <td>{{ payment.get_payment_method_display }}</td>
+                                <td>{{ payment.payment_date|date:"Y-m-d" }}</td>
+                                <td>
+                                    <span class="badge bg-{% if payment.status == 'completed' %}success{% elif payment.status == 'pending' %}warning{% else %}danger{% endif %}">
+                                        {{ payment.get_status_display }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- Summary -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-calculator me-2"></i>ملخص المبالغ</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span>المجموع الفرعي:</span>
+                    <span>{{ order.subtotal|floatformat:2 }} ج.م</span>
+                </div>
+                {% if order.tax_amount > 0 %}
+                <div class="d-flex justify-content-between mb-2">
+                    <span>الضريبة:</span>
+                    <span>{{ order.tax_amount|floatformat:2 }} ج.م</span>
+                </div>
+                {% endif %}
+                {% if order.discount_amount > 0 %}
+                <div class="d-flex justify-content-between mb-2 text-success">
+                    <span>الخصم:</span>
+                    <span>-{{ order.discount_amount|floatformat:2 }} ج.م</span>
+                </div>
+                {% endif %}
+                <hr>
+                <div class="d-flex justify-content-between fw-bold fs-5">
+                    <span>الإجمالي:</span>
+                    <span class="text-primary">{{ order.total_amount|floatformat:2 }} ج.م</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Card -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>حالة التنفيذ</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>نسبة الإكمال</span>
+                        <span>{{ order.completion_percentage|floatformat:0 }}%</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bg-{% if order.completion_percentage == 100 %}success{% elif order.completion_percentage > 50 %}info{% else %}warning{% endif %}" 
+                             role="progressbar" 
+                             style="width: {{ order.completion_percentage }}%">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row text-center">
+                    <div class="col-4">
+                        <div class="border-end">
+                            <h6 class="text-muted mb-1">العناصر</h6>
+                            <h5 class="mb-0">{{ items|length }}</h5>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="border-end">
+                            <h6 class="text-success mb-1">مكتمل</h6>
+                            <h5 class="mb-0 text-success">
+                                {% with completed=items|length %}
+                                    {% for item in items %}
+                                        {% if not item.is_fully_received %}
+                                            {% with completed=completed|add:"-1" %}{% endwith %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {{ completed }}
+                                {% endwith %}
+                            </h5>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <h6 class="text-warning mb-1">معلق</h6>
+                        <h5 class="mb-0 text-warning">
+                            {% with pending=0 %}
+                                {% for item in items %}
+                                    {% if not item.is_fully_received %}
+                                        {% with pending=pending|add:"1" %}{% endwith %}
+                                    {% endif %}
+                                {% endfor %}
+                                {{ pending }}
+                            {% endwith %}
+                        </h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Supplier Info -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-user-tie me-2"></i>معلومات المورد</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;">
+                        <i class="fas fa-user text-white"></i>
+                    </div>
+                    <div>
+                        <h6 class="mb-0">{{ order.supplier.name }}</h6>
+                        <small class="text-muted">{{ order.supplier.get_supplier_type_display }}</small>
+                    </div>
+                </div>
+                
+                <div class="mb-2">
+                    <i class="fas fa-user me-2 text-muted"></i>
+                    <span>{{ order.supplier.contact_person }}</span>
+                </div>
+                <div class="mb-2">
+                    <i class="fas fa-phone me-2 text-muted"></i>
+                    <a href="tel:{{ order.supplier.phone }}" class="text-decoration-none">{{ order.supplier.phone }}</a>
+                </div>
+                {% if order.supplier.email %}
+                <div class="mb-2">
+                    <i class="fas fa-envelope me-2 text-muted"></i>
+                    <a href="mailto:{{ order.supplier.email }}" class="text-decoration-none">{{ order.supplier.email }}</a>
+                </div>
+                {% endif %}
+                <div class="mb-3">
+                    <i class="fas fa-map-marker-alt me-2 text-muted"></i>
+                    <span>{{ order.supplier.address|truncatechars:50 }}</span>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>التقييم:</span>
+                    <div>
+                        {% for i in "12345" %}
+                            <i class="fas fa-star {% if order.supplier.current_rating >= i|add:0 %}text-warning{% else %}text-muted{% endif %}"></i>
+                        {% endfor %}
+                        <span class="ms-1">({{ order.supplier.current_rating|floatformat:1 }})</span>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <a href="{% url 'suppliers:detail' order.supplier.pk %}" class="btn btn-outline-primary btn-sm w-100">
+                        <i class="fas fa-eye me-1"></i>عرض تفاصيل المورد
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>إجراءات سريعة</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    {% if order.status == 'approved' or order.status == 'in_delivery' %}
+                    <a href="{% url 'suppliers:purchase_order_receive' order.pk %}" class="btn btn-success">
+                        <i class="fas fa-truck me-2"></i>
+                        {% if order.status == 'approved' %}استلام الأمر{% else %}استلام المتبقي{% endif %}
+                    </a>
+                    {% endif %}
+                    
+                    <button class="btn btn-outline-primary" onclick="printOrder()">
+                        <i class="fas fa-print me-2"></i>طباعة الأمر
+                    </button>
+                    
+                    <button class="btn btn-outline-info" onclick="sendToSupplier()">
+                        <i class="fas fa-paper-plane me-2"></i>إرسال للمورد
+                    </button>
+                    
+                    {% if order.status not in 'completed,cancelled' %}
+                    <button class="btn btn-outline-warning" onclick="addNote()">
+                        <i class="fas fa-sticky-note me-2"></i>إضافة ملاحظة
+                    </button>
+                    {% endif %}
+                    
+                    <a href="{% url 'suppliers:purchase_orders' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-list me-2"></i>جميع الأوامر
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Rejection Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">رفض أمر الشراء</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">سبب الرفض *</label>
+                    <textarea id="rejectionReason" class="form-control" rows="3" placeholder="أدخل سبب رفض الأمر..." required></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-danger" onclick="confirmReject()">تأكيد الرفض</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Note Modal -->
+<div class="modal fade" id="noteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">إضافة ملاحظة</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">الملاحظة</label>
+                    <textarea id="newNote" class="form-control" rows="4" placeholder="أدخل الملاحظة..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" onclick="saveNote()">حفظ الملاحظة</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include Toast Container -->
+{% include 'partials/toast.html' %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentOrderId = {{ order.pk }};
+
+function approveOrder(orderId) {
+    if (confirm('هل أنت متأكد من الموافقة على هذا الأمر؟')) {
+        $.post(`/suppliers/purchase-orders/${orderId}/approve/`, {
+            csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').val()
+        })
+        .done(function(response) {
+            if (response.success) {
+                showSuccessToast('تم الموافقة على الأمر بنجاح');
+                location.reload();
+            } else {
+                showErrorToast(response.error || 'حدث خطأ أثناء الموافقة');
+            }
+        })
+        .fail(function() {
+            showErrorToast('حدث خطأ في الاتصال');
+        });
+    }
+}
+
+function rejectOrder(orderId) {
+    currentOrderId = orderId;
+    $('#rejectModal').modal('show');
+}
+
+function confirmReject() {
+    const reason = $('#rejectionReason').val().trim();
+    
+    if (!reason) {
+        showErrorToast('يرجى إدخال سبب الرفض');
+        return;
+    }
+    
+    $.post(`/suppliers/purchase-orders/${currentOrderId}/reject/`, {
+        csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').val(),
+        rejection_reason: reason
+    })
+    .done(function(response) {
+        if (response.success) {
+            $('#rejectModal').modal('hide');
+            showSuccessToast('تم رفض الأمر بنجاح');
+            location.reload();
+        } else {
+            showErrorToast(response.error || 'حدث خطأ أثناء رفض الأمر');
+        }
+    })
+    .fail(function() {
+        showErrorToast('حدث خطأ في الاتصال');
+    });
+}
+
+function deleteOrder(orderId) {
+    if (confirm('هل أنت متأكد من حذف هذا الأمر؟ لا يمكن التراجع عن هذا الإجراء.')) {
+        $.post(`/suppliers/purchase-orders/${orderId}/delete/`, {
+            csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').val()
+        })
+        .done(function(response) {
+            if (response.success) {
+                showSuccessToast('تم حذف الأمر بنجاح');
+                if (response.redirect_url) {
+                    window.location.href = response.redirect_url;
+                } else {
+                    window.location.href = '/suppliers/purchase-orders/';
+                }
+            } else {
+                showErrorToast(response.error || 'حدث خطأ أثناء حذف الأمر');
+            }
+        })
+        .fail(function() {
+            showErrorToast('حدث خطأ في الاتصال');
+        });
+    }
+}
+
+function addNote() {
+    $('#noteModal').modal('show');
+}
+
+function saveNote() {
+    const note = $('#newNote').val().trim();
+    
+    if (!note) {
+        showErrorToast('يرجى إدخال الملاحظة');
+        return;
+    }
+    
+    // This would need a new endpoint to add notes
+    showInfoToast('سيتم إضافة هذه الميزة قريباً');
+    $('#noteModal').modal('hide');
+}
+
+function printOrder() {
+    window.print();
+}
+
+function exportOrder() {
+    showInfoToast('سيتم إضافة ميزة التصدير قريباً');
+}
+
+function sendToSupplier() {
+    showInfoToast('سيتم إضافة ميزة الإرسال للمورد قريباً');
+}
+
+// Auto-refresh for orders in delivery status
+{% if order.status == 'in_delivery' %}
+setInterval(function() {
+    // Check for updates every 5 minutes
+    $.get(window.location.href)
+    .done(function(data) {
+        // You could implement a more sophisticated update check here
+        console.log('Checking for updates...');
+    });
+}, 300000); // 5 minutes
+{% endif %}
+
+// Print styles
+$(document).ready(function() {
+    // Add print styles
+    $('<style>')
+        .prop('type', 'text/css')
+        .html(`
+            @media print {
+                .btn, .dropdown, .card-header .badge, .modal { display: none !important; }
+                .card { border: 1px solid #000 !important; box-shadow: none !important; }
+                .table { font-size: 12px; }
+                .badge { border: 1px solid #000; }
+                body { font-size: 12px; }
+                h1, h2, h3, h4, h5, h6 { color: #000 !important; }
+            }
+        `)
+        .appendTo('head');
+});
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.progress {
+    height: 8px;
+}
+
+.table-success {
+    background-color: rgba(25, 135, 84, 0.1) !important;
+}
+
+.table-warning {
+    background-color: rgba(255, 193, 7, 0.1) !important;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.badge {
+    font-size: 0.75em;
+}
+
+.text-primary {
+    color: #0d6efd !important;
+}
+
+/* Print Styles */
+@media print {
+    .btn, .dropdown, .modal, .toast-container {
+        display: none !important;
+    }
+    
+    .card {
+        border: 1px solid #000 !important;
+        box-shadow: none !important;
+        break-inside: avoid;
+        margin-bottom: 1rem;
+    }
+    
+    .table {
+        font-size: 11px;
+        border-collapse: collapse;
+    }
+    
+    .table th, .table td {
+        border: 1px solid #000 !important;
+        padding: 0.25rem !important;
+    }
+    
+    .badge {
+        border: 1px solid #000;
+        color: #000 !important;
+        background-color: transparent !important;
+    }
+    
+    body {
+        font-size: 12px;
+        color: #000;
+    }
+    
+    h1, h2, h3, h4, h5, h6 {
+        color: #000 !important;
+    }
+    
+    .text-muted {
+        color: #666 !important;
+    }
+    
+    .bg-light {
+        background-color: #f8f9fa !important;
+    }
+    
+    /* Hide sidebar on print */
+    .col-lg-4 {
+        display: none;
+    }
+    
+    .col-lg-8 {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}
+
+/* Status badges colors */
+.badge.bg-success {
+    background-color: #198754 !important;
+}
+
+.badge.bg-warning {
+    background-color: #ffc107 !important;
+    color: #000 !important;
+}
+
+.badge.bg-danger {
+    background-color: #dc3545 !important;
+}
+
+.badge.bg-info {
+    background-color: #0dcaf0 !important;
+    color: #000 !important;
+}
+
+.badge.bg-secondary {
+    background-color: #6c757d !important;
+}
+
+/* Hover effects */
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.075);
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    transition: transform 0.2s ease;
+}
+
+/* Custom scrollbar for notes */
+.bg-light {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.bg-light::-webkit-scrollbar {
+    width: 6px;
+}
+
+.bg-light::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.bg-light::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 3px;
+}
+
+.bg-light::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .d-flex.justify-content-between.align-items-center {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+    
+    .btn-group {
+        margin-top: 1rem;
+        width: 100%;
+    }
+    
+    .btn-group .btn {
+        font-size: 0.875rem;
+        padding: 0.375rem 0.5rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .card-body {
+        padding: 1rem 0.75rem;
+    }
+}
+
+/* Loading states */
+.btn.loading {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.btn.loading::after {
+    content: "";
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    margin-left: 0.5rem;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Status indicator animations */
+.badge {
+    transition: all 0.3s ease;
+}
+
+.badge:hover {
+    transform: scale(1.05);
+}
+
+/* Progress bar animation */
+.progress-bar {
+    transition: width 0.6s ease;
+}
+
+/* Card hover effects */
+.card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    transition: box-shadow 0.3s ease;
+}
+
+/* Icon colors */
+.text-success { color: #198754 !important; }
+.text-warning { color: #ffc107 !important; }
+.text-danger { color: #dc3545 !important; }
+.text-info { color: #0dcaf0 !important; }
+.text-muted { color: #6c757d !important; }
+
+/* Custom border colors */
+.border-end {
+    border-right: 1px solid #dee2e6 !important;
+}
+
+/* Modal improvements */
+.modal-content {
+    border-radius: 0.5rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+    border-bottom: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+}
+
+.modal-footer {
+    border-top: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+}
+
+/* Form improvements */
+.form-control:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+textarea.form-control {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* Utility classes */
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.user-select-none {
+    user-select: none;
+}
+
+/* Animation for status changes */
+@keyframes statusChange {
+    0% { background-color: #fff3cd; }
+    100% { background-color: transparent; }
+}
+
+.status-updated {
+    animation: statusChange 2s ease-out;
+}
+</style>
+{% endblock %}
+

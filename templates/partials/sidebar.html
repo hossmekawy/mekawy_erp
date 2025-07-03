@@ -1,0 +1,92 @@
+{% comment %}
+A modern, clean, RTL-responsive Bootstrap 5 sidebar for Mekawy ERP.
+Driven by `sidebar_nav_items` context processor.
+Colors are now driven by the `theme_context` processor.
+{% endcomment %}
+
+<style>
+  /* Dynamic Sidebar Styles */
+  #sidebar {
+      background-color: {{ sidebar_bg_color|default:'#343a40' }};
+      color: {{ sidebar_text_color|default:'#ffffff' }};
+  }
+  #sidebar .user-name,
+  #sidebar ul li a {
+      color: {{ sidebar_text_color|default:'#ffffff' }};
+  }
+  #sidebar .user-role,
+  #sidebar .footer {
+      color: {{ sidebar_text_color|default:'#ffffff' }};
+      opacity: 0.7;
+  }
+  #sidebar ul li a:hover,
+  #sidebar ul li a.dropdown-toggle:hover {
+      background-color: rgba(255, 255, 255, 0.1); /* A subtle hover that works on any background */
+  }
+  #sidebar ul li a.active {
+      background-color: rgba(255, 255, 255, 0.2); /* A slightly stronger active color */
+  }
+</style>
+
+<nav id="sidebar">
+  <div class="p-4 pt-5 d-flex flex-column justify-content-between h-100">
+
+    <div class="user-profile text-center mb-4">
+      <div class="img-container mx-auto mb-3">
+        {% if user.profile_picture %}
+          <img src="{{ user.profile_picture.url }}" alt="صورة الملف الشخصي" class="rounded-circle user-img">
+        {% else %}
+          <div class="rounded-circle user-initials d-flex align-items-center justify-content-center" style="background-color: rgba(255,255,255,0.2);">
+            <span>{{ user.initials }}</span>
+          </div>
+        {% endif %}
+      </div>
+      <h5 class="user-name mb-0">{{ user.get_full_name }}</h5>
+      <small class="user-role">{{ user.get_role_display }}</small>
+    </div>
+
+    <ul class="list-unstyled components mb-5">
+      {% for section, data in sidebar_nav_items.items %}
+        {% if data.links|length == 1 %}
+          {% for name, detail in data.links.items %}
+            <li class="mb-1">
+              {% if detail.is_modal %}
+                <a href="#" data-bs-toggle="modal" data-bs-target="{{ detail.resolved_url }}" class="d-flex align-items-center p-2 rounded">
+                  <i class="{{ detail.icon }} fs-5 me-2"></i>
+                  <span>{{ name }}</span>
+                </a>
+              {% else %}
+                <a href="{{ detail.resolved_url }}" class="d-flex align-items-center p-2 rounded {% if request.path == detail.resolved_url %}active{% endif %}">
+                  <i class="{{ detail.icon }} fs-5 me-2"></i>
+                  <span>{{ name }}</span>
+                </a>
+              {% endif %}
+            </li>
+          {% endfor %}
+        {% else %}
+          <li class="mb-1">
+            <a class="d-flex align-items-center p-2 rounded dropdown-toggle" href="#{{ data.id }}Menu" data-bs-toggle="collapse" aria-expanded="false">
+              <i class="{{ data.links.values.0.icon }} fs-5 me-2"></i>
+              <span>{{ section }}</span>
+            </a>
+            <ul class="collapse list-unstyled ps-3" id="{{ data.id }}Menu" data-bs-parent="#sidebar">
+              {% for name, detail in data.links.items %}
+                <li class="mb-1">
+                  <a href="{{ detail.resolved_url }}" class="d-flex align-items-center p-2 rounded {% if request.path == detail.resolved_url %}active-sub{% endif %}">
+                    <i class="{{ detail.icon }} fs-6 me-2"></i>
+                    <span>{{ name }}</span>
+                  </a>
+                </li>
+              {% endfor %}
+            </ul>
+          </li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+    
+    <div class="footer text-center small">
+      &copy; {{ current_year }} Mekawy ERP
+    </div>
+
+  </div>
+</nav>

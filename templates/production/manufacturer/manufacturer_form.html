@@ -1,0 +1,139 @@
+{% extends 'production/production_base.html' %}
+{% load widget_tweaks %}
+
+{% block production_title %}
+    {% if object %}
+        تعديل مصنع: {{ object.name }}
+    {% else %}
+        إضافة مصنع خارجي جديد
+    {% endif %}
+{% endblock %}
+
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item"><a href="{% url 'production:manufacturers:manufacturer_list' %}">المصانع الخارجية</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{% if object %}تعديل{% else %}إضافة{% endif %}</li>
+{% endblock %}
+
+{% block extra_css %}
+    {{ block.super }}
+    <style>
+        .card-header-icon {
+            font-size: 1.1rem;
+            color: var(--bs-primary);
+        }
+        .form-label {
+            font-weight: 500;
+        }
+        .input-group-text {
+            width: 45px;
+            justify-content: center;
+        }
+        .btn-production {
+            background-color: #0d6efd; /* Bootstrap primary blue */
+            color: white;
+            border: none;
+        }
+        .btn-production:hover {
+            background-color: #0b5ed7;
+        }
+    </style>
+{% endblock %}
+
+{% block production_content %}
+<form method="post" class="needs-validation" novalidate>
+    {% csrf_token %}
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-light d-flex align-items-center">
+                    <i class="fas fa-industry card-header-icon me-2"></i>
+                    <h5 class="mb-0">معلومات المصنع الأساسية</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <label for="{{ form.name.id_for_label }}" class="form-label">اسم المصنع</label>
+                            {% render_field form.name class="form-control form-control-lg" placeholder="مثال: مصنع الأمانة للخياطة" required=True %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="{{ form.contact_person.id_for_label }}" class="form-label">الشخص المسؤول</label>
+                            {% render_field form.contact_person class="form-control form-control-lg" placeholder="اسم الشخص المسؤول" required=True %}
+                        </div>
+                        <div class="col-12">
+                            <label for="{{ form.phone.id_for_label }}" class="form-label">الهاتف</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-phone-alt"></i></span>
+                                {% render_field form.phone class="form-control form-control-lg" dir="ltr" placeholder="01xxxxxxxxx" %}
+                            </div>
+                        </div>
+                        <div class="col-12">
+                             <label for="{{ form.address.id_for_label }}" class="form-label">العنوان</label>
+                             <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-map-marker-alt"></i></span>
+                                {% render_field form.address class="form-control form-control-lg" placeholder="عنوان المصنع بالتفصيل" %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light d-flex align-items-center">
+                    <i class="fas fa-dollar-sign card-header-icon me-2"></i>
+                    <h5 class="mb-0">التفاصيل المالية</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="mb-3">
+                        <label for="{{ form.price_per_piece.id_for_label }}" class="form-label">السعر للقطعة</label>
+                        <div class="input-group">
+                            {% render_field form.price_per_piece class="form-control" type="number" step="0.01" %}
+                            <span class="input-group-text">جنيه</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="{{ form.payment_terms_days.id_for_label }}" class="form-label">مدة السداد</label>
+                        <div class="input-group">
+                             {% render_field form.payment_terms_days class="form-control" type="number" %}
+                            <span class="input-group-text">أيام</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                 <div class="card-header bg-light d-flex align-items-center">
+                    <i class="fas fa-sliders-h card-header-icon me-2"></i>
+                    <h5 class="mb-0">التفاصيل التشغيلية</h5>
+                </div>
+                 <div class="card-body p-4">
+                    <div class="mb-3">
+                        <label for="{{ form.quality_rating.id_for_label }}" class="form-label">تقييم الجودة (من 5)</label>
+                         <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-star"></i></span>
+                            {% render_field form.quality_rating class="form-control" type="number" step="0.5" min="0" max="5" %}
+                        </div>
+                    </div>
+                     <div class="form-check form-switch fs-5">
+                        {% render_field form.is_active class="form-check-input" role="switch" %}
+                        <label for="{{ form.is_active.id_for_label }}" class="form-check-label">حالة المصنع (نشط)</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12 d-flex justify-content-end gap-2 border-top pt-3">
+            <a href="{% if object %}{% url 'production:manufacturers:manufacturer_detail' object.pk %}{% else %}{% url 'production:manufacturers:manufacturer_list' %}{% endif %}" class="btn btn-secondary btn-lg">
+                <i class="fas fa-times me-2"></i>إلغاء
+            </a>
+            <button type="submit" class="btn btn-production btn-lg">
+                <i class="fas fa-save me-2"></i>حفظ البيانات
+            </button>
+        </div>
+    </div>
+</form>
+{% endblock %}

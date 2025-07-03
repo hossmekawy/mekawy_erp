@@ -1,0 +1,44 @@
+{% comment %}
+A modern, clean, responsive RTL navbar for Bootstrap 5
+Replaces the old `partials/navbar.html` and integrates seamlessly with base.html
+{% endcomment %}
+
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm static-top" style="height: var(--navbar-height);">
+    <div class="container-fluid">
+      <!-- Sidebar Toggle -->
+      <button id="sidebarCollapse" class="btn btn-outline-secondary  me-2" aria-label="Toggle sidebar">
+        <i class="fas fa-bars"></i>
+      </button>
+  
+      <!-- Brand / Page Title -->
+      <a class="navbar-brand d-flex align-items-center me-auto" href="#">
+        <i class="fas fa-chart-line fs-4 text-primary me-2"></i>
+        <span class="fw-bold text-secondary d-none d-md-inline">{% block page_title %}لوحة التحكم{% endblock %}</span>
+      </a>
+  
+
+  
+      <!-- Collapsible content -->
+
+    </div>
+  </nav>
+  
+  <!-- Logout Modal (unchanged) -->
+  <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content">
+        <div class="modal-header border-0">
+          <h5 class="modal-title fw-bold" id="logoutModalLabel">تسجيل الخروج</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">هل أنت متأكد من رغبتك في تسجيل الخروج؟</p>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+          <a href="{% url 'users:logout' %}" class="btn btn-danger">تسجيل الخروج</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  

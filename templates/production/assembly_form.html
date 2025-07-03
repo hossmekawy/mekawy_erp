@@ -1,0 +1,673 @@
+{% extends 'production/production_base.html' %}
+{% load static i18n widget_tweaks %}
+
+{% block production_title %}
+    {% if form.instance.pk %} تعديل إرسال التجميع {% else %} إرسال للتجميع {% endif %}
+{% endblock %}
+
+{% block production_header_actions %}
+<a href="{% if form.instance.pk %}{% url 'production:assembly_detail' form.instance.pk %}{% else %}{% url 'production:assembly_list' %}{% endif %}" class="btn btn-production-outline" id="cancel-btn">
+    <i class="fas fa-times me-2"></i>إلغاء
+</a>
+{% endblock %}
+
+{% block production_breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'production:assembly_list' %}" class="text-black-50">عمليات التجميع</a></li>
+<li class="breadcrumb-item active" aria-current="page">{% if form.instance.pk %}تعديل إرسال{% else %}إرسال جديد{% endif %}</li>
+{% endblock %}
+
+{% block production_extra_css %}
+{{ block.super }}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<style>
+    .form-step-header {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--production-primary);
+        border-bottom: 2px solid var(--production-light);
+        padding-bottom: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+    .form-step-header .step-number {
+        background-color: var(--production-primary);
+        color: white;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        margin-left: 0.75rem;
+    }
+    .assembly-type-selector .btn-check + .btn {
+        transition: all 0.3s ease;
+        border-radius: 0.5rem !important;
+        border: 2px solid #e9ecef;
+        background-color: #f8f9fa;
+        color: var(--production-secondary);
+        font-weight: 500;
+        padding: 0.75rem 1.5rem;
+    }
+    .assembly-type-selector .btn-check:checked + .btn {
+        background-color: var(--production-primary);
+        color: white;
+        border-color: var(--production-primary);
+        box-shadow: 0 4px 12px rgba(44, 90, 160, 0.2);
+        transform: translateY(-2px);
+    }
+    .conditional-panel {
+        background-color: #f8f9fa;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        border: 1px solid #dee2e6;
+        transition: all 0.4s ease-in-out;
+        max-height: 0;
+        overflow: hidden;
+        opacity: 0;
+        margin-top: 0;
+    }
+    .conditional-panel.visible {
+        max-height: 500px; /* Adjust as needed */
+        opacity: 1;
+        margin-top: 1.5rem;
+    }
+    .conditional-panel.has-error {
+        border-color: var(--bs-danger);
+        background-color: #fff5f5;
+    }
+    .input-group-text {
+        background-color: #e9ecef;
+    }
+    .select2-container .select2-selection--single {
+        height: calc(1.5em + .75rem + 2px) !important;
+    }
+    .select2-container--default .select2-selection--single {
+        border: 1px solid #ced4da;
+    }
+    .select2-container .select2-selection--single .select2-selection__rendered {
+        line-height: calc(1.5em + .75rem);
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: calc(1.5em + .75rem);
+    }
+    .components-table th {
+        background-color: #f8f9fa;
+    }
+    .components-table th, .components-table td {
+        vertical-align: middle;
+    }
+    .warehouse-select-cell {
+        min-width: 220px;
+    }
+    .selected-warehouse-stock {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--bs-primary);
+        display: block;
+        margin-top: 0.3rem;
+        height: 1.2rem; /* Reserve space to prevent layout shift */
+    }
+    .selected-warehouse-stock .spinner-border-sm {
+        width: 0.8rem;
+        height: 0.8rem;
+    }
+    .quantity-input.is-invalid {
+        border-color: var(--bs-danger);
+        box-shadow: 0 0 0 0.25rem rgba(var(--bs-danger-rgb), .25);
+    }
+</style>
+{% endblock %}
+
+{% block production_content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <form method="post" novalidate id="assembly-form">
+            {% csrf_token %}
+            <div class="production-card">
+                 <div class="production-card-header">
+                    <i class="fas fa-cogs me-2"></i>
+                    {% if form.instance.pk %} تعديل بيانات إرسال التجميع {% else %} إرسال أمر إنتاج للتجميع {% endif %}
+                </div>
+                <div class="production-card-body">
+                    {% if form.non_field_errors or component_formset.non_form_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+                            {% for error in component_formset.non_form_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+                        </div>
+                    {% endif %}
+                    
+                    <!-- STEP 1: Select Production Order -->
+                    <div class="mb-4">
+                        <h5 class="form-step-header"><span class="step-number">1</span>اختر أمر الإنتاج</h5>
+                        {% render_field form.production_order class+="form-select form-select-lg" id="id_production_order" %}
+                        {% for error in form.production_order.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                        <div id="order-selection-error" class="text-danger mt-2" style="display: none;"></div>
+                    </div>
+
+                    <!-- STEP 2: Assembly Type -->
+                    <div class="mb-4">
+                        <h5 class="form-step-header"><span class="step-number">2</span>حدد نوع التجميع</h5>
+                        <div class="d-flex gap-3 assembly-type-selector">
+                           <input type="radio" class="btn-check" name="{{ form.assembly_type.html_name }}" id="id_assembly_type_in_house" value="in_house" autocomplete="off" {% if form.assembly_type.value == 'in_house' or not form.assembly_type.value %}checked{% endif %}>
+                           <label class="btn btn-outline-primary" for="id_assembly_type_in_house">
+                               <i class="fas fa-user-cog me-2"></i>داخلي
+                           </label>
+                           <input type="radio" class="btn-check" name="{{ form.assembly_type.html_name }}" id="id_assembly_type_outsourced" value="outsourced" autocomplete="off" {% if form.assembly_type.value == 'outsourced' %}checked{% endif %}>
+                           <label class="btn btn-outline-primary" for="id_assembly_type_outsourced">
+                               <i class="fas fa-industry me-2"></i>خارجي
+                           </label>
+                        </div>
+                        {% for error in form.assembly_type.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                    </div>
+                    
+                    <div id="conditional-details-wrapper">
+                        <div id="assembler-info-wrapper" class="conditional-panel">
+                            <h6 class="mb-3 text-primary"><i class="fas fa-user-check me-2"></i>المسؤول عن التجميع الداخلي</h6>
+                            <p class="mb-0">سيتم إسناد هذه العملية تلقائياً إلى المستخدم الحالي: <strong>{{ request.user.get_full_name|default:request.user.username }}</strong></p>
+                        </div>
+                        <div id="manufacturer-wrapper" class="conditional-panel {% if form.external_manufacturer.errors %}has-error{% endif %}">
+                            <div class="mb-3">
+                                <label for="{{ form.external_manufacturer.id_for_label }}" class="form-label fw-bold">{{ form.external_manufacturer.label }}</label>
+                                {% render_field form.external_manufacturer class+="form-select" %}
+                                {% for error in form.external_manufacturer.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                                {% if form.external_manufacturer.help_text %}
+                                    <div class="form-text text-info-emphasis mt-2">{{ form.external_manufacturer.help_text|safe }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 3: Assembly Components -->
+                    <div class="mt-4">
+                        <h5 class="form-step-header"><span class="step-number">3</span>حدد المكونات المرسلة</h5>
+                    
+                        <!-- Action Buttons -->
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <button type="button" class="btn btn-production-outline" id="load-bom-btn" disabled>
+                                <i class="fas fa-list-alt me-2"></i>تحميل المكونات من قائمة المواد (BOM)
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="manual-add-toggle-btn">
+                                <i class="fas fa-plus me-2"></i>إضافة مكون يدويًا
+                            </button>
+                        </div>
+                    
+                        <!-- Manual Add Search Box (Initially Hidden) -->
+                        <div id="manual-add-section" class="mb-3" style="display: none;">
+                            <label for="manual-component-search" class="form-label">ابحث عن المادة الخام لإضافتها:</label>
+                            <select id="manual-component-search" class="form-select"></select>
+                        </div>
+                    
+                        <!-- Loader -->
+                        <div id="components-loader" class="text-center py-4" style="display: none;">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">جاري جلب المكونات...</p>
+                        </div>
+                    
+                        <!-- Components Table -->
+                        <div id="components-section">
+                            <div id="global-components-warning" class="alert alert-warning" style="display: none;"></div>
+                            {{ component_formset.management_form }}
+                            <div class="table-responsive">
+                                <table class="table table-bordered components-table">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>المكون</th>
+                                            <th class="text-center" style="width: 140px;">الكمية المطلوبة</th>
+                                            <th class="text-center" style="width: 140px;">إجمالي المتاح</th>
+                                            <th class="text-center" style="width: 280px;">المخزن والكمية المرسلة</th>
+                                            <th class="text-center" style="width: 50px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="components-tbody">
+                                        <!-- Rows will be added dynamically here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div id="components-placeholder" class="production-empty text-center py-5">
+                                <i class="fas fa-boxes"></i>
+                                <h5>لم تتم إضافة أي مكونات</h5>
+                                <p>يمكنك تحميل المكونات من قائمة المواد أو إضافتها يدويًا.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 4: Sending Details -->
+                    <div class="mt-4">
+                        <h5 class="form-step-header"><span class="step-number">4</span>أدخل تفاصيل الإرسال</h5>
+                        <div class="row">
+                           <div class="col-md-6 mb-4">
+                               <label for="{{ form.quantity_sent.id_for_label }}" class="form-label">{{ form.quantity_sent.label }}</label>
+                               <div class="input-group">
+                                   <span class="input-group-text"><i class="fas fa-box"></i></span>
+                                   {% render_field form.quantity_sent class+="form-control" placeholder="0" %}
+                               </div>
+                               {% for error in form.quantity_sent.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                               <div class="form-text">هذه هي كمية القطع الرئيسية الجاهزة للتجميع.</div>
+                           </div>
+                           <div class="col-md-6 mb-4">
+                               <label for="{{ form.expected_completion_date.id_for_label }}" class="form-label">{{ form.expected_completion_date.label }}</label>
+                               <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                                   {% render_field form.expected_completion_date class+="form-control" %}
+                               </div>
+                               {% for error in form.expected_completion_date.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                           </div>
+                           <div class="col-12 mb-4">
+                                <label for="{{ form.notes.id_for_label }}" class="form-label">{{ form.notes.label }}</label>
+                               {% render_field form.notes class+="form-control" rows="3" placeholder="أضف أي ملاحظات خاصة بعملية الإرسال..." %}
+                           </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end mt-4">
+                        <button type="submit" class="btn btn-production btn-lg px-5" id="submit-button">
+                            <i class="fas fa-paper-plane me-2"></i>حفظ وإرسال
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# Hidden template for the component formset #}
+<div style="display:none;" id="component-form-template">
+    {{ component_formset.empty_form|safe }}
+</div>
+{% endblock %}
+
+{% block production_extra_js %}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // --- Global DOM Elements & State ---
+    const assemblyForm = document.getElementById('assembly-form');
+    const orderSelect = $('#id_production_order');
+    const componentsTbody = document.getElementById('components-tbody');
+    const formTemplate = document.getElementById('component-form-template').innerHTML;
+    const componentsLoader = document.getElementById('components-loader');
+    const componentsPlaceholder = document.getElementById('components-placeholder');
+    const totalFormsInput = document.querySelector('#id_components-TOTAL_FORMS');
+    const assemblyTypeRadios = document.querySelectorAll("input[name='{{ form.assembly_type.html_name }}']");
+    const assemblerInfoWrapper = document.getElementById('assembler-info-wrapper');
+    const manufacturerWrapper = document.getElementById('manufacturer-wrapper');
+    const loadBomBtn = document.getElementById('load-bom-btn');
+    const manualAddToggleBtn = document.getElementById('manual-add-toggle-btn');
+    const manualAddSection = document.getElementById('manual-add-section');
+    const manualComponentSearch = $('#manual-component-search');
+    const cancelBtn = document.getElementById('cancel-btn');
+    const globalWarningDiv = document.getElementById('global-components-warning');
+
+    const sessionStorageKey = `assemblyFormState_{{ request.user.id }}`;
+
+    // --- State Management Functions (Restored from original) ---
+    const saveState = () => {
+        const components = [];
+        componentsTbody.querySelectorAll('tr').forEach(row => {
+            const warehouseSelect = row.querySelector('.component-warehouse-select');
+            components.push({
+                material_id: row.dataset.materialId,
+                name: row.querySelector('strong').textContent,
+                unit: row.querySelector('.text-muted.small').textContent,
+                total_required: row.querySelector('.badge.bg-secondary').textContent,
+                total_available_stock: row.querySelector('.badge.bg-success, .badge.bg-danger').textContent,
+                quantity_sent: row.querySelector('.quantity-input').value,
+                source_warehouse_id: warehouseSelect ? warehouseSelect.value : '',
+                warehouses_json: row.dataset.warehousesJson,
+            });
+        });
+
+        const state = {
+            production_order: orderSelect.val(),
+            assembly_type: document.querySelector("input[name='{{ form.assembly_type.html_name }}']:checked")?.value,
+            external_manufacturer: document.getElementById('{{ form.external_manufacturer.id_for_label }}')?.value,
+            quantity_sent: document.getElementById('{{ form.quantity_sent.id_for_label }}')?.value,
+            expected_completion_date: document.getElementById('{{ form.expected_completion_date.id_for_label }}')?.value,
+            notes: document.getElementById('{{ form.notes.id_for_label }}')?.value,
+            components: components
+        };
+        sessionStorage.setItem(sessionStorageKey, JSON.stringify(state));
+    };
+
+    const loadState = () => {
+        const savedState = sessionStorage.getItem(sessionStorageKey);
+        if (!savedState) return;
+        const state = JSON.parse(savedState);
+
+        if (state.production_order) {
+            orderSelect.val(state.production_order).trigger('change');
+        }
+        if (state.assembly_type) {
+            const radio = document.querySelector(`input[value="${state.assembly_type}"]`);
+            if (radio) radio.checked = true;
+        }
+        if (state.external_manufacturer) {
+            const manufacturerSelect = document.getElementById('{{ form.external_manufacturer.id_for_label }}');
+            if (manufacturerSelect) manufacturerSelect.value = state.external_manufacturer;
+        }
+        const qtySentInput = document.getElementById('{{ form.quantity_sent.id_for_label }}');
+        if(qtySentInput) qtySentInput.value = state.quantity_sent || '';
+        
+        const dateInput = document.getElementById('{{ form.expected_completion_date.id_for_label }}');
+        if(dateInput) dateInput.value = state.expected_completion_date || '';
+
+        const notesInput = document.getElementById('{{ form.notes.id_for_label }}');
+        if(notesInput) notesInput.value = state.notes || '';
+
+
+        if (state.components && state.components.length > 0) {
+            state.components.forEach(comp => {
+                const componentData = { ...comp, warehouses: JSON.parse(comp.warehouses_json || '[]') };
+                addComponentRow(componentData, false); // Don't re-save state while loading it
+                const newRow = componentsTbody.querySelector(`tr[data-material-id="${comp.material_id}"]`);
+                if (newRow) {
+                    newRow.querySelector('.quantity-input').value = comp.quantity_sent;
+                    const warehouseSelect = newRow.querySelector('.component-warehouse-select');
+                    if (warehouseSelect) {
+                        warehouseSelect.value = comp.source_warehouse_id;
+                        warehouseSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }
+            });
+        }
+        toggleConditionalPanels();
+    };
+    
+    const clearState = () => sessionStorage.removeItem(sessionStorageKey);
+
+    // --- Core Logic Functions ---
+    const updateTablePlaceholder = () => {
+        const rowCount = componentsTbody.querySelectorAll('tr:not([style*="display: none"])').length;
+        componentsPlaceholder.style.display = rowCount > 0 ? 'none' : 'block';
+    };
+
+    const validateQuantity = (inputEl) => {
+        const quantitySent = parseFloat(inputEl.value || 0);
+        const maxStock = parseFloat(inputEl.dataset.maxStock || 0);
+        inputEl.classList.toggle('is-invalid', quantitySent > maxStock);
+    };
+
+    const updateWarehouseStockDisplay = (selectEl) => {
+        const warehouseId = selectEl.value;
+        const row = selectEl.closest('tr');
+        const stockDisplay = row.querySelector('.selected-warehouse-stock');
+        const quantityInput = row.querySelector('.quantity-input');
+        const warehouseInput = row.querySelector('input[name$="-source_warehouse"]');
+
+        if (warehouseInput) warehouseInput.value = warehouseId;
+
+        if (!warehouseId) {
+            stockDisplay.innerHTML = '&nbsp;';
+            quantityInput.dataset.maxStock = '0';
+            validateQuantity(quantityInput);
+            return;
+        }
+
+        const warehousesData = JSON.parse(row.dataset.warehousesJson || '[]');
+        const selectedWarehouseData = warehousesData.find(wh => wh.id == warehouseId);
+        const availableStock = selectedWarehouseData ? selectedWarehouseData.available_quantity : 0;
+
+        stockDisplay.textContent = `المتاح بهذا المخزن: ${parseFloat(availableStock).toFixed(2)}`;
+        quantityInput.dataset.maxStock = availableStock;
+        validateQuantity(quantityInput);
+    };
+    
+    const addComponentRow = (comp, shouldSaveState = true) => {
+        if (document.querySelector(`tr[data-material-id="${comp.material_id}"]`)) return;
+
+        let formIndex = parseInt(totalFormsInput.value);
+        const newFormHtml = formTemplate.replace(/__prefix__/g, formIndex);
+        const newRow = document.createElement('tr');
+        newRow.dataset.materialId = comp.material_id;
+        newRow.dataset.warehousesJson = JSON.stringify(comp.warehouses || []);
+
+        const totalRequired = parseFloat(comp.total_required || 0).toFixed(2);
+        const totalAvailableStock = parseFloat(comp.total_available_stock || comp.available || 0).toFixed(2);
+        const unit = comp.unit || 'وحدة';
+
+        newRow.innerHTML = `
+            <td>${newFormHtml}<strong>${comp.name}</strong><div class="text-muted small">${unit}</div></td>
+            <td class="text-center"><span class="badge bg-secondary fs-6">${totalRequired}</span></td>
+            <td class="text-center"><span class="badge fs-6 ${parseFloat(totalAvailableStock) > 0 ? 'bg-success' : 'bg-danger'}">${totalAvailableStock}</span></td>
+            <td class="warehouse-select-cell"></td>
+            <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger delete-row-btn" title="حذف المكون"><i class="fas fa-trash-alt"></i></button></td>
+        `;
+
+        newRow.querySelector('input[name$="-material"]').value = comp.material_id;
+        const targetCell = newRow.querySelector('.warehouse-select-cell');
+        const quantityInput = newRow.querySelector('input[name$="-quantity_sent"]');
+        quantityInput.value = '0.00';
+        quantityInput.classList.add('quantity-input');
+        const hiddenWarehouseInput = newRow.querySelector('input[name$="-source_warehouse"]');
+
+        // **FIX**: Check if warehouses exist and create dropdown or warning message
+        if (comp.warehouses && Array.isArray(comp.warehouses) && comp.warehouses.length > 0) {
+            const warehouseSelect = document.createElement('select');
+            warehouseSelect.className = 'form-select form-select-sm component-warehouse-select';
+            let optionsHtml = '<option value="">--- اختر مخزن ---</option>';
+            comp.warehouses.forEach(wh => {
+                optionsHtml += `<option value="${wh.id}">${wh.name} (المتاح: ${parseFloat(wh.available_quantity).toFixed(2)})</option>`;
+            });
+            warehouseSelect.innerHTML = optionsHtml;
+            targetCell.appendChild(warehouseSelect);
+        } else {
+            const noWarehouseInfo = document.createElement('div');
+            noWarehouseInfo.className = 'text-danger small mt-1';
+            noWarehouseInfo.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> لا توجد مخازن متاحة.';
+            targetCell.appendChild(noWarehouseInfo);
+        }
+        
+        const stockDisplay = document.createElement('div');
+        stockDisplay.className = 'selected-warehouse-stock';
+        stockDisplay.innerHTML = `&nbsp;`;
+
+        const inputGroup = document.createElement('div');
+        inputGroup.className = 'input-group input-group-sm mt-2';
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'btn btn-outline-secondary copy-required-qty-btn';
+        copyBtn.type = 'button';
+        copyBtn.title = 'استخدام الكمية المطلوبة';
+        copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+        copyBtn.dataset.requiredQty = totalRequired;
+        
+        inputGroup.appendChild(quantityInput);
+        if (parseFloat(totalRequired) > 0) inputGroup.appendChild(copyBtn);
+        
+        targetCell.appendChild(stockDisplay);
+        targetCell.appendChild(inputGroup);
+        
+        componentsTbody.appendChild(newRow);
+        totalFormsInput.value = formIndex + 1;
+        updateTablePlaceholder();
+
+        if (shouldSaveState) saveState();
+    };
+
+    const loadBomComponents = async () => {
+        const orderId = orderSelect.val();
+        if (!orderId) return;
+        componentsLoader.style.display = 'block';
+        loadBomBtn.disabled = true;
+        globalWarningDiv.style.display = 'none'; // Hide previous warnings
+        try {
+            const url = `{% url 'production:ajax_get_bom_components_for_order' %}?order_id=${orderId}`;
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                // Handle server errors (like 500) more gracefully
+                console.error(`Server responded with status: ${response.status}`);
+                if (typeof showErrorToast === 'function') showErrorToast(`حدث خطأ في الاتصال بالخادم (Code: ${response.status})`);
+                throw new Error(`Server error`);
+            }
+            
+            const data = await response.json();
+            console.log("Received BOM data from server:", data); 
+
+            if (data.error) {
+                 if (typeof showErrorToast === 'function') showErrorToast(data.error);
+                 console.error("Backend Error:", data.error);
+            } else if (!data.components || !Array.isArray(data.components)) {
+                if (typeof showErrorToast === 'function') showErrorToast('Received invalid data structure from server.');
+                console.error('Invalid data structure. Expected a "components" array.', data);
+            } else if (data.components.length === 0) {
+                 if (typeof showWarningToast === 'function') showWarningToast('لا توجد مكونات إضافية في قائمة المواد لهذا المنتج.');
+            } else {
+                // Check if ALL components lack warehouses, which indicates a system-wide setup issue.
+                const allComponentsLackWarehouses = data.components.every(c => !c.warehouses || c.warehouses.length === 0);
+                if (allComponentsLackWarehouses) {
+                    globalWarningDiv.innerHTML = '<strong><i class="fas fa-exclamation-triangle me-2"></i>تنبيه:</strong> لم يتم العثور على مخازن للمواد الخام (نوع "مكونات" أو "أقمشة"). يرجى التأكد من وجود مخازن نشطة من هذه الأنواع في النظام ليتم عرضها.';
+                    globalWarningDiv.style.display = 'block';
+                }
+
+                data.components.forEach(comp => {
+                    addComponentRow(comp);
+                });
+                if (typeof showSuccessToast === 'function') showSuccessToast(`تم تحميل ${data.components.length} مكون من قائمة المواد.`);
+            }
+        } catch (error) {
+            console.error('BOM Fetch error:', error);
+            if (typeof showErrorToast === 'function') showErrorToast('حدث خطأ أثناء جلب مكونات قائمة المواد.');
+        } finally {
+            componentsLoader.style.display = 'none';
+            loadBomBtn.disabled = false;
+        }
+    };
+    
+    const initializeManualAddComponent = () => {
+        manualComponentSearch.select2({
+            placeholder: 'ابحث بالاسم أو الكود...',
+            language: "ar",
+            width: '100%',
+            ajax: {
+                url: "{% url 'production:search_raw_materials_ajax' %}",
+                dataType: 'json',
+                delay: 250,
+                data: params => ({ term: params.term }),
+                processResults: data => ({ results: data.results })
+            },
+            templateResult: formatMaterialResult,
+            templateSelection: () => "ابحث عن مادة خام...",
+        }).on('select2:select', function(e) {
+            const data = e.params.data;
+            console.log("Manual add data:", data);
+            const componentData = {
+                material_id: data.id,
+                name: data.name,
+                total_available_stock: data.available,
+                unit: data.unit,
+                warehouses: data.warehouses
+            };
+            addComponentRow(componentData);
+            $(this).val(null).trigger('change');
+        });
+    };
+
+    const formatMaterialResult = (material) => {
+        if (material.loading) return material.text;
+        return $(`
+            <div class="select2-result-repository clearfix">
+                <div class="select2-result-repository__title">${material.text}</div>
+                <div class="select2-result-repository__statistics">
+                    <div class="select2-result-repository__forks" style="font-size: 0.9em; color: #555;">
+                        <i class="fas fa-boxes-stacked me-1"></i> المتاح: ${material.available}
+                    </div>
+                </div>
+            </div>
+        `);
+    };
+
+    const handleDeleteRow = (deleteBtn) => {
+        const row = deleteBtn.closest('tr');
+        const deleteCheckbox = row.querySelector('input[name$="-DELETE"]');
+        if (deleteCheckbox) {
+            deleteCheckbox.checked = true;
+            row.style.display = 'none';
+        } else {
+            row.remove();
+        }
+        updateTablePlaceholder();
+        saveState();
+    };
+
+    const toggleConditionalPanels = () => {
+        const selectedRadio = document.querySelector("input[name='{{ form.assembly_type.html_name }}']:checked");
+        if (assemblerInfoWrapper) assemblerInfoWrapper.classList.remove('visible');
+        if (manufacturerWrapper) manufacturerWrapper.classList.remove('visible');
+        
+        if (selectedRadio) {
+            if (selectedRadio.value === 'in_house' && assemblerInfoWrapper) assemblerInfoWrapper.classList.add('visible');
+            else if (selectedRadio.value === 'outsourced' && manufacturerWrapper) manufacturerWrapper.classList.add('visible');
+        }
+    };
+
+    // --- Event Listeners ---
+    orderSelect.on('change', (e) => {
+        loadBomBtn.disabled = !e.target.value;
+        componentsTbody.innerHTML = '';
+        totalFormsInput.value = 0;
+        updateTablePlaceholder();
+        saveState();
+    });
+
+    loadBomBtn.addEventListener('click', loadBomComponents);
+
+    manualAddToggleBtn.addEventListener('click', () => {
+        const isVisible = manualAddSection.style.display === 'block';
+        manualAddSection.style.display = isVisible ? 'none' : 'block';
+        if (!isVisible) {
+            manualComponentSearch.select2('open');
+        }
+    });
+
+    assemblyTypeRadios.forEach(radio => radio.addEventListener('change', toggleConditionalPanels));
+
+    componentsTbody.addEventListener('click', (e) => {
+        const copyBtn = e.target.closest('.copy-required-qty-btn');
+        const deleteBtn = e.target.closest('.delete-row-btn');
+        if (copyBtn) {
+            const requiredQty = copyBtn.dataset.requiredQty;
+            const quantityInput = copyBtn.closest('.input-group').querySelector('.quantity-input');
+            if (quantityInput && requiredQty) {
+                quantityInput.value = requiredQty;
+                validateQuantity(quantityInput);
+                saveState();
+            }
+        } else if (deleteBtn) {
+            handleDeleteRow(deleteBtn);
+        }
+    });
+    
+    componentsTbody.addEventListener('change', (e) => {
+        if (e.target.classList.contains('component-warehouse-select')) {
+            updateWarehouseStockDisplay(e.target);
+        }
+    });
+
+    componentsTbody.addEventListener('input', (e) => {
+        if (e.target.classList.contains('quantity-input')) {
+            validateQuantity(e.target);
+        }
+    });
+    
+    // Event listeners for state saving
+    assemblyForm.addEventListener('change', saveState);
+    assemblyForm.addEventListener('input', saveState);
+    assemblyForm.addEventListener('submit', clearState);
+    if(cancelBtn) cancelBtn.addEventListener('click', clearState);
+
+    // --- Initial Setup & Load ---
+    orderSelect.select2({ placeholder: '--- اختر أمر إنتاج ---', allowClear: true, language: "ar" });
+    $('#{{ form.external_manufacturer.id_for_label }}').select2({ placeholder: '--- اختر مصنعاً ---', allowClear: true, language: "ar" });
+    initializeManualAddComponent();
+    loadState();
+    updateTablePlaceholder();
+    toggleConditionalPanels();
+    loadBomBtn.disabled = !orderSelect.val();
+});
+</script>
+{% endblock %}

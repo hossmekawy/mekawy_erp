@@ -1,0 +1,352 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}لوحة تحكم الموردين - Mekawy ERP{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* =================================== */
+    /* 1. Stat Card Styles
+    /* =================================== */
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        display: flex;
+        align-items: center;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        border-left: 5px solid var(--color-primary); /* Default border color */
+    }
+
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    .stat-card .icon {
+        font-size: 2.5rem;
+        width: 65px;
+        height: 65px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        margin-left: 1.5rem;
+        flex-shrink: 0;
+    }
+
+    .stat-card .stat-value {
+        font-size: 2.2rem;
+        font-weight: 700;
+        color: var(--color-dark);
+        line-height: 1;
+    }
+
+    .stat-card .stat-label {
+        font-size: 0.95rem;
+        color: var(--color-secondary);
+        margin-top: 2px;
+    }
+
+    /* Color variations for stat cards */
+    .stat-card.active { border-left-color: var(--color-success); }
+    .icon-active { background-color: var(--color-success); }
+
+    .stat-card.total { border-left-color: var(--color-primary); }
+    .icon-total { background-color: var(--color-primary); }
+
+    .stat-card.pending { border-left-color: var(--color-warning); }
+    .icon-pending { background-color: var(--color-warning); }
+    
+    .stat-card.overdue { border-left-color: var(--color-danger); }
+    .icon-overdue { background-color: var(--color-danger); }
+
+    /* =================================== */
+    /* 2. Chart & List Styles
+    /* =================================== */
+    .chart-container {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        height: 400px; /* Consistent height for chart containers */
+    }
+
+    .list-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        height: 100%;
+    }
+
+    .list-group-item-action {
+        transition: transform 0.2s ease, background-color 0.2s ease;
+    }
+
+    .list-group-item-action:hover {
+        background-color: #f8f9fc;
+        transform: translateX(-3px);
+    }
+
+    .rating-stars {
+        color: var(--color-warning);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-0 text-gray-800 fw-bold">لوحة التحكم للموردين</h1>
+            <p class="text-muted mb-0">نظرة عامة على أداء ونشاط الموردين.</p>
+        </div>
+        <div>
+            <a href="{% url 'suppliers:create' %}" class="btn btn-primary shadow-sm">
+                <i class="fas fa-plus me-2"></i>إضافة مورد
+            </a>
+            <a href="{% url 'suppliers:purchase_order_create' %}" class="btn btn-outline-primary">
+                <i class="fas fa-file-invoice me-2"></i>أمر شراء جديد
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="stat-card active">
+                <div class="icon icon-active"><i class="fas fa-truck"></i></div>
+                <div>
+                    <div class="stat-value">{{ stats.total_suppliers|default:0 }}</div>
+                    <div class="stat-label">إجمالي الموردين</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="stat-card total">
+                <div class="icon icon-total"><i class="fas fa-file-invoice"></i></div>
+                <div>
+                    <div class="stat-value">{{ stats.total_orders|default:0 }}</div>
+                    <div class="stat-label">إجمالي الأوامر</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="stat-card pending">
+                <div class="icon icon-pending"><i class="fas fa-clock"></i></div>
+                <div>
+                    <div class="stat-value">{{ stats.pending_orders|default:0 }}</div>
+                    <div class="stat-label">أوامر معلقة</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="stat-card overdue">
+                <div class="icon icon-overdue"><i class="fas fa-exclamation-triangle"></i></div>
+                <div>
+                    <div class="stat-value">{{ stats.overdue_orders|default:0 }}</div>
+                    <div class="stat-label">أوامر متأخرة</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row">
+        <div class="col-lg-7 mb-4">
+            <div class="chart-container">
+                <h5 class="fw-bold text-dark mb-3">أوامر الشراء (آخر 12 شهر)</h5>
+                <canvas id="purchaseOrdersChart"></canvas>
+            </div>
+        </div>
+        <div class="col-lg-5 mb-4">
+            <div class="chart-container">
+                <h5 class="fw-bold text-dark mb-3">حالة أوامر الشراء</h5>
+                <canvas id="orderStatusChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lists Row -->
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card list-card">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-receipt me-2"></i>أحدث أوامر الشراء</h6>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% for order in recent_orders %}
+                    <a href="{% url 'suppliers:purchase_order_detail' order.pk %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-3 py-2">
+                        <div>
+                            <strong>{{ order.po_number }}</strong>
+                            <br>
+                            <small class="text-muted">{{ order.supplier.name }}</small>
+                        </div>
+                        <span class="badge bg-light text-dark fw-bold">{{ order.total_amount|floatformat:0 }} جنيه</span>
+                    </a>
+                    {% empty %}
+                    <div class="list-group-item text-center text-muted py-5">لا توجد أوامر حديثة.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 mb-4">
+            <div class="card list-card">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-star me-2"></i>الموردين الأعلى تقييماً</h6>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% for supplier in top_rated_suppliers %}
+                    <a href="{% url 'suppliers:detail' supplier.pk %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-3 py-2">
+                        <strong>{{ supplier.name }}</strong>
+                        <span class="rating-stars fw-bold">
+                           {{ supplier.current_rating|floatformat:1 }} <i class="fas fa-star"></i>
+                        </span>
+                    </a>
+                    {% empty %}
+                    <div class="list-group-item text-center text-muted py-5">لا توجد تقييمات كافية لعرضها.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    
+    // --- Safely parse data from Django template ---
+    /**
+     * Parses a value from the Django template, ensuring it's a valid number.
+     * @param {string} value - The value from the template tag, e.g., "{{ my_var|default:'0' }}"
+     * @returns {number} - A valid integer, defaulting to 0.
+     */
+    function parseStat(value) {
+        const num = parseInt(value, 10);
+        return isNaN(num) ? 0 : num;
+    }
+
+    // --- Chart Data Preparation ---
+    // By parsing values from quoted strings, we prevent JS syntax errors
+    // if a template variable fails to render.
+    const totalOrders = parseStat("{{ stats.total_orders|default:'0' }}");
+    const pendingOrders = parseStat("{{ stats.pending_orders|default:'0' }}");
+    const overdueOrders = parseStat("{{ stats.overdue_orders|default:'0' }}");
+    
+    // For the doughnut chart, you would ideally pass 'cancelled' count from the view.
+    // Here we use a placeholder.
+    const cancelledOrders = 10; 
+    const completedOrders = Math.max(0, totalOrders - pendingOrders - overdueOrders - cancelledOrders);
+
+
+    // --- 1. Purchase Orders Line Chart ---
+    var ctxLine = document.getElementById('purchaseOrdersChart').getContext('2d');
+    
+    // Destroy any existing chart on this canvas to prevent errors
+    var existingLineChart = Chart.getChart(ctxLine);
+    if (existingLineChart) {
+        existingLineChart.destroy();
+    }
+
+    new Chart(ctxLine, {
+        type: 'line',
+        data: {
+            labels: ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'],
+            datasets: [{
+                label: 'قيمة الأوامر (جنيه)',
+                data: [12000, 19000, 15000, 24000, 22000, 28000, 31000, 29000, 35000, 41000, 38000, 45000],
+                borderColor: 'rgba(74, 144, 226, 1)',
+                backgroundColor: 'rgba(74, 144, 226, 0.1)',
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: 'rgba(74, 144, 226, 1)',
+                pointRadius: 4
+            }]
+        },
+        options: {
+            animation: false, // Disable animation to prevent "looping"
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { callback: function(value) { return value.toLocaleString() + ' جنيه'; } }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return ' القيمة: ' + context.parsed.y.toLocaleString() + ' جنيه';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // --- 2. Order Status Doughnut Chart ---
+    var ctxDoughnut = document.getElementById('orderStatusChart').getContext('2d');
+
+    // Destroy any existing chart
+    var existingDoughnutChart = Chart.getChart(ctxDoughnut);
+    if (existingDoughnutChart) {
+        existingDoughnutChart.destroy();
+    }
+    
+    new Chart(ctxDoughnut, {
+        type: 'doughnut',
+        data: {
+            labels: ['مكتمل', 'معلق', 'متأخر', 'ملغي'],
+            datasets: [{
+                data: [
+                    completedOrders,
+                    pendingOrders,
+                    overdueOrders,
+                    cancelledOrders
+                ],
+                backgroundColor: [
+                    'rgba(28, 200, 138, 0.9)', // Success
+                    'rgba(246, 194, 62, 0.9)', // Warning
+                    'rgba(231, 74, 59, 0.9)',  // Danger
+                    'rgba(133, 135, 150, 0.9)'  // Secondary
+                ],
+                borderColor: '#fff',
+                borderWidth: 3
+            }]
+        },
+        options: {
+            animation: false, // Disable animation
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '70%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 20,
+                        font: { size: 14, family: "'Cairo', sans-serif" }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) { label += ': '; }
+                            if (context.parsed !== null) { label += context.parsed + ' أمر'; }
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

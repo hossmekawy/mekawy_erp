@@ -1,0 +1,13 @@
+<!-- Export Buttons Component -->
+<div class="inline-flex items-center space-x-1 space-x-reverse bg-gray-50 rounded-lg p-1">
+    <span class="text-sm text-gray-600 px-2">تصدير:</span>
+    
+    {% for export in exports %}
+    <a href="{{ export.url }}" 
+       class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white hover:shadow-sm rounded-md transition-all duration-200"
+       data-export="{{ export.type }}">
+        <i class="{{ export.icon }} mr-1 text-{{ export.color|default:'gray' }}-500"></i>
+        {{ export.label }}
+    </a>
+    {% endfor %}
+</div>

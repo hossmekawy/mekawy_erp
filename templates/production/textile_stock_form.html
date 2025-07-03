@@ -1,0 +1,1064 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block production_title %}
+    {% if object %}تعديل مخزون القماش{% else %}إضافة مخزون قماش جديد{% endif %}
+{% endblock %}
+
+{% block production_page_title %}
+    {% if object %}تعديل مخزون القماش{% else %}إضافة مخزون قماش جديد{% endif %}
+{% endblock %}
+
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item">
+        <a href="{% url 'production:textile_stock_list' %}" class="text-black-50">
+            <i class="fas fa-cut"></i> مخزون الأقمشة
+        </a>
+    </li>
+    <li class="breadcrumb-item active">
+        {% if object %}تعديل{% else %}إضافة جديد{% endif %}
+    </li>
+{% endblock %}
+
+{% block production_header_actions %}
+    <div class="d-flex gap-2">
+        <a href="{% url 'production:textile_stock_list' %}" class="btn btn-production-outline">
+            <i class="fas fa-arrow-left me-1"></i>
+            العودة للقائمة
+        </a>
+        {% if object %}
+            <a href="{% url 'production:textile_stock_detail' object.pk %}" class="btn btn-production-outline">
+                <i class="fas fa-eye me-1"></i>
+                عرض التفاصيل
+            </a>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block production_extra_css %}
+    <style>
+        .form-section {
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .form-section-header {
+            background: linear-gradient(135deg, var(--production-primary), var(--production-secondary));
+            color: white;
+            padding: 1rem 1.5rem;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .form-section-body {
+            padding: 2rem 1.5rem;
+        }
+
+        .form-floating > label {
+            color: var(--production-secondary);
+            font-weight: 500;
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            border-color: var(--production-primary);
+            box-shadow: 0 0 0 0.25rem rgba(44, 90, 160, 0.15);
+        }
+
+        .is-valid {
+            border-color: var(--production-success);
+        }
+
+        .is-invalid {
+            border-color: var(--production-danger);
+        }
+
+        .fabric-preview {
+            border: 2px dashed #dee2e6;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            text-align: center;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+
+        .fabric-preview.has-data {
+            border-color: var(--production-primary);
+            background: rgba(44, 90, 160, 0.05);
+        }
+
+        .fabric-preview-icon {
+            font-size: 3rem;
+            color: #dee2e6;
+            margin-bottom: 1rem;
+        }
+
+        .fabric-preview.has-data .fabric-preview-icon {
+            color: var(--production-primary);
+        }
+
+        .fabric-info-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .fabric-info-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f1f3f4;
+        }
+
+        .fabric-info-item:last-child {
+            border-bottom: none;
+        }
+
+        .fabric-info-label {
+            font-weight: 500;
+            color: var(--production-secondary);
+        }
+
+        .fabric-info-value {
+            font-weight: 600;
+            color: var(--production-dark);
+        }
+
+        .warehouse-info {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        .warehouse-info-title {
+            font-weight: 600;
+            color: #1976d2;
+            margin-bottom: 0.5rem;
+        }
+
+        .required-field::after {
+            content: " *";
+            color: var(--production-danger);
+        }
+
+        .form-help {
+            font-size: 0.875rem;
+            color: #6c757d;
+            margin-top: 0.25rem;
+        }
+
+        .btn-save {
+            background: linear-gradient(135deg, var(--production-success), #2ecc71);
+            border: none;
+            color: white;
+            padding: 0.75rem 2rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-save:hover {
+            background: linear-gradient(135deg, #229954, var(--production-success));
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+            color: white;
+        }
+
+        .btn-save:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .auto-save-indicator {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: var(--production-info);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            z-index: 1050;
+            transform: translateX(-100%);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .auto-save-indicator.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        @media (max-width: 768px) {
+            .form-section-body {
+                padding: 1.5rem 1rem;
+            }
+            
+            .fabric-preview {
+                padding: 1.5rem 1rem;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block production_content %}
+    <!-- Auto-save indicator -->
+    <div id="autoSaveIndicator" class="auto-save-indicator">
+        <i class="fas fa-save me-1"></i>
+        جاري الحفظ التلقائي...
+    </div>
+
+    <form method="post" class="needs-validation" novalidate id="textileStockForm">
+        {% csrf_token %}
+        
+        <!-- Basic Information Section -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <i class="fas fa-info-circle me-2"></i>
+                المعلومات الأساسية
+            </div>
+            <div class="form-section-body">
+                <div class="row g-3">
+                    <!-- Fabric Name -->
+                    <div class="col-md-6">
+                        <div class="form-floating">
+                            {{ form.name|add_class:"form-control"|attr:"required" }}
+                            <label for="{{ form.name.id_for_label }}" class="required-field">اسم القماش</label>
+                            {% if form.name.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.name.errors.0 }}
+                                </div>
+                            {% endif %}
+                            <div class="form-help">
+                                أدخل اسماً وصفياً للقماش (مثل: قطن أبيض عالي الجودة)
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Fabric Type -->
+                    <div class="col-md-6">
+                        <div class="form-floating">
+                            {{ form.fabric_type|add_class:"form-select"|attr:"required" }}
+                            <label for="{{ form.fabric_type.id_for_label }}" class="required-field">نوع القماش</label>
+                            {% if form.fabric_type.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.fabric_type.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Color -->
+                    <div class="col-md-4">
+                        <div class="form-floating">
+                            {{ form.color|add_class:"form-control"|attr:"required" }}
+                            <label for="{{ form.color.id_for_label }}" class="required-field">اللون</label>
+                            {% if form.color.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.color.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Width -->
+                    <div class="col-md-4">
+                        <div class="form-floating">
+                            {{ form.width|add_class:"form-control"|attr:"required"|attr:"step:0.01"|attr:"min:0" }}
+                            <label for="{{ form.width.id_for_label }}" class="required-field">العرض (سم)</label>
+                            {% if form.width.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.width.errors.0 }}
+                                </div>
+                            {% endif %}
+                            <div class="form-help">
+                                عرض القماش بالسنتيمتر
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quality Grade -->
+                    <div class="col-md-4">
+                        <div class="form-floating">
+                            {{ form.quality_grade|add_class:"form-select" }}
+                            <label for="{{ form.quality_grade.id_for_label }}">درجة الجودة</label>
+                            {% if form.quality_grade.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.quality_grade.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Batch Number -->
+                    <div class="col-md-6">
+                        <div class="form-floating">
+                            {{ form.batch_number|add_class:"form-control" }}
+                            <label for="{{ form.batch_number.id_for_label }}">رقم الدفعة</label>
+                            {% if form.batch_number.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.batch_number.errors.0 }}
+                                </div>
+                            {% endif %}
+                            <div class="form-help">
+                                رقم دفعة القماش من المورد (اختياري)
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active Status -->
+                    <div class="col-md-6">
+                        <div class="form-check form-switch mt-4">
+                            {{ form.is_active|add_class:"form-check-input" }}
+                            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                نشط
+                            </label>
+                            <div class="form-help">
+                                إلغاء التفعيل يخفي القماش من القوائم النشطة
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Warehouse & Supplier Information -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <i class="fas fa-warehouse me-2"></i>
+                معلومات المخزن والمورد
+            </div>
+            <div class="form-section-body">
+                <div class="row g-3">
+                    <!-- Warehouse -->
+                    <div class="col-md-6">
+                        <div class="form-floating">
+                            {{ form.warehouse|add_class:"form-select"|attr:"required" }}
+                            <label for="{{ form.warehouse.id_for_label }}" class="required-field">المخزن</label>
+                            {% if form.warehouse.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.warehouse.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div id="warehouseInfo" class="warehouse-info" style="display: none;">
+                            <div class="warehouse-info-title">معلومات المخزن</div>
+                            <div id="warehouseDetails"></div>
+                        </div>
+                    </div>
+
+                    <!-- Supplier -->
+                    <div class="col-md-6">
+                        <div class="form-floating">
+                            {{ form.supplier|add_class:"form-select" }}
+                            <label for="{{ form.supplier.id_for_label }}">المورد</label>
+                            {% if form.supplier.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.supplier.errors.0 }}
+                                </div>
+                            {% endif %}
+                            <div class="form-help">
+                                اختر المورد الذي تم شراء القماش منه (اختياري)
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Warehouse Product Link -->
+                    <div class="col-12">
+                        <div class="form-floating">
+                            {{ form.warehouse_product|add_class:"form-select" }}
+                            <label for="{{ form.warehouse_product.id_for_label }}">منتج المخزن المرتبط</label>
+                            {% if form.warehouse_product.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.warehouse_product.errors.0 }}
+                                </div>
+                            {% endif %}
+                            <div class="form-help">
+                                ربط القماش بمنتج في نظام المخزن العام لتتبع الكميات
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cost Information -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <i class="fas fa-dollar-sign me-2"></i>
+                معلومات التكلفة
+            </div>
+            <div class="form-section-body">
+                <div class="row g-3">
+                    <!-- Cost Per Meter -->
+                    <div class="col-md-6">
+                        <div class="form-floating">
+                            {{ form.cost_per_meter|add_class:"form-control"|attr:"required"|attr:"step:0.01"|attr:"min:0" }}
+                            <label for="{{ form.cost_per_meter.id_for_label }}" class="required-field">تكلفة المتر (جنيه)</label>
+                            {% if form.cost_per_meter.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.cost_per_meter.errors.0 }}
+                                </div>
+                            {% endif %}
+                            <div class="form-help">
+                                تكلفة المتر الواحد من القماش بالجنيه المصري
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cost Calculation Display -->
+                    <div class="col-md-6">
+                        <div class="fabric-info-card">
+                            <div class="fabric-info-item">
+                                <span class="fabric-info-label">تكلفة المتر:</span>
+                                <span class="fabric-info-value" id="displayCostPerMeter">0.00 جنيه</span>
+                            </div>
+                            <div class="fabric-info-item">
+                                <span class="fabric-info-label">الكمية المتاحة:</span>
+                                <span class="fabric-info-value" id="displayAvailableLength">
+                                    {% if object %}{{ object.length_available }}{% else %}0.00{% endif %} متر
+                                </span>
+                            </div>
+                            <div class="fabric-info-item">
+                                <span class="fabric-info-label">إجمالي القيمة:</span>
+                                <span class="fabric-info-value" id="displayTotalValue">0.00 جنيه</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fabric Preview -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <i class="fas fa-eye me-2"></i>
+                معاينة القماش
+            </div>
+            <div class="form-section-body">
+                <div class="fabric-preview" id="fabricPreview">
+                    <div class="fabric-preview-icon">
+                        <i class="fas fa-cut"></i>
+                    </div>
+                    <h5 id="fabricPreviewName">اسم القماش</h5>
+                    <p class="text-muted mb-0" id="fabricPreviewDetails">أدخل تفاصيل القماش لرؤية المعاينة</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Stock Information (Edit Mode Only) -->
+        {% if object %}
+        <div class="form-section">
+            <div class="form-section-header">
+                <i class="fas fa-chart-bar me-2"></i>
+                معلومات المخزون الحالي
+            </div>
+            <div class="form-section-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <div class="production-metric">
+                            <div class="production-metric-icon primary">
+                                <i class="fas fa-ruler"></i>
+                            </div>
+                            <div class="production-metric-value">{{ object.length_available }}</div>
+                            <div class="production-metric-label">متر متاح</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="production-metric">
+                            <div class="production-metric-icon success">
+                                <i class="fas fa-dollar-sign"></i>
+                            </div>
+                            <div class="production-metric-value">{{ object.cost_per_meter }}</div>
+                            <div class="production-metric-label">جنيه/متر</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="production-metric">
+                            <div class="production-metric-icon warning">
+                                <i class="fas fa-expand-arrows-alt"></i>
+                            </div>
+                            <div class="production-metric-value">{{ object.width }}</div>
+                            <div class="production-metric-label">سم عرض</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="production-metric">
+                            <div class="production-metric-icon info">
+                                <i class="fas fa-star"></i>
+                            </div>
+                            <div class="production-metric-value">{{ object.quality_grade }}</div>
+                            <div class="production-metric-label">درجة الجودة</div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if object.stock_item %}
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>مرتبط بالمخزن العام:</strong>
+                    هذا القماش مرتبط بمنتج "{{ object.warehouse_product.name }}" في المخزن العام.
+                    الكمية المتاحة يتم تحديثها تلقائياً من نظام المخزون.
+                </div>
+                {% else %}
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>غير مرتبط بالمخزن العام:</strong>
+                    لتتبع الكميات تلقائياً، يُنصح بربط هذا القماش بمنتج في نظام المخزون العام.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Form Actions -->
+        <div class="form-section">
+            <div class="form-section-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-save" id="saveBtn">
+                            <i class="fas fa-save me-2"></i>
+                            {% if object %}تحديث القماش{% else %}حفظ القماش{% endif %}
+                        </button>
+                        
+                        {% if not object %}
+                        <button type="button" class="btn btn-production-outline" id="saveAndAddAnother">
+                            <i class="fas fa-plus me-2"></i>
+                            حفظ وإضافة آخر
+                        </button>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-secondary" id="resetForm">
+                            <i class="fas fa-undo me-2"></i>
+                            إعادة تعيين
+                        </button>
+                        
+                        <a href="{% url 'production:textile_stock_list' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-2"></i>
+                            إلغاء
+                        </a>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        الحقول المميزة بـ <span class="text-danger">*</span> مطلوبة
+                    </small>
+                </div>
+            </div>
+        </div>
+    </form>
+{% endblock %}
+
+{% block production_extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize form
+    initTextileStockForm();
+    
+    // Auto-save functionality (for edit mode)
+    {% if object %}
+    initAutoSave();
+    {% endif %}
+});
+
+function initTextileStockForm() {
+    // Update fabric preview when form fields change
+    updateFabricPreview();
+    
+    // Form field event listeners
+    $('#id_name, #id_fabric_type, #id_color, #id_width, #id_quality_grade').on('input change', function() {
+        updateFabricPreview();
+    });
+    
+    $('#id_cost_per_meter').on('input', function() {
+        updateCostCalculations();
+    });
+    
+    // Warehouse selection handler
+    $('#id_warehouse').on('change', function() {
+        loadWarehouseInfo($(this).val());
+        loadWarehouseProducts($(this).val());
+    });
+    
+    // Form validation
+    initFormValidation();
+    
+    // Save and add another functionality
+    $('#saveAndAddAnother').on('click', function() {
+        $('#textileStockForm').append('<input type="hidden" name="save_and_add_another" value="1">');
+        $('#textileStockForm').submit();
+    });
+    
+    // Reset form
+    $('#resetForm').on('click', function() {
+        if (confirm('هل أنت متأكد من إعادة تعيين النموذج؟ ستفقد جميع التغييرات غير المحفوظة.')) {
+            document.getElementById('textileStockForm').reset();
+            updateFabricPreview();
+            updateCostCalculations();
+        }
+    });
+    
+    // Initial calculations
+    updateCostCalculations();
+    
+    // Load warehouse info if warehouse is already selected
+    const selectedWarehouse = $('#id_warehouse').val();
+    if (selectedWarehouse) {
+        loadWarehouseInfo(selectedWarehouse);
+    }
+}
+
+function updateFabricPreview() {
+    const name = $('#id_name').val() || 'اسم القماش';
+    const fabricType = $('#id_fabric_type option:selected').text() || '';
+    const color = $('#id_color').val() || '';
+    const width = $('#id_width').val() || '';
+    const quality = $('#id_quality_grade option:selected').text() || '';
+    
+    let details = [];
+    if (fabricType && fabricType !== '---------') details.push(fabricType);
+    if (color) details.push(`لون ${color}`);
+    if (width) details.push(`عرض ${width} سم`);
+    if (quality && quality !== '---------') details.push(`جودة ${quality}`);
+    
+    $('#fabricPreviewName').text(name);
+    $('#fabricPreviewDetails').text(details.length > 0 ? details.join(' • ') : 'أدخل تفاصيل القماش لرؤية المعاينة');
+    
+    // Update preview state
+    const preview = $('#fabricPreview');
+    if (name !== 'اسم القماش' || details.length > 0) {
+        preview.addClass('has-data');
+    } else {
+        preview.removeClass('has-data');
+    }
+}
+
+function updateCostCalculations() {
+    const costPerMeter = parseFloat($('#id_cost_per_meter').val()) || 0;
+    const availableLength = parseFloat($('#displayAvailableLength').text()) || 0;
+    const totalValue = costPerMeter * availableLength;
+    
+    $('#displayCostPerMeter').text(formatCurrency(costPerMeter));
+    $('#displayTotalValue').text(formatCurrency(totalValue));
+}
+
+function loadWarehouseInfo(warehouseId) {
+    if (!warehouseId) {
+        $('#warehouseInfo').hide();
+        return;
+    }
+    
+    // This would typically make an AJAX call to get warehouse details
+    // For now, we'll show a placeholder
+    $('#warehouseDetails').html(`
+        <div class="d-flex justify-content-between">
+            <span>المخزن المحدد:</span>
+            <span class="fw-bold">${$('#id_warehouse option:selected').text()}</span>
+        </div>
+    `);
+    $('#warehouseInfo').show();
+}
+
+function loadWarehouseProducts(warehouseId) {
+    if (!warehouseId) {
+        return;
+    }
+    
+    // AJAX call to load products for the selected warehouse
+    $.ajax({
+        url: '{% url "production:get_warehouse_products_ajax" %}',
+        data: {
+            'warehouse_id': warehouseId
+        },
+        success: function(data) {
+            const select = $('#id_warehouse_product');
+            select.empty();
+            select.append('<option value="">---------</option>');
+            
+            if (data.products) {
+                data.products.forEach(function(product) {
+                    select.append(`<option value="${product.id}">${product.name}</option>`);
+                });
+            }
+        },
+        error: function() {
+            console.error('Error loading warehouse products');
+        }
+    });
+}
+
+function initFormValidation() {
+    // Real-time validation
+    $('.form-control, .form-select').on('blur', function() {
+        validateField($(this));
+    });
+    
+    // Form submission validation
+    $('#textileStockForm').on('submit', function(e) {
+        let isValid = true;
+        
+        // Validate required fields
+        $(this).find('[required]').each(function() {
+            if (!validateField($(this))) {
+                isValid = false;
+            }
+        });
+        
+        // Custom validations
+        const costPerMeter = parseFloat($('#id_cost_per_meter').val());
+        if (costPerMeter <= 0) {
+            showFieldError($('#id_cost_per_meter'), 'تكلفة المتر يجب أن تكون أكبر من صفر');
+            isValid = false;
+        }
+        
+        const width = parseFloat($('#id_width').val());
+        if (width <= 0) {
+            showFieldError($('#id_width'), 'عرض القماش يجب أن يكون أكبر من صفر');
+            isValid = false;
+        }
+        
+        if (!isValid) {
+            e.preventDefault();
+            showErrorToast('يرجى تصحيح الأخطاء في النموذج');
+            
+            // Scroll to first error
+            const firstError = $('.is-invalid').first();
+            if (firstError.length) {
+                $('html, body').animate({
+                    scrollTop: firstError.offset().top - 100
+                }, 500);
+            }
+        } else {
+            // Show loading state
+            $('#saveBtn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>جاري الحفظ...');
+        }
+    });
+}
+
+function validateField(field) {
+    const value = field.val().trim();
+    const isRequired = field.prop('required');
+    
+    // Clear previous validation state
+    field.removeClass('is-valid is-invalid');
+    field.siblings('.invalid-feedback').remove();
+    
+    // Required field validation
+    if (isRequired && !value) {
+        showFieldError(field, 'هذا الحقل مطلوب');
+        return false;
+    }
+    
+    // Field-specific validations
+    const fieldId = field.attr('id');
+    
+    if (fieldId === 'id_cost_per_meter' && value) {
+        const cost = parseFloat(value);
+        if (isNaN(cost) || cost <= 0) {
+            showFieldError(field, 'تكلفة المتر يجب أن تكون رقماً موجباً');
+            return false;
+        }
+    }
+    
+    if (fieldId === 'id_width' && value) {
+        const width = parseFloat(value);
+        if (isNaN(width) || width <= 0) {
+            showFieldError(field, 'عرض القماش يجب أن يكون رقماً موجباً');
+            return false;
+        }
+    }
+    
+    if (fieldId === 'id_name' && value) {
+        if (value.length < 3) {
+            showFieldError(field, 'اسم القماش يجب أن يكون 3 أحرف على الأقل');
+            return false;
+        }
+    }
+    
+    // Show success state for valid fields
+    if (value || !isRequired) {
+        field.addClass('is-valid');
+    }
+    
+    return true;
+}
+
+function showFieldError(field, message) {
+    field.addClass('is-invalid');
+    
+    // Remove existing error message
+    field.siblings('.invalid-feedback').remove();
+    
+    // Add new error message
+    field.after(`<div class="invalid-feedback">${message}</div>`);
+}
+
+function initAutoSave() {
+    let autoSaveTimeout;
+    let hasChanges = false;
+    
+    // Track form changes
+    $('#textileStockForm input, #textileStockForm select, #textileStockForm textarea').on('input change', function() {
+        hasChanges = true;
+        
+        // Clear existing timeout
+        clearTimeout(autoSaveTimeout);
+        
+        // Set new timeout for auto-save
+        autoSaveTimeout = setTimeout(function() {
+            if (hasChanges) {
+                performAutoSave();
+            }
+        }, 3000); // Auto-save after 3 seconds of inactivity
+    });
+    
+    // Prevent auto-save on form submission
+    $('#textileStockForm').on('submit', function() {
+        clearTimeout(autoSaveTimeout);
+        hasChanges = false;
+    });
+}
+
+function performAutoSave() {
+    // Show auto-save indicator
+    $('#autoSaveIndicator').addClass('show');
+    
+    // Prepare form data
+    const formData = new FormData(document.getElementById('textileStockForm'));
+    formData.append('auto_save', '1');
+    
+    // Perform AJAX save
+    $.ajax({
+        url: window.location.href,
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            if (response.success) {
+                hasChanges = false;
+                
+                // Update indicator
+                $('#autoSaveIndicator').removeClass('show');
+                setTimeout(function() {
+                    $('#autoSaveIndicator').html('<i class="fas fa-check me-1"></i>تم الحفظ التلقائي').addClass('show');
+                    setTimeout(function() {
+                        $('#autoSaveIndicator').removeClass('show');
+                        $('#autoSaveIndicator').html('<i class="fas fa-save me-1"></i>جاري الحفظ التلقائي...');
+                    }, 2000);
+                }, 100);
+            }
+        },
+        error: function() {
+            $('#autoSaveIndicator').removeClass('show');
+            console.error('Auto-save failed');
+        }
+    });
+}
+
+// Utility functions
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('ar-EG', {
+        style: 'currency',
+        currency: 'EGP',
+        minimumFractionDigits: 2
+    }).format(amount);
+}
+
+function showErrorToast(message) {
+    // Create toast element
+    const toast = $(`
+        <div class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    `);
+    
+    // Add to toast container
+    $('.toast-container').append(toast);
+    
+    // Show toast
+    const bsToast = new bootstrap.Toast(toast[0]);
+    bsToast.show();
+    
+    // Remove from DOM after hiding
+    toast.on('hidden.bs.toast', function() {
+        $(this).remove();
+    });
+}
+
+function showSuccessToast(message) {
+    // Create toast element
+    const toast = $(`
+        <div class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="fas fa-check-circle me-2"></i>
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    `);
+    
+    // Add to toast container
+    $('.toast-container').append(toast);
+    
+    // Show toast
+    const bsToast = new bootstrap.Toast(toast[0]);
+    bsToast.show();
+    
+    // Remove from DOM after hiding
+    toast.on('hidden.bs.toast', function() {
+        $(this).remove();
+    });
+}
+
+// Keyboard shortcuts
+$(document).on('keydown', function(e) {
+    // Ctrl+S or Cmd+S to save
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        $('#saveBtn').click();
+    }
+    
+    // Escape to cancel
+    if (e.key === 'Escape') {
+        if (confirm('هل تريد إلغاء التعديلات والعودة إلى القائمة؟')) {
+            window.location.href = '{% url "production:textile_stock_list" %}';
+        }
+    }
+});
+
+// Warn before leaving with unsaved changes
+let formChanged = false;
+$('#textileStockForm input, #textileStockForm select, #textileStockForm textarea').on('input change', function() {
+    formChanged = true;
+});
+
+$('#textileStockForm').on('submit', function() {
+    formChanged = false;
+});
+
+$(window).on('beforeunload', function(e) {
+    if (formChanged) {
+        const message = 'لديك تغييرات غير محفوظة. هل أنت متأكد من المغادرة؟';
+        e.returnValue = message;
+        return message;
+    }
+});
+</script>
+{% endblock %}
+
+{% block production_modals %}
+    {{ block.super }}
+    
+    <!-- Warehouse Products Loading Modal -->
+    <div class="modal fade" id="warehouseProductsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-boxes me-2"></i>
+                        منتجات المخزن
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">جاري التحميل...</span>
+                        </div>
+                        <p>جاري تحميل منتجات المخزن...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Fabric Preview Modal -->
+    <div class="modal fade" id="fabricPreviewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-eye me-2"></i>
+                        معاينة تفاصيل القماش
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="fabric-info-card">
+                                <h6 class="mb-3">المعلومات الأساسية</h6>
+                                <div class="fabric-info-item">
+                                    <span class="fabric-info-label">الاسم:</span>
+                                    <span class="fabric-info-value" id="modalFabricName">-</span>
+                                </div>
+                                <div class="fabric-info-item">
+                                    <span class="fabric-info-label">النوع:</span>
+                                    <span class="fabric-info-value" id="modalFabricType">-</span>
+                                </div>
+                                <div class="fabric-info-item">
+                                    <span class="fabric-info-label">اللون:</span>
+                                    <span class="fabric-info-value" id="modalFabricColor">-</span>
+                                </div>
+                                <div class="fabric-info-item">
+                                    <span class="fabric-info-label">العرض:</span>
+                                    <span class="fabric-info-value" id="modalFabricWidth">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="fabric-info-card">
+                                <h6 class="mb-3">معلومات التكلفة</h6>
+                                <div class="fabric-info-item">
+                                    <span class="fabric-info-label">تكلفة المتر:</span>
+                                    <span class="fabric-info-value" id="modalCostPerMeter">-</span>
+                                </div>
+                                <div class="fabric-info-item">
+                                    <span class="fabric-info-label">الكمية المتاحة:</span>
+                                    <span class="fabric-info-value" id="modalAvailableLength">-</span>
+                                </div>
+                                <div class="fabric-info-item">
+                                    <span class="fabric-info-label">إجمالي القيمة:</span>
+                                    <span class="fabric-info-value" id="modalTotalValue">-</span>
+                                </div>
+                                <div class="fabric-info-item">
+                                    <span class="fabric-info-label">درجة الجودة:</span>
+                                    <span class="fabric-info-value" id="modalQualityGrade">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>
+                        إغلاق
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

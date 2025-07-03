@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="Mekawy ERP - نظام تخطيط موارد المؤسسة">
+    <meta name="author" content="Mekawy ERP">
+
+    <title>{% block title %}Mekawy ERP{% endblock %}</title>
+
+    {% load static %}
+    <link rel="icon" type="image/x-icon" href="{% static 'images/favicon/favicon.ico' %}">
+    
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" type="text/css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    
+    <style>
+        /* =================================== */
+        /* 1. CORE & LAYOUT STYLES
+        /* =================================== */
+        :root {
+            --color-primary: #4A90E2;
+            --color-secondary: #858796;
+            --color-success: #1cc88a;
+            --color-info: #36b9cc;
+            --color-warning: #f6c23e;
+            --color-danger: #e74a3b;
+            --color-light: #f8f9fc;
+            --color-dark: #5a5c69;
+            --sidebar-width: 270px; /* Sidebar width */
+            --navbar-height: 70px;
+        }
+
+        * {
+            font-family: 'Cairo', sans-serif;
+        }
+
+        body {
+            background-color: var(--color-light);
+            font-size: 14px;
+        }
+
+        .wrapper {
+            display: flex;
+            width: 100%;
+            align-items: stretch;
+        }
+
+        /* Navbar */
+        .navbar {
+            background-color: white;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+            height: var(--navbar-height);
+            padding: 0 1.5rem;
+            z-index: 1030;
+        }
+
+        /* Main Container */
+        .main-container {
+            padding: 2rem;
+            min-height: calc(100vh - var(--navbar-height));
+        }
+
+        /* =================================== */
+        /* 2. NEW SIDEBAR STYLES (Colorlib V9 Inspired)
+        /* =================================== */
+        #sidebar {
+            min-width: var(--sidebar-width);
+            max-width: var(--sidebar-width);
+            background: #343a40; /* Dark background */
+            color: #fff;
+            transition: all 0.3s ease-in-out;
+            position: fixed;
+            top: 0;
+            right: 0; /* Positioned on the right for RTL */
+            height: 100vh;
+            z-index: 1031; /* Higher than navbar */
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            overflow-y: auto;
+        }
+        #sidebar.active {
+            margin-right: calc(-1 * var(--sidebar-width)); /* Hide sidebar */
+        }
+        #sidebar .user-profile {
+            padding: 1rem 0;
+        }
+        #sidebar .user-profile .img-container {
+            width: 100px;
+            height: 100px;
+            border: 3px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+        }
+        #sidebar .user-profile .user-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        #sidebar .user-profile .user-initials {
+            width: 100%;
+            height: 100%;
+            background-color: var(--color-primary);
+            font-size: 2.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+        #sidebar .user-profile .user-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0;
+        }
+        #sidebar .user-profile .user-role {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        #sidebar ul.components {
+            padding: 20px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        #sidebar ul li a {
+            padding: 12px 20px;
+            font-size: 1.05em;
+            display: block;
+            color: rgba(255, 255, 255, 0.8);
+            border-right: 3px solid transparent;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+        #sidebar ul li a:hover {
+            color: #fff;
+            background: #495057;
+            border-right-color: var(--color-primary);
+        }
+        #sidebar ul li a.active {
+            color: #fff;
+            background: var(--color-primary);
+        }
+        #sidebar ul ul a {
+            font-size: 0.9em !important;
+            padding-right: 30px !important;
+            background: #495057;
+        }
+        #sidebar ul ul a.active-sub {
+            color: var(--color-success);
+            font-weight: 600;
+        }
+        #sidebar .footer {
+            font-size: 0.75rem;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.5);
+            padding: 1rem;
+        }
+        
+        /* =================================== */
+        /* 3. CONTENT & RESPONSIVE STYLES
+        /* =================================== */
+        #content {
+            width: 100%;
+            min-height: 100vh;
+            transition: all 0.3s ease-in-out;
+            padding-right: var(--sidebar-width); /* Make space for sidebar */
+        }
+        #content.active {
+            padding-right: 0;
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 992px) {
+            #sidebar {
+                margin-right: calc(-1 * var(--sidebar-width));
+            }
+            #sidebar.active {
+                margin-right: 0;
+            }
+            #content {
+                padding-right: 0;
+            }
+            /* When sidebar is open on mobile, add an overlay */
+            body.sidebar-open #content::after {
+                content: '';
+                position: fixed;
+                top: 0;
+                right: 0;
+                left: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 1030;
+            }
+        }
+        
+        /* =================================== */
+        /* 4. GENERAL COMPONENT STYLES
+        /* =================================== */
+        .card {
+            border: none;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+            border-radius: 0.35rem;
+        }
+        .card-header {
+            background-color: #f8f9fc;
+            border-bottom: 1px solid #e3e6f0;
+            padding: 1rem 1.25rem;
+        }
+        .btn {
+            border-radius: 0.35rem;
+            font-weight: 600;
+            padding: 0.5rem 1rem;
+        }
+        .form-control {
+            border-radius: 0.35rem;
+            border: 1px solid #d1d3e2;
+            padding: 0.75rem;
+        }
+        .form-control:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+        }
+        .table { color: var(--color-dark); }
+        .table th {
+            border-top: none;
+            font-weight: 600;
+            color: var(--color-dark);
+            background-color: var(--color-light);
+        }
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1050;
+        }
+        .page-link { color: var(--color-primary); }
+        .page-item.active .page-link {
+            background-color: var(--color-primary);
+            border-color: var(--color-primary);
+        }
+        
+        /* Custom Scrollbar */
+        #sidebar::-webkit-scrollbar { width: 6px; }
+        #sidebar::-webkit-scrollbar-track { background: #555; }
+        #sidebar::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
+        #sidebar::-webkit-scrollbar-thumb:hover { background: #aaa; }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    <div class="wrapper d-flex align-items-stretch">
+        {% if user.is_authenticated %}
+            {% include 'partials/sidebar.html' %}
+        {% endif %}
+
+        <div id="content">
+            {% if user.is_authenticated %}
+                {% include 'partials/navbar.html' %}
+            {% endif %}
+
+            <div class="main-container">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {% if message.tags == 'error' %}
+                                <i class="fas fa-exclamation-triangle"></i>
+                            {% elif message.tags == 'success' %}
+                                <i class="fas fa-check-circle"></i>
+                            {% elif message.tags == 'warning' %}
+                                <i class="fas fa-exclamation-circle"></i>
+                            {% elif message.tags == 'info' %}
+                                <i class="fas fa-info-circle"></i>
+                            {% endif %}
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                {% block content %}{% endblock %}
+            </div>
+
+            {% if user.is_authenticated %}
+                {% include 'partials/footer.html' %}
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="logoutModalLabel">تأكيد تسجيل الخروج</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    هل أنت متأكد أنك تريد تسجيل الخروج؟
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <a href="{% url 'users:logout' %}" class="btn btn-danger">تسجيل الخروج</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        $(document).ready(function() {
+            // Sidebar Toggle Logic
+            $('#sidebarCollapse').on('click', function () {
+                event.stopPropagation();
+                $('#sidebar').toggleClass('active');
+                $('#content').toggleClass('active');
+                $('body').toggleClass('sidebar-open');
+            });
+
+            $('#content').on('click', function () {
+                if ($('body').hasClass('sidebar-open')) {
+                    $('#sidebar').removeClass('active');
+                    $('#content').removeClass('active');
+                    $('body').removeClass('sidebar-open');
+                }
+            });
+
+            // Auto-hide alerts after 5 seconds
+            setTimeout(function() {
+                $('.alert').fadeOut('slow');
+            }, 5000);
+
+            // Initialize Bootstrap tooltips
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}تعديل الملف الشخصي{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-4 text-gray-800">تعديل الملف الشخصي</h1>
+
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="row">
+                    <div class="col-md-8">
+                        <h5 class="mb-3">المعلومات الأساسية</h5>
+                        {{ form|crispy }}
+                        <hr>
+                        <h5 class="mb-3">معلومات إضافية</h5>
+                        {{ profile_settings_form|crispy }}
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                إجراءات
+                            </div>
+                            <div class="card-body">
+                                <button type="submit" class="btn btn-primary w-100 mb-2">
+                                    <i class="fas fa-save"></i> حفظ التغييرات
+                                </button>
+                                <a href="{% url 'users:profile' %}" class="btn btn-secondary w-100 mb-3">
+                                    <i class="fas fa-times"></i> إلغاء
+                                </a>
+                                <hr>
+                                <a href="{% url 'users:password_change' %}" class="btn btn-outline-warning w-100">
+                                    <i class="fas fa-key"></i> تغيير كلمة المرور
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

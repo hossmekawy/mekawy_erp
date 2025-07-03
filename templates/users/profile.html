@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}الملف الشخصي - {{ user.full_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">الملف الشخصي</h1>
+        <a href="{% url 'users:profile_edit' %}" class="btn btn-primary btn-icon-split">
+            <span class="icon text-white-50"><i class="fas fa-edit"></i></span>
+            <span class="text">تعديل الملف الشخصي</span>
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- Profile Card -->
+        <div class="col-lg-4">
+            <div class="card shadow mb-4">
+                <div class="card-body text-center d-flex flex-column align-items-center">
+                    {% if user.profile_picture %}
+                        <img src="{{ user.profile_picture.url }}" 
+                             alt="Profile Picture" class="img-fluid rounded-circle mb-3" style="width: 150px; height: 150px; object-fit: cover;">
+                    {% else %}
+                        <div class="mb-3">
+                            <svg class="img-fluid rounded-circle" width="150" height="150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Placeholder: Initials" preserveAspectRatio="xMidYMid slice" focusable="false">
+                                <title>Placeholder</title>
+                                <rect width="100%" height="100%" fill="#868e96"></rect>
+                                <text x="50%" y="50%" fill="#dee2e6" dy=".3em" text-anchor="middle" font-size="4rem" font-family="Cairo, sans-serif">{{ user.first_name|first|upper }}{{ user.last_name|first|upper }}</text>
+                            </svg>
+                        </div>
+                    {% endif %}
+                    <h4 class="mb-1">{{ user.full_name }}</h4>
+                    <p class="text-muted mb-2">{{ user.get_role_display }}</p>
+                    <p class="text-muted mb-4">{{ user.department|default:"-" }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Details -->
+        <div class="col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">تفاصيل الحساب</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-sm-3"><h6 class="mb-0">الاسم الكامل</h6></div>
+                        <div class="col-sm-9 text-secondary">{{ user.full_name }}</div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-sm-3"><h6 class="mb-0">البريد الإلكتروني</h6></div>
+                        <div class="col-sm-9 text-secondary">{{ user.email }}</div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-sm-3"><h6 class="mb-0">اسم المستخدم</h6></div>
+                        <div class="col-sm-9 text-secondary">{{ user.username }}</div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-sm-3"><h6 class="mb-0">رقم الهاتف</h6></div>
+                        <div class="col-sm-9 text-secondary">{{ user.phone|default:"لم يتم إضافته" }}</div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-sm-3"><h6 class="mb-0">تاريخ الانضمام</h6></div>
+                        <div class="col-sm-9 text-secondary">{{ user.date_joined|date:"d M Y" }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">معلومات إضافية</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-sm-3"><h6 class="mb-0">نبذة تعريفية</h6></div>
+                        <div class="col-sm-9 text-secondary">{{ profile.bio|default:"-" }}</div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-sm-3"><h6 class="mb-0">الموقع</h6></div>
+                        <div class="col-sm-9 text-secondary">{{ profile.location|default:"-" }}</div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-sm-3"><h6 class="mb-0">تاريخ الميلاد</h6></div>
+                        <div class="col-sm-9 text-secondary">{{ profile.birth_date|date:"d M Y"|default:"-" }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

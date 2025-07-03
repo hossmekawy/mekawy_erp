@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>طباعة أوامر الإنتاج</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            direction: rtl;
+            margin: 0;
+            padding: 20px;
+            font-size: 12px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+        }
+        
+        .company-name {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .report-title {
+            font-size: 18px;
+            color: #666;
+        }
+        
+        .print-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-size: 10px;
+            color: #666;
+        }
+        
+        .summary {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .summary-item {
+            display: inline-block;
+            margin-left: 30px;
+        }
+        
+        .orders-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        
+        .orders-table th,
+        .orders-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        
+        .orders-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        
+        .orders-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .status {
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        
+        .status-pending { background-color: #fff3cd; color: #856404; }
+        .status-approved { background-color: #d4edda; color: #155724; }
+        .status-in_cutting { background-color: #cce5ff; color: #004085; }
+        .status-in_assembly { background-color: #e2e3e5; color: #383d41; }
+        .status-in_dyeing { background-color: #f8d7da; color: #721c24; }
+        .status-in_finishing { background-color: #d1ecf1; color: #0c5460; }
+        .status-completed { background-color: #d4edda; color: #155724; }
+        
+        .priority {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+        }
+        
+        .priority-low { background-color: #e2e3e5; color: #383d41; }
+        .priority-normal { background-color: #cce5ff; color: #004085; }
+        .priority-high { background-color: #fff3cd; color: #856404; }
+        .priority-urgent { background-color: #f8d7da; color: #721c24; }
+        
+        .page-break {
+            page-break-before: always;
+        }
+        
+        .footer {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+        }
+        
+        @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-name">شركة المكاوي للملابس الجاهزة</div>
+        <div class="report-title">تقرير أوامر الإنتاج</div>
+    </div>
+    
+    <div class="print-info">
+        <div>تاريخ الطباعة: {{ print_date|date:"Y/m/d H:i" }}</div>
+        <div>عدد الأوامر: {{ total_orders }}</div>
+        <div>إجمالي الكمية: {{ total_quantity }}</div>
+    </div>
+    
+    <div class="summary">
+        <strong>ملخص الأوامر:</strong>
+        <div class="summary-item">
+            <strong>العدد الإجمالي:</strong> {{ total_orders }}
+        </div>
+        <div class="summary-item">
+            <strong>إجمالي القطع:</strong> {{ total_quantity }}
+        </div>
+    </div>
+    
+    <table class="orders-table">
+        <thead>
+            <tr>
+                <th>رقم الأمر</th>
+                <th>المنتج</th>
+                <th>الكمية</th>
+                <th>الحالة</th>
+                <th>الأولوية</th>
+                <th>تاريخ البدء</th>
+                <th>تاريخ الإنجاز المتوقع</th>
+                <th>القماش</th>
+                <th>أمتار القماش</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr>
+                <td>{{ order.order_number }}</td>
+                <td>{{ order.product.name }}</td>
+                <td>{{ order.quantity_ordered }}</td>
+                <td>
+                    <span class="status status-{{ order.status }}">
+                        {{ order.get_status_display }}
+                    </span>
+                </td>
+                <td>
+                    <span class="priority priority-{{ order.priority }}">
+                        {{ order.get_priority_display }}
+                    </span>
+                </td>
+                <td>{{ order.start_date|date:"Y/m/d" }}</td>
+                <td>{{ order.expected_completion_date|date:"Y/m/d" }}</td>
+                <td>{{ order.textile_stock.name|default:"-" }}</td>
+                <td>{{ order.fabric_meters_allocated|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div class="footer">
+        <p>تم إنشاء هذا التقرير بواسطة نظام إدارة الإنتاج - شركة المكاوي للملابس الجاهزة</p>
+    </div>
+</body>
+</html>

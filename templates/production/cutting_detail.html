@@ -1,0 +1,234 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+
+{% block production_title %}تفاصيل عملية القص{% endblock %}
+
+{% block production_breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'production:cutting_list' %}">متابعة القص</a></li>
+<li class="breadcrumb-item active" aria-current="page">تفاصيل عملية القص</li>
+{% endblock %}
+
+{% block production_header_actions %}
+<div class="d-flex justify-content-end align-items-center gap-2">
+    {% if not cutting_process.is_completed and cutting_process.production_order.bom_version %}
+    <a href="{% url 'production:draws:draw_create' %}?bom_id={{ cutting_process.production_order.bom_version.pk }}" class="btn btn-success" target="_blank" title="إضافة رسمة قص للمقاسات الناقصة">
+        <i class="fas fa-plus-square me-2"></i> إضافة رسمة قص
+    </a>
+    {% endif %}
+    <a href="{% url 'production:cutting_sheet_print_pdf' cutting_process.pk %}" class="btn btn-secondary" target="_blank">
+        <i class="fas fa-print me-2"></i> طباعة PDF
+    </a>
+    {% if not cutting_process.is_completed %}
+    <a href="{% url 'production:cutting_update' cutting_process.pk %}" class="btn btn-production-outline">
+        <i class="fas fa-edit me-2"></i> تعديل
+    </a>
+    <a href="{% url 'production:cutting_complete' cutting_process.pk %}" class="btn btn-production" onclick="return confirm('هل أنت متأكد من إكمال هذه العملية؟ سيتم إنشاء سجلات القطع التفصيلية ولا يمكن التراجع عن هذا الإجراء.')">
+        <i class="fas fa-check-circle me-2"></i> إكمال وتوليد القطع
+    </a>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block production_extra_css %}
+<style>
+    .details-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.5rem;
+    }
+    .detail-card {
+        background-color: #fff;
+        border: 1px solid #e3e6f0;
+        border-radius: 0.5rem;
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    }
+    .detail-card-header {
+        background-color: #f8f9fc;
+        padding: 0.75rem 1.25rem;
+        border-bottom: 1px solid #e3e6f0;
+        font-weight: bold;
+        color: var(--production-primary);
+    }
+    .detail-card-body {
+        padding: 1.25rem;
+    }
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #f0f1f3;
+    }
+    .detail-item:last-child {
+        border-bottom: none;
+    }
+    .detail-item .label {
+        color: #858796;
+    }
+    .detail-item .value {
+        font-weight: 500;
+        color: #5a5c69;
+    }
+    .stat-card-lg {
+        border-left: 5px solid var(--production-info);
+    }
+</style>
+{% endblock %}
+
+{% block production_content %}
+<div class="details-grid">
+    <!-- Main Details Card -->
+    <div class="detail-card">
+        <div class="detail-card-header"><i class="fas fa-info-circle me-2"></i>معلومات أساسية</div>
+        <div class="detail-card-body">
+            <div class="detail-item">
+                <span class="label">أمر الإنتاج:</span>
+                <span class="value"><a href="{% url 'production:order_detail' cutting_process.production_order.pk %}">#{{ cutting_process.production_order.order_number }}</a></span>
+            </div>
+            <div class="detail-item">
+                <span class="label">المنتج:</span>
+                <span class="value">{{ cutting_process.production_order.product.name }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">القاص:</span>
+                <span class="value">{{ cutting_process.cutter.get_full_name|default:cutting_process.cutter.username }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">تاريخ القص:</span>
+                <span class="value">{{ cutting_process.cutting_date|date:"Y-m-d H:i" }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">الحالة:</span>
+                <span class="value">
+                    {% if cutting_process.is_completed %}
+                        <span class="production-status completed"><i class="fas fa-check-circle me-1"></i> مكتمل</span>
+                    {% else %}
+                        <span class="production-status in-progress"><i class="fas fa-spinner fa-spin me-1"></i> قيد التنفيذ</span>
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Single Layer Calculation Card -->
+    <div class="detail-card">
+        <div class="detail-card-header"><i class="fas fa-layer-group me-2"></i>حسابات الطبقة الواحدة</div>
+        <div class="detail-card-body">
+            <div class="detail-item">
+                <span class="label">عرض الفرشة:</span>
+                <span class="value"><strong>{{ cutting_process.single_layer_width|default:"--"|floatformat:2 }}</strong> م</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">عدد القطع في الطبقة:</span>
+                <span class="value"><strong>{{ cutting_process.single_layer_pieces|default:"--" }}</strong></span>
+            </div>
+             <div class="detail-item">
+                <span class="label">طول الفرشة المستخدم:</span>
+                <span class="value"><strong>{{ cutting_process.single_layer_fabric_length|default:"--"|floatformat:2 }}</strong> م</span>
+            </div>
+            <div class="detail-item stat-card-lg ps-3">
+                <span class="label">ميتراج القطعة المحسوب:</span>
+                <span class="value fs-5 text-production-primary"><strong>{{ cutting_process.single_layer_meterage|default:"--"|floatformat:3 }}</strong></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Totals & Marker Details -->
+    <div class="col-lg-6">
+        <div class="detail-card h-100">
+            <div class="detail-card-header"><i class="fas fa-ruler-combined me-2"></i>تفاصيل الرسمة والإجماليات</div>
+            <div class="detail-card-body">
+                <div class="detail-item">
+                    <span class="label">مقاسات الرسمة (Marker):</span>
+                    <span class="value"><code>{{ cutting_process.marker_details.sizes|join:", " }}</code></span>
+                </div>
+                 <div class="detail-item">
+                    <span class="label">إجمالي القماش المستخدم:</span>
+                    <span class="value">{{ cutting_process.total_fabric_used|floatformat:2 }} متر</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">إجمالي القصه:</span>
+                    <span class="value">{{ cutting_stats.total_garments }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">إجمالي القطع المفردة:</span>
+                    <span class="value">{{ cutting_stats.total_individual_pieces }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">هدر القماش:</span>
+                    <span class="value">{{ cutting_process.fabric_waste|floatformat:2 }} متر</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Cutting Tables -->
+    <div class="col-lg-6">
+        <div class="detail-card h-100">
+            <div class="detail-card-header"><i class="fas fa-table me-2"></i>جداول القص (الفرشات)</div>
+            <div class="table-responsive">
+                <table class="table table-sm production-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>طول الثوب</th>
+                            <th>الطبقات</th>
+                            <th>الإجمالي</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for table in cutting_tables %}
+                        <tr>
+                            <td>{{ table.fabric_length|floatformat:2 }} م</td>
+                            <td>{{ table.layers_count }}</td>
+                            <td><strong>{{ table.total_pieces }}</strong></td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="3" class="text-center p-3">لا توجد فرشات.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="detail-card mt-4">
+    <div class="detail-card-header"><i class="fas fa-puzzle-piece me-2"></i>جرد القطع المقصوصة</div>
+     <div class="table-responsive">
+         <table class="table production-table table-striped mb-0">
+            <thead>
+                <tr>
+                    <th>اسم القطعة</th>
+                    <th>المقاس</th>
+                    <th>الكمية</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for piece in cut_pieces %}
+                <tr>
+                    <td>{{ piece.piece_type }}</td>
+                    <td><span class="badge bg-secondary">{{ piece.size }}</span></td>
+                    <td><strong>{{ piece.quantity }}</strong></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3" class="text-center p-3">
+                        <div class="production-empty">
+                            <i class="fas fa-box-open"></i>
+                            <p class="small mt-2">
+                            {% if cutting_process.is_completed %}
+                                لم يتم توليد قطع. تحقق من تعريف رسومات القص.
+                            {% else %}
+                                أكمل العملية لتوليد القطع.
+                            {% endif %}
+                            </p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+     </div>
+</div>
+
+{% endblock %}

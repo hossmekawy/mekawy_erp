@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}المخازن - {% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'css/warehouses.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block sidebar %}
+<div class="sidebar">
+    <div class="sidebar-header">
+        <h5>إدارة المخازن</h5>
+    </div>
+    <ul class="nav nav-pills flex-column">
+        <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" 
+               href="{% url 'warehouses:dashboard' %}">
+                <i class="fas fa-tachometer-alt"></i> لوحة التحكم
+            </a>
+        </li>
+        
+        {% if user.role in 'admin,warehouse_manager' %}
+        <li class="nav-item">
+            <a class="nav-link {% if 'warehouse' in request.resolver_match.url_name %}active{% endif %}" 
+               href="{% url 'warehouses:warehouse_list' %}">
+                <i class="fas fa-warehouse"></i> المخازن
+            </a>
+        </li>
+        {% endif %}
+        
+        <li class="nav-item">
+            <a class="nav-link {% if 'product' in request.resolver_match.url_name %}active{% endif %}" 
+               href="{% url 'warehouses:product_list' %}">
+                <i class="fas fa-box"></i> المنتجات
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link {% if 'stock' in request.resolver_match.url_name %}active{% endif %}" 
+               href="{% url 'warehouses:stock_list' %}">
+                <i class="fas fa-boxes"></i> المخزون
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link {% if 'movement' in request.resolver_match.url_name %}active{% endif %}" 
+               href="{% url 'warehouses:movement_list' %}">
+                <i class="fas fa-exchange-alt"></i> حركات المخزون
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link {% if 'transfer' in request.resolver_match.url_name %}active{% endif %}" 
+               href="{% url 'warehouses:transfer_list' %}">
+                <i class="fas fa-truck"></i> التحويلات
+            </a>
+        </li>
+        
+        {% if user.role in 'admin,warehouse_manager' %}
+        <li class="nav-item">
+            <a class="nav-link {% if 'category' in request.resolver_match.url_name %}active{% endif %}" 
+               href="{% url 'warehouses:category_list' %}">
+                <i class="fas fa-tags"></i> التصنيفات
+            </a>
+        </li>
+        {% endif %}
+        
+        {% if user.role in 'admin,warehouse_manager,accountant' %}
+        <li class="nav-item">
+            <a class="nav-link {% if 'report' in request.resolver_match.url_name %}active{% endif %}" 
+               href="{% url 'warehouses:reports' %}">
+                <i class="fas fa-chart-bar"></i> التقارير
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="warehouse-content">
+    {% block warehouse_content %}
+    {% endblock %}
+</div>
+
+{% include 'partials/toast.html' %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/warehouses.js' %}"></script>
+{% endblock %}
