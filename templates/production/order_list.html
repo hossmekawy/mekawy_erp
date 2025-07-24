@@ -68,7 +68,7 @@
                             {% for order in orders %}
                                 <tr>
                                     <td>
-                                        <a href="{{ order.get_absolute_url }}" class="fw-bold text-primary">{{ order.order_number }}</a>
+                                        <a href="{% url 'production:order_detail' order.pk %}" class="fw-bold text-primary">{{ order.order_number }}</a>
                                         <small class="d-block text-muted">{{ order.batch_number }}</small>
                                     </td>
                                     <td>

@@ -10,82 +10,262 @@
 {% endblock %}
 
 {% block production_breadcrumb_items %}
-    <li class="breadcrumb-item"><a href="{% url 'production:dyeing_list' %}" class="text-black-50">عمليات الصباغة</a></li>
+    <li class="breadcrumb-item">
+        <a href="{% url 'production:dyeing_list' %}" class="text-primary hover:text-primary-dark transition-colors">عمليات الصباغة</a>
+    </li>
     <li class="breadcrumb-item active" aria-current="page">
         {% if object %}تعديل العملية{% else %}عملية جديدة{% endif %}
     </li>
 {% endblock %}
 
 {% block production_content %}
-<div class="production-card">
-    <div class="production-card-header">
-        {% if object %}
-            <i class="fas fa-edit me-2"></i>تعديل عملية الصباغة لأمر: {{ object.assembly_process.production_order.order_number }}
-        {% else %}
-            <i class="fas fa-plus-circle me-2"></i>إرسال ملابس للصباغة
-        {% endif %}
-    </div>
-    <form method="post" novalidate>
-        {% csrf_token %}
-        <div class="production-card-body">
-            {% if form.non_field_errors %}
-                <div class="alert alert-danger">
-                    {% for error in form.non_field_errors %}
-                        <p class="mb-0">{{ error }}</p>
-                    {% endfor %}
-                </div>
-            {% endif %}
-
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <label for="{{ form.assembly_process.id_for_label }}" class="form-label fw-bold">عملية التجميع المكتملة</label>
-                    {% render_field form.assembly_process class+="form-select" data-control="select2" %}
-                    <div class="form-text">اختر عملية التجميع التي تم استلامها وجاهزة للإرسال للصباغة.</div>
-                    {% for error in form.assembly_process.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-                </div>
-                <div class="col-md-6">
-                    <label for="{{ form.dyeing_facility.id_for_label }}" class="form-label fw-bold">مصنع الصباغة</label>
-                    {% render_field form.dyeing_facility class+="form-select" data-control="select2" %}
-                    {% if form.dyeing_facility.help_text %}
-                        <div class="form-text text-info">{{ form.dyeing_facility.help_text|safe }}</div>
-                    {% endif %}
-                    {% for error in form.dyeing_facility.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-                </div>
-                <div class="col-md-12">
-                    <label for="{{ form.color_specification.id_for_label }}" class="form-label fw-bold">مواصفات اللون</label>
-                    {% render_field form.color_specification class+="form-control" placeholder="مثال: أزرق دينم درجة 5" %}
-                    {% for error in form.color_specification.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-                </div>
-                
-                <!-- The cost field has been removed from the form -->
-
-                <div class="col-md-6">
-                    <label for="{{ form.sent_date.id_for_label }}" class="form-label fw-bold">تاريخ ووقت الإرسال</label>
-                    {% render_field form.sent_date class+="form-control" %}
-                    {% for error in form.sent_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-                </div>
-                <div class="col-md-6">
-                    <label for="{{ form.expected_return_date.id_for_label }}" class="form-label fw-bold">تاريخ العودة المتوقع</label>
-                    {% render_field form.expected_return_date class+="form-control" %}
-                    {% for error in form.expected_return_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-                </div>
-                 <div class="col-12">
-                    <label for="{{ form.notes.id_for_label }}" class="form-label fw-bold">ملاحظات</label>
-                    {% render_field form.notes class+="form-control" placeholder="أضف أي ملاحظات أو تعليمات خاصة لعملية الصباغة" %}
-                    {% for error in form.notes.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+<!-- Form Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-0 overflow-hidden">
+            <div class="card-body p-4 bg-gradient {% if object %}bg-primary{% else %}bg-success{% endif %} text-white">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="display-6">
+                        {% if object %}
+                            <i class="fas fa-edit"></i>
+                        {% else %}
+                            <i class="fas fa-plus-circle"></i>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <h4 class="mb-1">
+                            {% if object %}
+                                تعديل عملية الصباغة
+                            {% else %}
+                                إرسال ملابس للصباغة
+                            {% endif %}
+                        </h4>
+                        {% if object %}
+                            <p class="mb-0 opacity-75">
+                                أمر الإنتاج: {{ object.assembly_process.production_order.order_number }}
+                            </p>
+                        {% else %}
+                            <p class="mb-0 opacity-75">
+                                إنشاء عملية صباغة جديدة وإرسال المنتجات للمصنع
+                            </p>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="production-card-footer text-end">
-            <a href="{% if object %}{{ object.get_absolute_url }}{% else %}{% url 'production:dyeing_list' %}{% endif %}" class="btn btn-secondary">
-                <i class="fas fa-times me-2"></i>إلغاء
-            </a>
-            <button type="submit" class="btn btn-production">
-                <i class="fas fa-save me-2"></i>
-                {% if object %}حفظ التعديلات{% else %}إنشاء وإرسال{% endif %}
-            </button>
+    </div>
+</div>
+
+<!-- Main Form -->
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-light border-0 py-4">
+                <h5 class="mb-0 d-flex align-items-center gap-2">
+                    <i class="fas fa-form text-primary"></i>
+                    بيانات عملية الصباغة
+                </h5>
+            </div>
+            <form method="post" novalidate>
+                {% csrf_token %}
+                <div class="card-body p-4">
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger border-0 bg-danger bg-opacity-10" role="alert">
+                            <div class="d-flex align-items-start gap-2">
+                                <i class="fas fa-exclamation-triangle text-danger mt-1"></i>
+                                <div class="flex-grow-1">
+                                    {% for error in form.non_field_errors %}
+                                        <div class="mb-0">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <div class="row g-4">
+                        <!-- Assembly Process Selection -->
+                        <div class="col-lg-6">
+                            <div class="form-floating-custom">
+                                <label for="{{ form.assembly_process.id_for_label }}" class="form-label fw-semibold d-flex align-items-center gap-2 mb-2">
+                                    <i class="fas fa-cogs text-primary"></i>
+                                    عملية التجميع المكتملة
+                                    <span class="text-danger">*</span>
+                                </label>
+                                {% render_field form.assembly_process class+="form-select form-select-lg" data-control="select2" %}
+                                <div class="form-text mt-2">
+                                    <i class="fas fa-info-circle text-info me-1"></i>
+                                    اختر عملية التجميع التي تم استلامها وجاهزة للإرسال للصباغة
+                                </div>
+                                {% for error in form.assembly_process.errors %}
+                                    <div class="invalid-feedback d-block mt-2">
+                                        <i class="fas fa-exclamation-circle me-1"></i>{{ error }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Dyeing Facility Selection -->
+                        <div class="col-lg-6">
+                            <div class="form-floating-custom">
+                                <label for="{{ form.dyeing_facility.id_for_label }}" class="form-label fw-semibold d-flex align-items-center gap-2 mb-2">
+                                    <i class="fas fa-industry text-primary"></i>
+                                    مصنع الصباغة
+                                    <span class="text-danger">*</span>
+                                </label>
+                                {% render_field form.dyeing_facility class+="form-select form-select-lg" data-control="select2" %}
+                                {% if form.dyeing_facility.help_text %}
+                                    <div class="form-text mt-2">
+                                        <i class="fas fa-lightbulb text-warning me-1"></i>
+                                        {{ form.dyeing_facility.help_text|safe }}
+                                    </div>
+                                {% endif %}
+                                {% for error in form.dyeing_facility.errors %}
+                                    <div class="invalid-feedback d-block mt-2">
+                                        <i class="fas fa-exclamation-circle me-1"></i>{{ error }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Color Specification -->
+                        <div class="col-12">
+                            <div class="form-floating-custom">
+                                <label for="{{ form.color_specification.id_for_label }}" class="form-label fw-semibold d-flex align-items-center gap-2 mb-2">
+                                    <i class="fas fa-palette text-primary"></i>
+                                    مواصفات اللون
+                                    <span class="text-danger">*</span>
+                                </label>
+                                {% render_field form.color_specification class+="form-control form-control-lg" placeholder="مثال: أزرق دينم درجة 5، أحمر قرمزي، أخضر زمردي..." %}
+                                {% for error in form.color_specification.errors %}
+                                    <div class="invalid-feedback d-block mt-2">
+                                        <i class="fas fa-exclamation-circle me-1"></i>{{ error }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Date Information Section -->
+                        <div class="col-12">
+                            <div class="border-top pt-4 mt-4">
+                                <h6 class="text-muted fw-semibold mb-3 d-flex align-items-center gap-2">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    معلومات التوقيت
+                                </h6>
+                                <div class="row g-3">
+                                    <!-- Sent Date -->
+                                    <div class="col-md-6">
+                                        <div class="form-floating-custom">
+                                            <label for="{{ form.sent_date.id_for_label }}" class="form-label fw-semibold d-flex align-items-center gap-2 mb-2">
+                                                <i class="fas fa-paper-plane text-success"></i>
+                                                تاريخ ووقت الإرسال
+                                                <span class="text-danger">*</span>
+                                            </label>
+                                            {% render_field form.sent_date class+="form-control form-control-lg" %}
+                                            {% for error in form.sent_date.errors %}
+                                                <div class="invalid-feedback d-block mt-2">
+                                                    <i class="fas fa-exclamation-circle me-1"></i>{{ error }}
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+
+                                    <!-- Expected Return Date -->
+                                    <div class="col-md-6">
+                                        <div class="form-floating-custom">
+                                            <label for="{{ form.expected_return_date.id_for_label }}" class="form-label fw-semibold d-flex align-items-center gap-2 mb-2">
+                                                <i class="fas fa-calendar-check text-info"></i>
+                                                تاريخ العودة المتوقع
+                                                <span class="text-danger">*</span>
+                                            </label>
+                                            {% render_field form.expected_return_date class+="form-control form-control-lg" %}
+                                            {% for error in form.expected_return_date.errors %}
+                                                <div class="invalid-feedback d-block mt-2">
+                                                    <i class="fas fa-exclamation-circle me-1"></i>{{ error }}
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Notes Section -->
+                        <div class="col-12">
+                            <div class="border-top pt-4 mt-4">
+                                <div class="form-floating-custom">
+                                    <label for="{{ form.notes.id_for_label }}" class="form-label fw-semibold d-flex align-items-center gap-2 mb-2">
+                                        <i class="fas fa-sticky-note text-warning"></i>
+                                        ملاحظات وتعليمات خاصة
+                                    </label>
+                                    {% render_field form.notes class+="form-control" rows="4" placeholder="أضف أي ملاحظات أو تعليمات خاصة لعملية الصباغة، مثل: درجة اللون المطلوبة، نوع الصباغة، معالجة خاصة..." %}
+                                    <div class="form-text mt-2">
+                                        <i class="fas fa-info-circle text-muted me-1"></i>
+                                        هذه المعلومات ستساعد المصنع في تنفيذ عملية الصباغة بالشكل المطلوب
+                                    </div>
+                                    {% for error in form.notes.errors %}
+                                        <div class="invalid-feedback d-block mt-2">
+                                            <i class="fas fa-exclamation-circle me-1"></i>{{ error }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="card-footer bg-light border-0 py-4">
+                    <div class="d-flex flex-column flex-sm-row gap-3 justify-content-end">
+                        <a href="{% if object %}{{ object.get_absolute_url }}{% else %}{% url 'production:dyeing_list' %}{% endif %}" 
+                           class="btn btn-light btn-lg d-flex align-items-center justify-content-center gap-2">
+                            <i class="fas fa-times"></i>
+                            <span>إلغاء</span>
+                        </a>
+                        <button type="submit" class="btn {% if object %}btn-primary{% else %}btn-success{% endif %} btn-lg d-flex align-items-center justify-content-center gap-2">
+                            <i class="fas fa-save"></i>
+                            <span>
+                                {% if object %}حفظ التعديلات{% else %}إنشاء وإرسال{% endif %}
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </form>
         </div>
-    </form>
+    </div>
+</div>
+
+<!-- Help Section -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card bg-info bg-opacity-10 border-info border-opacity-25">
+            <div class="card-body p-4">
+                <h6 class="text-info fw-semibold mb-3 d-flex align-items-center gap-2">
+                    <i class="fas fa-question-circle"></i>
+                    نصائح مهمة
+                </h6>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="fas fa-check-circle text-success mt-1"></i>
+                            <small class="text-muted">تأكد من اختيار عملية التجميع المكتملة والمستلمة فقط</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="fas fa-clock text-warning mt-1"></i>
+                            <small class="text-muted">احرص على دقة تواريخ الإرسال والعودة المتوقعة</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="fas fa-palette text-info mt-1"></i>
+                            <small class="text-muted">كن محددًا في وصف مواصفات اللون المطلوبة</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -96,8 +276,24 @@ $(document).ready(function() {
     $('[data-control="select2"]').select2({
         theme: "bootstrap-5",
         width: $(this).data('width') ? $(this).data('width') : $(this).hasClass('w-100') ? '100%' : 'style',
-        placeholder: $(this).data('placeholder'),
-        language: "ar"
+        placeholder: function() {
+            return $(this).data('placeholder') || 'اختر من القائمة...';
+        },
+        language: "ar",
+        allowClear: true
+    });
+
+    // Add loading states and animations
+    const form = $('form');
+    const submitBtn = form.find('button[type="submit"]');
+    const originalBtnContent = submitBtn.html();
+
+    form.on('submit', function() {
+        submitBtn.prop('disabled', true);
+        submitBtn.html(`
+            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            جاري الحفظ...
+        `);
     });
 
     // When an assembly process is selected, you might want to fetch related info via AJAX
@@ -106,8 +302,71 @@ $(document).ready(function() {
         if (assemblyId) {
             // Optional: AJAX call to get default data for the selected assembly
             console.log("Selected Assembly Process ID:", assemblyId);
+            
+            // Add visual feedback
+            $(this).closest('.form-floating-custom').addClass('border-success border-opacity-25');
+            setTimeout(() => {
+                $(this).closest('.form-floating-custom').removeClass('border-success border-opacity-25');
+            }, 2000);
         }
+    });
+
+    // Add visual feedback for form validation
+    $('input, select, textarea').on('blur', function() {
+        const field = $(this);
+        if (field.val() && field.val().trim() !== '') {
+            field.addClass('is-valid');
+            field.removeClass('is-invalid');
+        } else if (field.prop('required')) {
+            field.addClass('is-invalid');
+            field.removeClass('is-valid');
+        }
+    });
+
+    // Auto-resize textarea
+    $('textarea').on('input', function() {
+        this.style.height = 'auto';
+        this.style.height = this.scrollHeight + 'px';
     });
 });
 </script>
+
+<style>
+/* Custom form styling */
+.form-floating-custom {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.form-floating-custom:hover {
+    transform: translateY(-1px);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.25);
+}
+
+.form-control.is-valid {
+    border-color: var(--bs-success);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='m2.3 6.73.94-.94 1.46 1.46 3.4-3.4.94.94L3.7 9.13 2.3 6.73z'/%3e%3c/svg%3e");
+}
+
+.form-control.is-invalid {
+    border-color: var(--bs-danger);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath d='m5.8 4.6 2.4 2.4M8.2 4.6l-2.4 2.4'/%3e%3c/svg%3e");
+}
+
+/* Loading animation */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.spinner-border-sm {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+</style>
 {% endblock %}

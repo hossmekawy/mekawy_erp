@@ -7,6 +7,8 @@ from django.contrib.auth import get_user_model
 from django.views.generic import (
     ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
 )
+from django.utils.translation import gettext_lazy as _
+
 from django.views.decorators.http import require_POST
 from django.urls import reverse_lazy, reverse
 from django.http import JsonResponse, HttpResponse
@@ -26,6 +28,10 @@ import csv
 import json
 from django.views import View
 from collections import Counter
+from django.db.models.functions import TruncMonth
+from finance.models import Invoice, Account, AccountCategory
+
+from finance.utils import create_double_entry_transaction
 
 from .models import (
     ProductionOrder, CuttingProcess, AssemblyProcess, DyeingProcess, 
@@ -34,11 +40,11 @@ from .models import (
     AssemblyComponent, GarmentDraw, FinishingComponent, QualityControlCheck,ProductionReport
 )
 from .forms import (
-    ProductionOrderForm, BillOfMaterialsForm, BOMItemFormSet, CuttingProcessForm, 
+    CutPieceFormSet, CuttingTableForm, ProductionOrderForm, BillOfMaterialsForm, BOMItemFormSet, CuttingProcessForm, 
     AssemblyProcessForm, DyeingProcessForm, FinishingProcessForm, FinishingReceiveForm,
     AssemblyReceiveForm, DyeingReceiveForm, ExternalManufacturerForm, ExitPermitForm,
     ReceiptConfirmationForm, QualityControlCheckForm, ProductionCostAnalysisUpdateForm,
-    AssemblySendForm, DyeingSendForm, FinishingSendForm ,CuttingTableFormSet,CustomAssemblyComponentFormSet
+    AssemblySendForm, DyeingSendForm, FinishingSendForm ,CuttingTableFormSet,CustomAssemblyComponentFormSet,ManufacturerProductPriceFormSet ,ExternalManufacturerForm, CustomFinishingComponentFormSet  
 )
 from warehouses.models import Product, StockItem, StockMovement, ProductBatch, Category , Warehouse
 
@@ -333,7 +339,6 @@ class ProductionOrderCreateView(LoginRequiredMixin, CreateView):
         # Continue with the default invalid form handling (re-rendering the page)
         return super().form_invalid(form)
 
-
 class ProductionOrderUpdateView(LoginRequiredMixin, UpdateView):
     model = ProductionOrder
     form_class = ProductionOrderForm
@@ -381,7 +386,6 @@ class ProductionOrderUpdateView(LoginRequiredMixin, UpdateView):
         
         # Continue with the default invalid form handling
         return super().form_invalid(form)
-
 
 class ProductionOrderDeleteView(LoginRequiredMixin, DeleteView):
     model = ProductionOrder
@@ -874,8 +878,23 @@ def complete_cutting_process(request, pk):
             cutting_process.completed_at = timezone.now()
             cutting_process.save()
 
-            production_order.status = 'in_assembly'
-            production_order.save(update_fields=['status'])
+            final_cut_quantity = cutting_process.total_pieces_cut
+
+            if final_cut_quantity > 0:
+                original_quantity = production_order.quantity_ordered
+                # Update the production order quantity to the actual cut quantity
+                production_order.quantity_ordered = final_cut_quantity
+                # Advance the status
+                production_order.status = 'in_assembly'
+                # Save both fields in a single operation
+                production_order.save(update_fields=['quantity_ordered', 'status'])
+                
+                # Inform the user about the automatic change
+                messages.info(request, f"تم تحديث الكمية المطلوبة في أمر الإنتاج #{production_order.order_number} من {original_quantity} إلى {final_cut_quantity} بناءً على إجمالي القطع المقصوصة.")
+            else:
+                 # Fallback: if no pieces were cut for some reason, just advance the status.
+                 production_order.status = 'in_assembly'
+                 production_order.save(update_fields=['status'])
 
             messages.success(request, f'اكتملت عملية القص! تم توليد {len(pieces_to_create)} نوع من القطع وتحديث مخزون القماش.')
 
@@ -1032,6 +1051,8 @@ class AssemblyProcessCreateView(LoginRequiredMixin, CreateView):
     def get_success_url(self):
         return reverse('production:assembly_detail', kwargs={'pk': self.object.pk})
 
+# In production/views.py
+
 class AssemblyProcessDetailView(LoginRequiredMixin, DetailView):
     model = AssemblyProcess
     template_name = 'production/assembly_detail.html'
@@ -1040,29 +1061,24 @@ class AssemblyProcessDetailView(LoginRequiredMixin, DetailView):
     def get_queryset(self):
         # Optimize query by pre-fetching related data needed in the template
         return super().get_queryset().select_related(
-            'production_order__product__size_group',
+            # CORRECTED: The path to size_group is through the order's bom_version
+            'production_order__product',
+            'production_order__bom_version__size_group', 
             'external_manufacturer',
             'assembler'
         ).prefetch_related(
-            'components__material__unit_new' # Prefetch components and their related material+unit
+            'components__material__unit_new'
         )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         assembly_process = self.get_object()
 
-        # Pass sent components to the template
-        # The prefetch_related in get_queryset makes this efficient
         context['sent_components'] = assembly_process.components.all()
-        
-        # Check for related processes
         context['exit_permit'] = ExitPermit.objects.filter(assembly_process=assembly_process).first()
         context['dyeing_process_exists'] = assembly_process.dyeing_processes.exists()
-        
-        # Form for receiving items
         context['receive_form'] = AssemblyReceiveForm(instance=assembly_process)
         
-        # Prepare context for statistics display
         context['assembly_stats'] = {
             'defect_rate': assembly_process.defect_rate,
             'loss_rate': assembly_process.loss_rate,
@@ -1072,27 +1088,27 @@ class AssemblyProcessDetailView(LoginRequiredMixin, DetailView):
             ),
         }
         
-        # Prepare ExitPermitForm with a detailed description if needed
         if assembly_process.assembly_type == 'outsourced' and not context['exit_permit']:
-            product = assembly_process.production_order.product
-            size_group = product.size_group
+            production_order = assembly_process.production_order
+            product = production_order.product
             
-            # Build the description string part-by-part
-            description_parts = [f"قطع جاهزة للتجميع للمنتج: {product.name} (أمر #{assembly_process.production_order.order_number})"]
+            # CORRECTED: Get the size group from the order's specific BOM version
+            bom = production_order.bom_version
+            size_group = bom.size_group if bom else None
+            
+            description_parts = [f"قطع جاهزة للتجميع للمنتج: {product.name} (أمر #{production_order.order_number})"]
             if size_group:
                 sizes_str = ", ".join(size_group.sizes)
                 description_parts.append(f"مجموعة المقاسات: {size_group.name} ({sizes_str})")
             
-            # Add sent components to the description
             if context['sent_components']:
                 description_parts.append("\n--- مكونات إضافية مرسلة ---")
                 for comp in context['sent_components']:
                     unit_name = comp.material.unit_new.symbol if comp.material.unit_new else 'وحدة'
                     description_parts.append(f"- {comp.material.name}: {comp.quantity_sent} {unit_name}")
 
-            # Prepare initial data for the form
             initial_data = {
-                'production_order': assembly_process.production_order,
+                'production_order': production_order,
                 'permit_type': 'assembly_pieces',
                 'items_description': "\n".join(description_parts),
                 'quantity': assembly_process.quantity_sent,
@@ -1103,7 +1119,6 @@ class AssemblyProcessDetailView(LoginRequiredMixin, DetailView):
             context['exit_permit_form'] = ExitPermitForm(initial=initial_data)
 
         return context
-
 
 class AssemblyProcessUpdateView(LoginRequiredMixin, UpdateView):
     model = AssemblyProcess
@@ -1234,12 +1249,20 @@ def get_stock_for_material_in_warehouse_ajax(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
     
+from django.contrib.contenttypes.models import ContentType
+from finance.models import Invoice, Account, AccountCategory
+from finance.utils import create_double_entry_transaction
+from datetime import timedelta
+# ... other existing imports
+
+
 @login_required
 @require_POST
 def receive_assembly_process(request, pk):
     """
     Handles the submission of the 'Receive Items' modal form.
-    This view now explicitly updates the production order status.
+    This view now explicitly updates the production order status AND
+    creates the necessary financial records for outsourced jobs.
     """
     assembly_process = get_object_or_404(AssemblyProcess, pk=pk, is_completed=False)
     form = AssemblyReceiveForm(request.POST, instance=assembly_process)
@@ -1249,16 +1272,36 @@ def receive_assembly_process(request, pk):
             process = form.save(commit=False)
             process.is_completed = True
             process.actual_completion_date = timezone.now()
-            process.save()
-
-            # Calculate final costs
+            
+            # First, calculate the cost. This must be done before creating the invoice.
             process.calculate_assembly_cost()
+            process.save() # Save the process with the final cost
 
-            # **NEW**: Update the production order status (formerly a signal)
+            # **FINANCIAL LOGIC**
+            # If the assembly was outsourced and has a cost, create an invoice and a transaction.
+            if process.assembly_type == 'outsourced' and process.external_manufacturer and process.assembly_cost > 0:
+                success = create_invoice_and_transaction(
+                    request=request,
+                    process_instance=process,
+                    manufacturer=process.external_manufacturer,
+                    cost=process.assembly_cost,
+                    expense_code="EXP-ASM-01",
+                    expense_name=_("Outsourced Assembly Costs"),
+                    notes=_("Auto-invoice for assembly process #{id} for order {order_num}").format(
+                        id=process.id, order_num=process.production_order.order_number
+                    )
+                )
+                if not success:
+                    # The helper function puts error in messages, we just need to stop the transaction.
+                    raise ValueError("Failed to create financial records for assembly.")
+
+            # Update the production order status
             process.production_order.status = 'in_dyeing'
             process.production_order.save(update_fields=['status'])
 
-            messages.success(request, f'تم استلام وتوثيق عملية التجميع لأمر الإنتاج {process.production_order.order_number}.')
+            messages.success(request, _('Assembly process for order {order_num} has been successfully received.').format(
+                order_num=process.production_order.order_number
+            ))
     else:
         for field, errors in form.errors.items():
             for error in errors:
@@ -1329,6 +1372,52 @@ class DyeingProcessListView(LoginRequiredMixin, ListView):
         context['facilities'] = ExternalManufacturer.objects.filter(dyeing_jobs__isnull=False).distinct()
         return context
 
+def create_invoice_and_transaction(request, process_instance, manufacturer, cost, expense_code, expense_name, notes):
+    """
+    Helper function to create an invoice and a double-entry transaction for a production process.
+    """
+    try:
+        # 1. Create the Invoice
+        invoice = Invoice.objects.create(
+            recipient_content_type=ContentType.objects.get_for_model(manufacturer),
+            recipient_object_id=manufacturer.pk,
+            issue_date=timezone.now().date(),
+            due_date=timezone.now().date() + timezone.timedelta(days=manufacturer.payment_terms_days),
+            total_amount=cost,
+            status='sent',
+            notes=notes
+        )
+
+        # 2. Find the manufacturer's liability account (created by the signal)
+        manufacturer_liability_account = Account.objects.get(
+            owner_content_type=ContentType.objects.get_for_model(manufacturer),
+            owner_object_id=manufacturer.pk
+        )
+
+        # 3. Find or create the specific expense account
+        expense_category, _ = AccountCategory.objects.get_or_create(name=_("Production Expenses"), defaults={'category_type': 'expense'})
+        expense_account, _ = Account.objects.get_or_create(
+            code=expense_code,
+            defaults={'name': expense_name, 'category': expense_category}
+        )
+
+        # 4. Create the double-entry transaction
+        create_double_entry_transaction(
+            description=notes,
+            created_by=request.user,
+            debit_account=expense_account,          # Debit Expense (increases expense)
+            credit_account=manufacturer_liability_account, # Credit Liability (increases what we owe)
+            amount=cost,
+            date=timezone.now().date(),
+            source_document=invoice
+        )
+        return True
+    except Account.DoesNotExist:
+        messages.error(request, f"خطأ حرج: لم يتم العثور على حساب مالي للمصنع {manufacturer.name}.")
+        return False
+    except Exception as e:
+        messages.error(request, f"خطأ في إنشاء السجلات المالية: {e}")
+        return False
 
 
 class DyeingProcessCreateView(LoginRequiredMixin, CreateView):
@@ -1336,14 +1425,7 @@ class DyeingProcessCreateView(LoginRequiredMixin, CreateView):
     form_class = DyeingSendForm
     template_name = 'production/dyeing_form.html'
 
-    def get_initial(self):
-        initial = super().get_initial()
-        assembly_id = self.request.GET.get('assembly_id')
-        if assembly_id:
-            assembly = get_object_or_404(AssemblyProcess, pk=assembly_id, is_completed=True)
-            initial['assembly_process'] = assembly
-            initial['dyeing_cost_per_piece'] = assembly.external_manufacturer.price_per_piece if assembly.assembly_type == 'outsourced' and assembly.external_manufacturer else 0
-        return initial
+
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -1358,7 +1440,6 @@ class DyeingProcessCreateView(LoginRequiredMixin, CreateView):
             dyeing_facility = form.cleaned_data['dyeing_facility']
 
             form.instance.quantity_sent = assembly_process.quantity_received
-            form.instance.dyeing_cost_per_piece = dyeing_facility.price_per_piece
             
 
             self.object = form.save()
@@ -1375,14 +1456,18 @@ class DyeingProcessCreateView(LoginRequiredMixin, CreateView):
     def get_success_url(self):
         return reverse('production:dyeing_detail', kwargs={'pk': self.object.pk})
 
+# In production/views.py
+
 class DyeingProcessDetailView(LoginRequiredMixin, DetailView):
     model = DyeingProcess
     template_name = 'production/dyeing_detail.html'
     context_object_name = 'dyeing_process'
 
     def get_queryset(self):
+        # CORRECTED: The query now follows the correct path to the size_group
         return super().get_queryset().select_related(
-            'assembly_process__production_order__product__size_group',
+            'assembly_process__production_order__product',
+            'assembly_process__production_order__bom_version__size_group',
             'dyeing_facility'
         )
 
@@ -1397,15 +1482,20 @@ class DyeingProcessDetailView(LoginRequiredMixin, DetailView):
             context['receive_form'] = DyeingReceiveForm(instance=dyeing_process)
 
         if not context['exit_permit']:
-            product = dyeing_process.assembly_process.production_order.product
-            size_group = product.size_group
+            production_order = dyeing_process.assembly_process.production_order
+            product = production_order.product
             
-            description_parts = [f"ملابس جاهزة للصباغة للمنتج: {product.name} (أمر #{dyeing_process.assembly_process.production_order.order_number})"]
+            # CORRECTED: Get the size group from the order's specific BOM version
+            bom = production_order.bom_version
+            size_group = bom.size_group if bom else None
+            
+            description_parts = [f"ملابس جاهزة للصباغة للمنتج: {product.name} (أمر #{production_order.order_number})"]
             if size_group:
                 sizes_str = ", ".join(size_group.sizes)
                 description_parts.append(f"مجموعة المقاسات: {size_group.name} ({sizes_str})")
 
             initial_data = {
+                'production_order': production_order, # FIX: Add the missing production_order
                 'permit_type': 'dyeing_garments',
                 'items_description': "\n".join(description_parts),
                 'quantity': dyeing_process.quantity_sent,
@@ -1456,7 +1546,7 @@ class DyeingProcessDeleteView(LoginRequiredMixin, DeleteView):
 def receive_dyeing_process(request, pk):
     """
     Handles receiving items from the dyeing process.
-    This view now explicitly updates the production order status.
+    Creates financial records for outsourced jobs.
     """
     dyeing_process = get_object_or_404(DyeingProcess, pk=pk, is_completed=False)
     form = DyeingReceiveForm(request.POST, instance=dyeing_process)
@@ -1466,17 +1556,33 @@ def receive_dyeing_process(request, pk):
             process = form.save(commit=False)
             process.is_completed = True
             process.actual_return_date = timezone.now()
+            process.calculate_total_cost()
             process.save()
 
-            # Calculate final costs
-            process.calculate_total_cost()
+            # **FINANCIAL LOGIC**
+            if process.dyeing_facility and process.total_dyeing_cost > 0:
+                success = create_invoice_and_transaction(
+                    request=request,
+                    process_instance=process,
+                    manufacturer=process.dyeing_facility,
+                    cost=process.total_dyeing_cost,
+                    expense_code="EXP-DYE-01",
+                    expense_name=_("Dyeing Costs"),
+                    notes=_("Auto-invoice for dyeing process #{id} for order {order_num}").format(
+                        id=process.id, order_num=process.assembly_process.production_order.order_number
+                    )
+                )
+                if not success:
+                    raise ValueError("Failed to create financial records for dyeing.")
 
-            # **NEW**: Update the production order status (formerly a signal)
+            # Update the production order status
             production_order = process.assembly_process.production_order
             production_order.status = 'in_finishing'
             production_order.save(update_fields=['status'])
 
-            messages.success(request, f'تم استلام وتوثيق عملية الصباغة لأمر {production_order.order_number}.')
+            messages.success(request, _("Dyeing process for order {order_num} has been successfully received.").format(
+                order_num=production_order.order_number
+            ))
     else:
         for field, errors in form.errors.items():
             for error in errors:
@@ -1549,7 +1655,6 @@ class FinishingProcessCreateView(LoginRequiredMixin, CreateView):
 
         with transaction.atomic():
             dyeing_process = form.cleaned_data['dyeing_process']
-            form.instance.quantity_input = dyeing_process.quantity_received
             
             if form.cleaned_data.get('finishing_type') == 'in_house':
                 form.instance.finisher = self.request.user 
@@ -1708,10 +1813,22 @@ class FinishingProcessUpdateView(LoginRequiredMixin, UpdateView):
 
         return super().form_invalid(form)
 
+# In production/views.py
+
 class FinishingProcessDetailView(LoginRequiredMixin, DetailView):
     model = FinishingProcess
     template_name = 'production/finishing_detail.html'
     context_object_name = 'finishing_process'
+
+    def get_queryset(self):
+        # CORRECTED: The query now follows the correct, deep path to the size_group
+        return super().get_queryset().select_related(
+            'dyeing_process__assembly_process__production_order__product',
+            'dyeing_process__assembly_process__production_order__bom_version__size_group',
+            'external_manufacturer', 
+            'finisher', 
+            'supervisor'
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1721,20 +1838,13 @@ class FinishingProcessDetailView(LoginRequiredMixin, DetailView):
         if not process.is_completed:
             context['receive_form'] = FinishingReceiveForm(instance=process)
 
-        # --- METRICS CALCULATION ---
         quantity_input = Decimal(process.quantity_input or 0)
         quantity_output = Decimal(process.quantity_output or 0)
         defects = Decimal(process.defects_in_finishing or 0)
-
-        # Loss is the quantity that is unaccounted for
         loss_quantity = quantity_input - quantity_output - defects
         
-        # Calculate rates, handling division by zero
-        # Efficiency: (Good Output / Total Input) * 100
         efficiency = (quantity_output / quantity_input * 100) if quantity_input > 0 else 0
-        # Defect Rate: (Defective Output / Total Input) * 100
         defect_rate = (defects / quantity_input * 100) if quantity_input > 0 else 0
-        # Loss Rate: (Lost Quantity / Total Input) * 100
         loss_rate = (loss_quantity / quantity_input * 100) if quantity_input > 0 else 0
 
         context['finishing_stats'] = {
@@ -1743,11 +1853,13 @@ class FinishingProcessDetailView(LoginRequiredMixin, DetailView):
             'loss_rate': loss_rate,
         }
 
-        # This part is for the exit permit modal, it should be preserved
         if process.finishing_type == 'outsourced' and not context['exit_permit'] and not process.is_completed:
             production_order = process.dyeing_process.assembly_process.production_order
             product = production_order.product
-            size_group = product.size_group
+            
+            # CORRECTED: Get the size group from the order's specific BOM version
+            bom = production_order.bom_version
+            size_group = bom.size_group if bom else None
 
             description_parts = [
                 f"منتجات جاهزة للتشطيب للمنتج: {product.name} (أمر #{production_order.order_number})"
@@ -1768,7 +1880,6 @@ class FinishingProcessDetailView(LoginRequiredMixin, DetailView):
         
         return context
 
-
 class FinishingProcessDeleteView(LoginRequiredMixin, DeleteView):
     model = FinishingProcess
     template_name = 'production/finishing_confirm_delete.html'
@@ -1778,6 +1889,8 @@ class FinishingProcessDeleteView(LoginRequiredMixin, DeleteView):
 
 
 # Add this new AJAX view to your views.py
+# In production/views.py
+
 @login_required
 def ajax_get_finishing_bom_components_for_dyeing(request):
     """
@@ -1799,11 +1912,11 @@ def ajax_get_finishing_bom_components_for_dyeing(request):
         if not bom:
             return JsonResponse({'components': [], 'message': 'لا توجد قائمة مواد (BOM) نشطة للمنتج.'})
 
-        # Filter for raw material warehouses
-        raw_material_warehouses = Warehouse.objects.filter(type='raw_materials')
+        # --- FIX: Changed 'type' to 'warehouse_type' and included both component and textile types ---
+        raw_material_warehouses = Warehouse.objects.filter(
+            warehouse_type__in=['components', 'textile'], is_active=True
+        )
         
-        # Get BOM items, excluding fabric (assuming 'fabric' is a product_type)
-        # and prefetch related unit information
         bom_items = bom.items.filter(
             material__is_active=True
         ).exclude(
@@ -1812,22 +1925,20 @@ def ajax_get_finishing_bom_components_for_dyeing(request):
         
         components = []
         for item in bom_items:
-            # Calculate required quantity for the finishing process based on dyeing input
-            # This assumes BOM quantity is per piece and we need to multiply by quantity_received
             required_quantity_for_finishing = item.quantity * dyeing_process.quantity_received
             
-            # Fetch all stock items for this material across raw material warehouses
             stock_items = StockItem.objects.filter(
                 product=item.material,
                 warehouse__in=raw_material_warehouses
             ).select_related('warehouse')
 
-            warehouses_data = [
-                {'id': si.warehouse.id, 'name': si.warehouse.name}
-                for si in stock_items if si.available_quantity > 0
-            ]
+            # --- FIX: Correctly build the warehouses_data list ---
+            warehouses_data = [{
+                'id': si.warehouse.id,
+                'name': si.warehouse.name,
+                'available_quantity': si.available_quantity 
+            } for si in stock_items]
             
-            # Get the total available stock across all warehouses for display
             total_available = stock_items.aggregate(
                 total=Coalesce(Sum(F('quantity') - F('reserved_quantity')), Decimal('0.0'))
             )['total']
@@ -1835,10 +1946,10 @@ def ajax_get_finishing_bom_components_for_dyeing(request):
             components.append({
                 'material_id': item.material.id,
                 'name': item.material.name,
-                'total_required': float(required_quantity_for_finishing), # Convert to float for JSON
-                'available_stock_total': float(total_available), # Convert to float for JSON
+                'total_required': float(required_quantity_for_finishing),
+                'available_stock_total': float(total_available),
                 'unit': item.material.unit_new.symbol if item.material.unit_new else 'وحدة',
-                'warehouses': warehouses_data, # List of available warehouses
+                'warehouses': warehouses_data,
             })
             
         return JsonResponse({'components': components})
@@ -1848,77 +1959,95 @@ def ajax_get_finishing_bom_components_for_dyeing(request):
     except Exception as e:
         logging.error(f"Error in ajax_get_finishing_bom_components_for_dyeing: {e}")
         return JsonResponse({'error': str(e)}, status=500)
-
-
+    
 @login_required
 @require_POST
 def receive_finishing_process(request, pk):
     """
     Handles receiving items from the finishing process. This is the final step
-    that adds the produced goods into the main warehouse inventory.
+    that creates financial records for outsourced jobs and adds the produced 
+    goods into the main warehouse inventory.
     """
-    # Step 1: Get the FinishingProcess instance, ensuring it's not already completed.
-    process = get_object_or_404(FinishingProcess, pk=pk, is_completed=False)
-    
-    # Step 2: Validate the incoming POST data using the form.
-    form = FinishingReceiveForm(request.POST, instance=process)
+    finishing_process = get_object_or_404(FinishingProcess, pk=pk, is_completed=False)
+    form = FinishingReceiveForm(request.POST, instance=finishing_process)
 
     if form.is_valid():
-        # Step 3: Use a database transaction to ensure all steps succeed or none do.
         with transaction.atomic():
-            # Step 4: Save the FinishingProcess with its completion details.
-            finishing_process = form.save(commit=False)
-            finishing_process.is_completed = True
-            finishing_process.actual_completion_date = timezone.now()
-            finishing_process.save()
+            # 1. Save the finishing process with its completion details
+            process = form.save(commit=False)
+            process.is_completed = True
+            process.actual_completion_date = timezone.now()
+            process.calculate_total_cost()
+            process.save()
 
-            # Step 5: Get all related objects needed for the inventory update.
+            # 2. Handle financial logic for outsourced work
+            if process.finishing_type == 'outsourced' and process.external_manufacturer and process.total_finishing_cost > 0:
+                success = create_invoice_and_transaction(
+                    request=request,
+                    process_instance=process,
+                    manufacturer=process.external_manufacturer,
+                    cost=process.total_finishing_cost,
+                    expense_code="EXP-FIN-01",
+                    expense_name=_("Outsourced Finishing Costs"),
+                    notes=_("Auto-invoice for finishing process #{id} for order {order_num}").format(
+                        id=process.id, order_num=process.dyeing_process.assembly_process.production_order.order_number
+                    )
+                )
+                if not success:
+                    raise ValueError("Failed to create financial records for finishing.")
+
+            # 3. Handle inventory update for finished goods
             production_order = finishing_process.dyeing_process.assembly_process.production_order
-            finished_product = production_order.product # This is the warehouses.Product instance
+            finished_product = production_order.product
             destination_warehouse = finishing_process.destination_warehouse
             quantity_produced = finishing_process.quantity_output
 
-            # Step 6: Proceed only if there are items to add to a valid warehouse.
-            if quantity_produced > 0 and destination_warehouse:
-                
-                # Step 7: Find or create the stock item for the finished product in the destination warehouse.
+            if quantity_produced > 0:
+                if not destination_warehouse:
+                    messages.error(request, _("Cannot complete process: A destination warehouse for finished goods was not selected."))
+                    raise ValueError("Destination warehouse is missing.")
+
+                # Find or create the stock item for the finished product in the destination warehouse.
                 stock_item, _ = StockItem.objects.get_or_create(
                     product=finished_product,
                     warehouse=destination_warehouse,
                     defaults={'quantity': 0}
                 )
 
-                # Step 8: Create a batch record for traceability, linking back to this process.
+                # Create a batch record for traceability.
                 ProductBatch.objects.create(
-                    stock=stock_item,
+                    stock_item=stock_item,
                     batch_number=production_order.batch_number,
                     quantity=quantity_produced,
                     production_finishing_source=finishing_process,
                     cost_per_piece=production_order.cost_analysis.cost_per_piece if hasattr(production_order, 'cost_analysis') else 0
                 )
 
-                # Step 9: Create an 'in' movement. This is the official record of adding stock.
-                # The signal on StockMovement will automatically update the StockItem quantity.
+                # Create an 'in' movement to officially add the stock.
                 StockMovement.objects.create(
                     stock_item=stock_item,
                     movement_type='in',
                     quantity=quantity_produced,
                     reference_number=f"PROD-{production_order.order_number}",
-                    notes=f"إنتاج مكتمل من أمر #{production_order.order_number}",
+                    notes=_("Completed production from order #{num}").format(num=production_order.order_number),
                     created_by=request.user
                 )
+                messages.info(request, _("{qty} pieces of '{prod}' have been added to warehouse '{wh}'.").format(
+                    qty=quantity_produced, prod=finished_product.name, wh=destination_warehouse.name
+                ))
 
-            # Step 10: Mark the main production order as complete.
+            # 4. Mark the main production order as complete
             production_order.status = 'completed'
             production_order.actual_completion_date = timezone.now().date()
             production_order.save(update_fields=['status', 'actual_completion_date'])
 
-            messages.success(request, f'اكتملت عملية التشطيب! تم إضافة {quantity_produced} قطعة إلى مخزن {destination_warehouse.name}.')
+            messages.success(request, _("Finishing process for order {order_num} has been completed.").format(
+                order_num=production_order.order_number
+            ))
     else:
-        # If the form is invalid, display the errors to the user.
         for field, errors in form.errors.items():
             for error in errors:
-                messages.error(request, f"{form.fields[field].label if field != '__all__' else 'خطأ'}: {error}")
+                messages.error(request, f"{form.fields[field].label if field != '__all__' else 'Error'}: {error}")
 
     return redirect('production:finishing_detail', pk=pk)
 
@@ -2044,7 +2173,8 @@ class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
         # Get active and completed jobs
         context['active_jobs'] = manufacturer.assembly_processes.filter(is_completed=False).select_related('production_order__product').order_by('-start_date')
         context['job_history'] = manufacturer.assembly_processes.filter(is_completed=True).select_related('production_order__product').order_by('-actual_completion_date')
-        
+        context['product_prices'] = manufacturer.product_prices.select_related('product').order_by('product__name')
+
         return context
 class ExternalManufacturerCreateView(LoginRequiredMixin, CreateView):
     model = ExternalManufacturer
@@ -2064,9 +2194,32 @@ class ExternalManufacturerUpdateView(LoginRequiredMixin, UpdateView):
     def get_success_url(self):
         return reverse_lazy('production:manufacturers:manufacturer_detail', kwargs={'pk': self.object.pk})
 
+    def get_context_data(self, **kwargs):
+            context = super().get_context_data(**kwargs)
+            if self.request.POST:
+                context['product_price_formset'] = ManufacturerProductPriceFormSet(self.request.POST, instance=self.object, prefix='prices')
+            else:
+                context['product_price_formset'] = ManufacturerProductPriceFormSet(instance=self.object, prefix='prices')
+            return context
+
+    # ADDED: Method to validate and save formset
     def form_valid(self, form):
-        messages.success(self.request, 'تم تحديث بيانات المصنع بنجاح.')
-        return super().form_valid(form)
+        context = self.get_context_data()
+        formset = context['product_price_formset']
+        if form.is_valid() and formset.is_valid():
+            with transaction.atomic():
+                self.object = form.save()
+                formset.instance = self.object
+                formset.save()
+            messages.success(self.request, 'تم تحديث بيانات المصنع والأسعار بنجاح.')
+            return redirect(self.get_success_url())
+        else:
+            # Add formset errors to messages if invalid
+            for fs_form in formset:
+                for field, error_list in fs_form.errors.items():
+                    for error in error_list:
+                         messages.error(self.request, f"خطأ في الأسعار: {error}")
+            return self.form_invalid(form)
 
 
 
@@ -2138,70 +2291,74 @@ class ExitPermitCreateView(LoginRequiredMixin, CreateView):
         return reverse('production:exit_permits:exit_permit_detail', kwargs={'pk': self.object.pk})
 
 
+# In production/views.py
+
 @login_required
 @require_POST
 def create_exit_permit_ajax(request):
-    assembly_id = request.POST.get('assembly_id')
-    dyeing_id = request.POST.get('dyeing_id')
-    finishing_id = request.POST.get('finishing_id') # NEW: Capture finishing_id
+    """
+    Handles the creation of an exit permit via AJAX for any production stage.
+    This single, robust function correctly handles assembly, dyeing, and finishing.
+    """
+    # Create a mutable copy of the POST data so we can add the production_order to it.
+    mutable_data = request.POST.copy()
 
-    if not any([assembly_id, dyeing_id, finishing_id]): # MODIFIED: Check all IDs
+    assembly_id = mutable_data.get('assembly_id')
+    dyeing_id = mutable_data.get('dyeing_id')
+    finishing_id = mutable_data.get('finishing_id')
+
+    if not any([assembly_id, dyeing_id, finishing_id]):
         return JsonResponse({'success': False, 'error': 'Process ID is missing.'}, status=400)
-
-    form = ExitPermitForm(request.POST)
-    if form.is_valid():
-        permit = form.save(commit=False)
-        
-        process_object = None
-        
-        if dyeing_id:
-            process_object = get_object_or_404(DyeingProcess, pk=dyeing_id)
-            if ExitPermit.objects.filter(dyeing_process=process_object).exists():
-                return JsonResponse({'success': False, 'error': 'Permit already exists for this dyeing process.'}, status=400)
-            
-            permit.dyeing_process = process_object
-            permit.production_order = process_object.assembly_process.production_order
-            permit.permit_type = 'dyeing_garments'
-            permit.destination = process_object.dyeing_facility.name
-            permit.quantity = process_object.quantity_sent
-            permit.purpose = f"إرسال للصباغة - اللون: {process_object.color_specification}"
-            
+    
+    # --- Step 1: Find the correct Production Order BEFORE validation ---
+    production_order = None
+    try:
+        if finishing_id:
+            process = get_object_or_404(FinishingProcess, pk=finishing_id)
+            production_order = process.dyeing_process.assembly_process.production_order
+        elif dyeing_id:
+            process = get_object_or_404(DyeingProcess, pk=dyeing_id)
+            production_order = process.assembly_process.production_order
         elif assembly_id:
-            process_object = get_object_or_404(AssemblyProcess, pk=assembly_id)
-            if ExitPermit.objects.filter(assembly_process=process_object).exists():
-                 return JsonResponse({'success': False, 'error': 'Permit already exists for this assembly process.'}, status=400)
+            process = get_object_or_404(AssemblyProcess, pk=assembly_id)
+            production_order = process.production_order
+    except Exception as e:
+         return JsonResponse({'success': False, 'error': f'Could not find the related process: {e}'}, status=404)
 
-            permit.assembly_process = process_object
-            permit.production_order = process_object.production_order
-            permit.permit_type = 'assembly_pieces'
-            if process_object.external_manufacturer:
-                permit.destination = process_object.external_manufacturer.name
-            permit.quantity = process_object.quantity_sent
-            permit.purpose = "إرسال للتجميع الخارجي"
-        
-        # NEW: Handle Finishing Process
-        elif finishing_id:
-            process_object = get_object_or_404(FinishingProcess, pk=finishing_id)
-            if ExitPermit.objects.filter(finishing_process=process_object).exists():
-                return JsonResponse({'success': False, 'error': 'Permit already exists for this finishing process.'}, status=400)
+    # --- Step 2: Add the Production Order to the form data ---
+    if production_order:
+        mutable_data['production_order'] = production_order.pk
+    
+    # --- Step 3: Validate the form WITH the complete data ---
+    form = ExitPermitForm(mutable_data)
+
+    if form.is_valid():
+        with transaction.atomic():
+            permit = form.save(commit=False)
             
-            permit.finishing_process = process_object
-            permit.production_order = process_object.dyeing_process.assembly_process.production_order
-            permit.permit_type = 'finishing_products'
-            if process_object.external_manufacturer:
-                permit.destination = process_object.external_manufacturer.name
-            permit.quantity = process_object.quantity_input # Quantity from dyeing process
-            permit.purpose = "إرسال للتشطيب الخارجي"
+            # Link the specific process object to the permit
+            if finishing_id:
+                permit.finishing_process = get_object_or_404(FinishingProcess, pk=finishing_id)
+            elif dyeing_id:
+                permit.dyeing_process = get_object_or_404(DyeingProcess, pk=dyeing_id)
+            elif assembly_id:
+                permit.assembly_process = get_object_or_404(AssemblyProcess, pk=assembly_id)
 
-        permit.requested_by = request.user
-        permit.save()
-        
-        messages.success(request, f"تم إنشاء تصريح الخروج {permit.permit_number} بنجاح.")
-        return JsonResponse({'success': True, 'message': f'Exit permit {permit.permit_number} created.'})
+            permit.requested_by = request.user
+            permit.save()
+            
+            # Return a success message in the JSON response for the frontend to display
+            return JsonResponse({
+                'success': True, 
+                'message': f"تم إنشاء تصريح الخروج {permit.permit_number} بنجاح."
+            })
     else:
-        # Return form errors
-        return JsonResponse({'success': False, 'errors': form.errors}, status=400)
-
+        # If the form is invalid, return the specific errors for easier debugging.
+        return JsonResponse({
+            'success': False, 
+            'error': 'فشل الإنشاء، يرجى مراجعة الأخطاء.', 
+            'errors': form.errors
+        }, status=400)
 @login_required
 def print_dyeing_process_pdf(request, pk):
     dyeing_process = get_object_or_404(DyeingProcess.objects.select_related(
@@ -3172,29 +3329,43 @@ def search_raw_materials_ajax(request):
 def get_size_group_for_product_ajax(request):
     """
     REWRITTEN: This function now correctly queries the unified Product model
-    instead of the deleted FinishedProduct model.
+    and its related BillOfMaterials to find the size group.
     """
     product_id = request.GET.get('product_id')
     if not product_id:
         return JsonResponse({'error': 'No product ID provided'}, status=400)
     
     try:
-        product = Product.objects.select_related('size_group').get(id=product_id)
-        if product.size_group:
+        product = Product.objects.get(id=product_id)
+        # Find the active BOM for the product to get the size group
+        active_bom = BillOfMaterials.objects.filter(product=product, is_active=True).first()
+        
+        if active_bom and active_bom.size_group:
+            size_group = active_bom.size_group
             data = {
-                'id': product.size_group.id,
-                'name': product.size_group.name,
-                'sizes': product.size_group.sizes
+                'id': size_group.id,
+                'name': size_group.name,
+                'sizes': size_group.sizes
             }
             return JsonResponse({'size_group': data})
         else:
-            return JsonResponse({'size_group': None})
+            # If no active BOM or no size group on BOM, check the product's own size groups
+            if product.size_groups.exists():
+                # Returning the first size group as a fallback
+                size_group = product.size_groups.first()
+                data = {
+                    'id': size_group.id,
+                    'name': size_group.name,
+                    'sizes': size_group.sizes
+                }
+                return JsonResponse({'size_group': data})
+            else:
+                return JsonResponse({'size_group': None})
     except Product.DoesNotExist:
         return JsonResponse({'error': 'Product not found'}, status=404)
     except Exception as e:
         logging.error(f"Error in get_size_group_for_product_ajax: {e}")
         return JsonResponse({'error': 'An unexpected error occurred.'}, status=500)
-
 
 
 @login_required
@@ -4441,6 +4612,9 @@ def export_finished_products(request):
 
 
 
+# In production/views.py
+# In production/views.py
+
 @login_required
 def get_order_details_ajax(request):
     order_id = request.GET.get('order_id')
@@ -4448,45 +4622,52 @@ def get_order_details_ajax(request):
         return JsonResponse({'success': False, 'error': 'No order ID provided'}, status=400)
     
     try:
-        # Pre-fetch related models to optimize the query
+        # We need the product and its related size groups.
+        # prefetch_related is used for ManyToMany relationships like 'size_groups'.
         order = ProductionOrder.objects.select_related(
-            'product__size_group', 
-            'textile_stock__product', # Access the product through the stock item
-            'bom_version'
+            'product', 
+            'bom_version',
+            'textile_stock__product'
+        ).prefetch_related(
+            'product__size_groups'  # Prefetch the M2M relationship from Product
         ).get(pk=order_id)
         
-        size_group_data = None
-        if order.product.size_group:
-            size_group_data = {
-                'id': order.product.size_group.id,
-                'name': order.product.size_group.name,
-                'sizes': order.product.size_group.sizes,
-            }
+        product = order.product
+        all_sizes = set() # Use a set to automatically handle duplicates
+
+        # CORRECTED LOGIC: Collect all sizes from all of the product's associated size groups
+        if product.size_groups.exists():
+            for size_group in product.size_groups.all():
+                # The 'sizes' field is a JSON list, so we add each item to our set
+                for size in size_group.sizes:
+                    all_sizes.add(size)
+        
+        # Create a dictionary with a sorted list of all unique sizes for the frontend
+        size_data = {
+            'sizes': sorted(list(all_sizes)) # Sort for a consistent order
+        }
 
         # Safely access textile stock attributes
         fabric_name = order.textile_stock.product.name if order.textile_stock and order.textile_stock.product else "N/A"
         fabric_width = order.textile_stock.product.width if order.textile_stock and order.textile_stock.product else None
 
         data = {
-            'success': True, # Add success flag
+            'success': True,
             'product_id': order.product.id,
             'product_name': order.product.name,
             'fabric_name': fabric_name,
-            'fabric_width': float(fabric_width) if fabric_width else None, # Convert Decimal to float for JSON
+            'fabric_width': float(fabric_width) if fabric_width else None,
             'quantity_ordered': order.quantity_ordered,
-            'size_group': size_group_data,
+            'size_group': size_data, # Pass the new combined list of sizes
             'bom_version_id': order.bom_version.id if order.bom_version else None,
         }
         return JsonResponse(data)
     except ProductionOrder.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Order not found'}, status=404)
     except Exception as e:
-        # Log the error for better debugging
         import logging
         logging.error(f"Error in get_order_details_ajax: {str(e)}")
         return JsonResponse({'success': False, 'error': 'An unexpected server error occurred.'}, status=500)
-
-
 @login_required
 def print_cutting_sheet_pdf(request, pk):
     """
@@ -4546,13 +4727,18 @@ def ajax_get_dyeing_process_details(request):
         return JsonResponse({'error': 'Dyeing Process ID is required'}, status=400)
 
     try:
-        # Use select_related to optimize the query by fetching related objects in a single DB hit
+        # CORRECTED: The query now follows the correct path to the size_group
         process = DyeingProcess.objects.select_related(
-            'assembly_process__production_order__product__size_group'
+            'assembly_process__production_order__product',
+            'assembly_process__production_order__bom_version__size_group'
         ).get(pk=dyeing_process_id)
 
         order = process.assembly_process.production_order
         product = order.product
+        bom = order.bom_version
+
+        # CORRECTED: Get sizes from the BOM version's size group
+        sizes = bom.size_group.sizes if bom and bom.size_group else []
 
         # Prepare the data to be sent back as JSON
         data = {
@@ -4560,17 +4746,14 @@ def ajax_get_dyeing_process_details(request):
             'order_number': order.order_number,
             'quantity': process.quantity_received,
             'status': order.get_status_display(),
-            'sizes': product.size_group.sizes if product.size_group else [],
+            'sizes': sizes,
         }
         return JsonResponse({'success': True, 'data': data})
     except DyeingProcess.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Process not found'}, status=404)
     except Exception as e:
-        # It's good practice to log errors for debugging purposes
-        # import logging
         logging.error(f"Error in ajax_get_dyeing_process_details: {e}")
         return JsonResponse({'success': False, 'error': 'An unexpected error occurred.'}, status=500)
-
 @login_required
 def ajax_get_bom_for_assembly(request):
     """

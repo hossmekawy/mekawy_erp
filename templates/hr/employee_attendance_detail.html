@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .attendance-table th, .attendance-table td {
+        text-align: center;
+        vertical-align: middle;
+    }
+    .attendance-table td {
+        font-weight: bold;
+        font-size: 1.1rem;
+    }
+    .status-late { background-color: #f6c23e !important; color: #5a5c69; }
+    .status-absent { background-color: #e74a3b !important; color: white; }
+    .status-incomplete { background-color: #36b9cc !important; color: white; }
+    .status-weekend { background-color: #f8f9fc; color: #858796; }
+    .status-present { background-color: #e4f6e5; }
+    .status-early-leave { background-color: #faddc2; }
+
+    .employee-info-card img {
+        width: 120px;
+        height: 120px;
+        object-fit: cover;
+        border: 3px solid #e3e6f0;
+    }
+</style>
+{% endblock %}
+
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Page Heading & View Switcher -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">{{ page_title }}</h1>
+        <div class="btn-group" role="group">
+            <a href="{% url 'hr:employee_attendance_detail' employee.id %}?view=month" class="btn {% if view_type == 'month' %}btn-primary{% else %}btn-outline-primary{% endif %}">عرض شهري</a>
+            <a href="{% url 'hr:employee_attendance_detail' employee.id %}?view=week" class="btn {% if view_type == 'week' %}btn-primary{% else %}btn-outline-primary{% endif %}">عرض أسبوعي</a>
+        </div>
+    </div>
+
+    <!-- Employee Info Card -->
+    <div class="card shadow mb-4 employee-info-card">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-auto text-center text-md-start">
+                    <img src="{% if employee.photo %}{{ employee.photo.url }}{% else %}{% static 'images/default_avatar.png' %}{% endif %}" alt="{{ employee.full_name }}" class="rounded-circle mb-3 mb-md-0">
+                </div>
+                <div class="col-md">
+                    <h4 class="font-weight-bold text-primary">{{ employee.full_name }}</h4>
+                    <p class="mb-1"><strong>كود الموظف:</strong> {{ employee.employee_id }}</p>
+                    <p class="mb-1"><strong>القسم:</strong> {{ employee.department.name|default:"-" }}</p>
+                    <p class="mb-0"><strong>المسمى الوظيفي:</strong> {{ employee.job_title }}</p>
+                </div>
+                <div class="col-md text-md-end mt-3 mt-md-0">
+                    {% if view_type == 'week' %}
+                        <h5 class="text-dark">تقرير الأسبوع: من <strong>{{ week_start_date|date:"d-m-Y" }}</strong> إلى <strong>{{ week_end_date|date:"d-m-Y" }}</strong></h5>
+                    {% else %}
+                        <h5 class="text-dark">تقرير شهر: <strong>{{ current_month_name }} {{ current_year }}</strong></h5>
+                    {% endif %}
+                    <p class="mb-1"><strong>مواعيد العمل:</strong> من {{ employee.work_start_time|time:"H:i" }} إلى {{ employee.work_end_time|time:"H:i" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance Table Card -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">سجل الحضور والانصراف</h6>
+            <div>
+                {% if view_type == 'week' %}
+                    <a href="{% url 'hr:employee_attendance_detail' employee.id %}?view=week&date={{ prev_week_date|date:'Y-m-d' }}" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-arrow-right"></i> الأسبوع السابق
+                    </a>
+                    <a href="{% url 'hr:employee_attendance_detail' employee.id %}?view=week&date={{ next_week_date|date:'Y-m-d' }}" class="btn btn-secondary btn-sm">
+                        الأسبوع التالي <i class="fas fa-arrow-left"></i>
+                    </a>
+                {% else %}
+                    <a href="{% url 'hr:employee_attendance_detail' employee.id %}?view=month&year={{ prev_year }}&month={{ prev_month }}" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-arrow-right"></i> الشهر السابق
+                    </a>
+                    <a href="{% url 'hr:employee_attendance_detail' employee.id %}?view=month&year={{ next_year }}&month={{ next_month }}" class="btn btn-secondary btn-sm">
+                        الشهر التالي <i class="fas fa-arrow-left"></i>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered attendance-table" width="100%" cellspacing="0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>اليوم</th>
+                            <th>التاريخ</th>
+                            <th>وقت الحضور</th>
+                            <th>وقت الانصراف</th>
+                            <th>الحالة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for day in report_data %}
+                            <tr class="
+                                {% if 'متأخر' in day.status %}status-late
+                                {% elif 'غائب' in day.status %}status-absent
+                                {% elif 'ناقصة' in day.status %}status-incomplete
+                                {% elif 'عطلة' in day.status %}status-weekend
+                                {% elif 'مبكر' in day.status %}status-early-leave
+                                {% elif 'حاضر' in day.status %}status-present
+                                {% endif %}
+                            ">
+                                <td>{{ day.day_name }}</td>
+                                <td>{{ day.date|date:"d-m-Y" }}</td>
+                                <td>{{ day.check_in|time:"H:i"|default:"-" }}</td>
+                                <td>{{ day.check_out|time:"H:i"|default:"-" }}</td>
+                                <td>{{ day.status }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

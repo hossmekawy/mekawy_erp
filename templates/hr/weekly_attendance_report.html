@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .attendance-grid th, .attendance-grid td {
+        text-align: center;
+        vertical-align: middle;
+        min-width: 120px;
+        padding: 0.75rem 0.5rem;
+    }
+    /* Sticky columns for employee info */
+    .attendance-grid th:nth-child(1), .attendance-grid td:nth-child(1),
+    .attendance-grid th:nth-child(2), .attendance-grid td:nth-child(2) {
+        position: -webkit-sticky;
+        position: sticky;
+        right: 0;
+        background-color: #f8f9fc;
+        z-index: 2;
+    }
+    .attendance-grid th:nth-child(1), .attendance-grid td:nth-child(1) { right: 0px; min-width: 80px; width: 80px; }
+    .attendance-grid th:nth-child(2), .attendance-grid td:nth-child(2) { right: 80px; min-width: 200px; text-align: right; font-weight: 600; cursor: pointer; }
+
+    .attendance-grid thead th { top: 0; z-index: 3; background-color: #e9ecef; }
+    .table-responsive { max-height: 75vh; overflow-x: auto; }
+    .time-entry { display: block; font-size: 0.9rem; font-weight: bold; }
+    
+    /* Status Colors */
+    .status-present { background-color: #e4f6e5; }
+    .status-late-warning { background-color: #fff3cd; } /* Yellow for warning */
+    .status-half-day { background-color: #f8d7da; } /* Red for half-day */
+    .status-absent { background-color: #f8f9fc; color: #858796; }
+    .status-weekend { background-color: #f8f9fc; color: #858796; font-style: italic; }
+    .check-in { color: #1cc88a; }
+    .check-out { color: #e74a3b; }
+
+    .employee-photo { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid #dee2e6; cursor: pointer; transition: transform 0.2s; animation: fadeIn 0.5s ease-in-out; }
+    .employee-photo:hover { transform: scale(1.1); }
+    .employee-icon { width: 45px; height: 45px; border-radius: 50%; background-color: #e9ecef; display: inline-flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #adb5bd; cursor: pointer; }
+    
+    /* Modal Styles */
+    .modal-employee-photo { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 4px solid #fff; box-shadow: 0 0 15px rgba(0,0,0,0.2); }
+    .modal-employee-icon { width: 120px; height: 120px; border-radius: 50%; background-color: #e9ecef; display: flex; align-items: center; justify-content: center; font-size: 4rem; color: #adb5bd; }
+    
+    /* Summary Column Style */
+    .summary-cell { min-width: 250px; text-align: right; font-size: 0.9rem; }
+    .summary-cell div { margin-bottom: 0.25rem; }
+    .summary-cell .badge { margin-right: 5px; }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: scale(0.9); }
+        to { opacity: 1; transform: scale(1); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    
+    <!-- Header Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between">
+                <div class="mb-3 mb-md-0">
+                    <h1 class="h2 mb-1 text-dark fw-bold">{{ page_title }}</h1>
+                    <p class="text-muted mb-0">عرض الحضور والغياب لجميع الموظفين خلال أسبوع</p>
+                </div>
+                
+                <div class="btn-toolbar" role="toolbar">
+                    <div class="btn-group me-2" role="group">
+                        <a href="{% url 'hr:weekly_attendance_report' %}?date={{ prev_week_date|date:'Y-m-d' }}" class="btn btn-outline-primary d-flex align-items-center"><i class="fas fa-arrow-right me-2"></i> الأسبوع السابق</a>
+                        <a href="{% url 'hr:weekly_attendance_report' %}?date={{ next_week_date|date:'Y-m-d' }}" class="btn btn-outline-primary d-flex align-items-center">الأسبوع التالي <i class="fas fa-arrow-left ms-2"></i></a>
+                    </div>
+                     <div class="btn-group" role="group">
+                        <a href="?date={{ week_start_date|date:'Y-m-d' }}&format=pdf" target="_blank" class="btn btn-outline-danger d-flex align-items-center"><i class="fas fa-file-pdf me-2"></i> طباعة PDF</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance Grid Card -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom py-3">
+            <h5 class="mb-0 text-dark fw-semibold"><i class="fas fa-calendar-week text-primary me-2"></i>الأسبوع من {{ week_start_date|date:"d-m-Y" }} إلى {{ week_end_date|date:"d-m-Y" }}</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover attendance-grid" id="attendanceTable">
+                    <thead>
+                        <tr>
+                            <th class="fw-semibold text-dark">الصورة</th>
+                            <th class="fw-semibold text-dark">اسم الموظف</th>
+                            {% for day in week_dates %}
+                                <th class="fw-semibold text-dark">
+                                    {% if day.weekday == 5 %}السبت{% elif day.weekday == 6 %}الأحد{% elif day.weekday == 0 %}الاثنين{% elif day.weekday == 1 %}الثلاثاء{% elif day.weekday == 2 %}الأربعاء{% elif day.weekday == 3 %}الخميس{% elif day.weekday == 4 %}الجمعة{% endif %}
+                                    <br><small class="text-muted">{{ day|date:"d-m" }}</small>
+                                </th>
+                            {% endfor %}
+                            <th class="fw-semibold text-dark">ملخص الأسبوع</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for employee, data in report_data.items %}
+                            <tr class="employee-row" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#employeeDetailModal"
+                                data-name="{{ employee.full_name }}"
+                                data-phone="{{ employee.phone_number|default:'غير متوفر' }}"
+                                data-gender="{{ employee.get_gender_display }}"
+                                data-address="{{ employee.address|default:'غير متوفر' }}"
+                                data-photo-url="{% if employee.photo %}{{ employee.photo.url }}{% else %}{% endif %}">
+                                <td>
+                                    {% if employee.photo %}<img src="{{ employee.photo.url }}" alt="{{ employee.full_name }}" class="employee-photo" loading="lazy" decoding="async">
+                                    {% else %}<span class="employee-icon"><i class="fas fa-user"></i></span>{% endif %}
+                                </td>
+                                <td>{{ employee.full_name }}</td>
+                                {% for day_date, day_info in data.daily_records.items %}
+                                    <td class="{{ day_info.css_class }}">
+                                        {% if day_info.record and day_info.record.check_in %}
+                                            <span class="time-entry check-in"><i class="fas fa-sign-in-alt"></i> {{ day_info.record.check_in|date:'H:i' }}</span>
+                                            {% if day_info.record.check_out %}
+                                                <span class="time-entry check-out"><i class="fas fa-sign-out-alt"></i> {{ day_info.record.check_out|date:'H:i' }}</span>
+                                            {% else %}
+                                                <span class="time-entry check-out text-warning">بصمة ناقصة</span>
+                                            {% endif %}
+                                        {% else %}
+                                            {{ day_info.status }}
+                                        {% endif %}
+                                    </td>
+                                {% endfor %}
+                                <td class="summary-cell">
+                                    <div><strong>الحضور:</strong> {{ data.summary.attended_days }} / {{ work_days_in_week }} أيام</div>
+                                    <div><strong>إجمالي التأخير:</strong> {{ data.summary.lateness_str }}</div>
+                                    <hr class="my-1">
+                                    <div>
+                                        <span class="badge bg-warning text-dark">تأخير: {{ data.summary.late_days }}</span>
+                                        <span class="badge bg-danger">نصف يوم: {{ data.summary.half_days }}</span>
+                                        <span class="badge bg-secondary">غياب: {{ data.summary.absent_days }}</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="{{ week_dates|length|add:3 }}" class="text-center py-5">
+                                    <div class="empty-state">
+                                        <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                                        <h5 class="text-muted">لا توجد سجلات حضور في هذا الأسبوع.</h5>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Employee Detail Modal -->
+<div class="modal fade" id="employeeDetailModal" tabindex="-1" aria-labelledby="employeeDetailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0">
+        <h5 class="modal-title" id="employeeDetailModalLabel">تفاصيل الموظف</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center">
+        <div id="modal-employee-image-container" class="mb-3"></div>
+        <h3 id="modal-employee-name" class="fw-bold mb-3"></h3>
+        <ul class="list-group list-group-flush text-end">
+          <li class="list-group-item"><i class="fas fa-phone-alt text-primary me-2"></i><strong>رقم الهاتف:</strong> <span id="modal-employee-phone"></span></li>
+          <li class="list-group-item"><i class="fas fa-venus-mars text-primary me-2"></i><strong>الجنس:</strong> <span id="modal-employee-gender"></span></li>
+          <li class="list-group-item"><i class="fas fa-map-marker-alt text-primary me-2"></i><strong>العنوان:</strong> <span id="modal-employee-address"></span></li>
+        </ul>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    const employeeModal = document.getElementById('employeeDetailModal');
+    employeeModal.addEventListener('show.bs.modal', function (event) {
+        const triggerElement = event.relatedTarget;
+        const name = triggerElement.getAttribute('data-name');
+        const phone = triggerElement.getAttribute('data-phone');
+        const gender = triggerElement.getAttribute('data-gender');
+        const address = triggerElement.getAttribute('data-address');
+        const photoUrl = triggerElement.getAttribute('data-photo-url');
+
+        const modalTitle = employeeModal.querySelector('.modal-title');
+        const modalImageContainer = employeeModal.querySelector('#modal-employee-image-container');
+        const modalName = employeeModal.querySelector('#modal-employee-name');
+        const modalPhone = employeeModal.querySelector('#modal-employee-phone');
+        const modalGender = employeeModal.querySelector('#modal-employee-gender');
+        const modalAddress = employeeModal.querySelector('#modal-employee-address');
+
+        modalTitle.textContent = 'تفاصيل: ' + name;
+        modalName.textContent = name;
+        modalPhone.textContent = phone;
+        modalGender.textContent = gender;
+        modalAddress.textContent = address;
+
+        if (photoUrl) {
+            modalImageContainer.innerHTML = `<img src="${photoUrl}" alt="${name}" class="modal-employee-photo">`;
+        } else {
+            modalImageContainer.innerHTML = '<span class="modal-employee-icon"><i class="fas fa-user"></i></span>';
+        }
+    });
+});
+</script>
+{% endblock %}

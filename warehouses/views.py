@@ -1,3 +1,4 @@
+import logging
 from django.conf import settings
 from django.shortcuts import render, get_object_or_404, redirect
 from django.template.loader import render_to_string
@@ -15,15 +16,29 @@ from django.db.models import ProtectedError
 from .models import Category, Warehouse, Product, StockItem, StockMovement, StockTransfer
 # Add the missing import at the top of the file
 from django.http import HttpResponse
+from django.core.paginator import Paginator
 from decimal import Decimal, InvalidOperation
-
+from .models import Product, Category
+import pandas as pd
+import io
 import json
 from django.contrib.auth.decorators import login_required, permission_required
 from django.views.decorators.http import require_http_methods
 import csv
 from datetime import datetime, timedelta
-from .forms import CategoryForm, StockItemUpdateForm, WarehouseForm, ProductForm, StockItemForm, UnitForm,UnitConversionForm
+from .forms import CategoryForm, StockItemUpdateForm, StockTransferForm, WarehouseForm, ProductForm, StockItemForm, UnitForm,UnitConversionForm
+from django import forms  # <-- Add this import to fix the error
 # views.py
+from django.core.exceptions import AppRegistryNotReady  # Add this import above
+
+try:
+    from production.models import SizeGroup
+    PRODUCTION_APP_AVAILABLE = True
+except (ImportError, AppRegistryNotReady):
+    PRODUCTION_APP_AVAILABLE = False
+
+
+
 
 class WarehouseDashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'warehouses/dashboard.html'
@@ -78,19 +93,27 @@ class CategoryCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
         messages.error(self.request, 'يرجى تصحيح الأخطاء المذكورة.')
         return super().form_invalid(form)
 
-class CategoryDetailView(LoginRequiredMixin, PermissionRequiredMixin,DetailView):
+class CategoryDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
     model = Category
     template_name = 'warehouses/category_detail.html'
     context_object_name = 'category'
     permission_required = 'warehouses.view_category'
 
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['products'] = self.object.product_set.all()[:10]  # Show first 10 products
-        context['products_count'] = self.object.product_set.count()
-        return context
+        category = self.get_object()
 
+        # Get all related products for pagination
+        product_list = category.product_set.all().order_by('name')
+
+        # Set up the paginator
+        paginator = Paginator(product_list, 15)  # Show 15 products per page
+        page_number = self.request.GET.get('page')
+        products_page = paginator.get_page(page_number)
+
+        context['products_page'] = products_page
+        context['products_count'] = product_list.count()
+        return context
 class CategoryUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     model = Category
     form_class = CategoryForm
@@ -128,6 +151,7 @@ class ProductListView(LoginRequiredMixin, PermissionRequiredMixin,ListView):
     context_object_name = 'products'
     paginate_by = 25
     permission_required = 'warehouses.view_product'
+    
     def get_queryset(self):
         queryset = Product.objects.select_related('category').all()
         search = self.request.GET.get('search')
@@ -146,6 +170,79 @@ class ProductListView(LoginRequiredMixin, PermissionRequiredMixin,ListView):
             queryset = queryset.filter(product_type=product_type)
             
         return queryset.order_by('name')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Pass filter choices to the template
+        context['categories'] = Category.objects.filter(is_active=True)
+        context['product_types'] = Product.PRODUCT_TYPES
+        return context
+
+class ProductListPDFView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    """
+    Generates a PDF report for the filtered list of products.
+    """
+    permission_required = 'warehouses.view_product'
+    template_name = 'pdf/warehouses/product_list_pdf.html'
+
+    def get(self, request, *args, **kwargs):
+        # Reuse the filtering logic from ProductListView
+        product_list_view = ProductListView()
+        product_list_view.request = request
+        queryset = product_list_view.get_queryset() # This gets the filtered list
+
+        # Prepare context for the PDF template header
+        category_id = request.GET.get('category')
+        product_type_code = request.GET.get('product_type')
+        
+        category_name = None
+        if category_id:
+            try:
+                category_name = Category.objects.get(id=category_id).name
+            except Category.DoesNotExist:
+                pass
+
+        product_type_name = dict(Product.PRODUCT_TYPES).get(product_type_code)
+
+        context = {
+            'products': queryset,
+            'timestamp': timezone.now(),
+            'filters': {
+                'search': request.GET.get('search', ''),
+                'category_name': category_name,
+                'product_type_name': product_type_name,
+            }
+        }
+
+        html_string = render_to_string(self.template_name, context, request=request)
+        
+        try:
+            # IMPORTANT: Ensure WKHTMLTOPDF_PATH is set in settings.py
+            config = pdfkit.configuration(wkhtmltopdf=settings.WKHTMLTOPDF_PATH)
+            # Options to enable local file access for CSS and to handle headers/footers
+            options = {
+                'page-size': 'A4',
+                'orientation': 'Landscape',
+                'encoding': "UTF-8",
+                'enable-local-file-access': True,
+                'header-font-size': '8',
+                'footer-font-size': '8',
+            }
+            pdf = pdfkit.from_string(html_string, False, configuration=config, options=options)
+            
+            response = HttpResponse(pdf, content_type='application/pdf')
+            # Use 'inline' to display in browser, 'attachment' to force download
+            response['Content-Disposition'] = 'inline; filename="product_list_report.pdf"'
+            return response
+        except FileNotFoundError:
+            messages.error(request, "Could not generate PDF. wkhtmltopdf executable not found. Please check server configuration.")
+            return redirect('warehouses:product_list')
+        except Exception as e:
+            # Log the error for debugging
+            print(f"PDF generation error: {e}")
+            messages.error(request, f"An unexpected error occurred while generating the PDF: {e}")
+            return redirect('warehouses:product_list')
+
 
 class ProductCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     model = Product
@@ -446,142 +543,132 @@ class StockListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
 
 
 class StockCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    """
+    Handles the creation of new stock items. If a stock item for the selected
+    product and warehouse already exists, it adds the specified quantity to it.
+    This view is now protected against double-submission errors.
+    """
     template_name = 'warehouses/stock_form.html'
-    permission_required = 'warehouses.add_stockitem'    
-    def get(self, request):
-        from django import forms
-        
+    permission_required = 'warehouses.add_stockitem'
+
+    def get_form(self):
+        """Defines the form used for creating stock."""
         class StockForm(forms.Form):
             warehouse = forms.ModelChoiceField(
                 queryset=Warehouse.objects.filter(is_active=True),
+                label="المخزن",
                 empty_label="اختر المخزن",
                 widget=forms.Select(attrs={'class': 'form-select'})
             )
             product = forms.ModelChoiceField(
                 queryset=Product.objects.filter(is_active=True),
+                label="المنتج",
                 empty_label="اختر المنتج",
                 widget=forms.Select(attrs={'class': 'form-select'})
             )
             quantity = forms.DecimalField(
+                label="الكمية",
                 min_value=0.01,
                 decimal_places=2,
                 widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
             )
             location = forms.CharField(
+                label="الموقع في المخزن (اختياري)",
                 required=False,
                 max_length=100,
                 widget=forms.TextInput(attrs={'class': 'form-control'})
             )
-        
+        return StockForm
+
+    def get(self, request, *args, **kwargs):
+        """Handles GET requests by displaying the empty stock creation form."""
+        StockForm = self.get_form()
         form = StockForm()
         return render(request, self.template_name, {'form': form})
-    
-    def post(self, request):
-        import logging
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        """
+        Handles POST requests to create or update stock.
+        Includes a check to prevent duplicate submissions from adding double quantity.
+        """
         logger = logging.getLogger(__name__)
-        
-        # Log the request to debug double submission
-        logger.info(f"Stock creation request from user: {request.user.username}")
-        
-        from django import forms
-        
-        class StockForm(forms.Form):
-            warehouse = forms.ModelChoiceField(
-                queryset=Warehouse.objects.filter(is_active=True),
-                empty_label="اختر المخزن",
-                widget=forms.Select(attrs={'class': 'form-select'})
-            )
-            product = forms.ModelChoiceField(
-                queryset=Product.objects.filter(is_active=True),
-                empty_label="اختر المنتج",
-                widget=forms.Select(attrs={'class': 'form-select'})
-            )
-            quantity = forms.DecimalField(
-                min_value=0.01,
-                decimal_places=2,
-                widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
-            )
-            location = forms.CharField(
-                required=False,
-                max_length=100,
-                widget=forms.TextInput(attrs={'class': 'form-control'})
-            )
-        
+        StockForm = self.get_form()
         form = StockForm(request.POST)
-        
+
         if form.is_valid():
             warehouse = form.cleaned_data['warehouse']
             product = form.cleaned_data['product']
             quantity = form.cleaned_data['quantity']
             location = form.cleaned_data.get('location', '')
-            
-            logger.info(f"Adding {quantity} of {product.name} to {warehouse.name}")
-            
+
+            logger.info(f"Stock creation request from user {request.user.username} for {quantity} of '{product.name}' in '{warehouse.name}'")
+
+            # --- FIX: IDEMPOTENCY CHECK TO PREVENT DOUBLE SUBMISSION ---
+            # This check prevents the same operation from running twice if a user double-clicks the submit button.
+            ten_seconds_ago = timezone.now() - timedelta(seconds=10)
+            if StockMovement.objects.filter(
+                stock_item__warehouse=warehouse,
+                stock_item__product=product,
+                movement_type='in',
+                quantity=quantity,
+                created_by=request.user,
+                created_at__gte=ten_seconds_ago
+            ).exists():
+                messages.warning(request, 'تم استلام هذا الطلب بالفعل. ربما قمت بالنقر على زر الإضافة مرتين؟')
+                return redirect('warehouses:stock_list')
+
             try:
-                # Use get_or_create to handle race conditions
-                existing_stock, created = StockItem.objects.get_or_create(
+                # Use get_or_create to atomically find or create the stock item.
+                # The 'defaults' are only used if a new item is being created.
+                stock_item, created = StockItem.objects.get_or_create(
                     warehouse=warehouse,
                     product=product,
-                    defaults={
-                        'quantity': 0,  # Start with 0, signal will update
-                        'location': location
-                    }
+                    defaults={'quantity': 0, 'location': location}
                 )
-                
-                if created:
-                    # New stock item created
-                    logger.info(f"Created new stock item")
-                    
-                    # Create initial stock movement - signal will handle quantity update
-                    StockMovement.objects.create(
-                        stock_item=existing_stock,
-                        movement_type='in',
-                        quantity=quantity,
-                        reference_number=f'NEW-{timezone.now().strftime("%Y%m%d%H%M%S")}',
-                        notes='إنشاء مخزون جديد',
-                        created_by=request.user
-                    )
-                    
-                    messages.success(request, f'تم إنشاء عنصر مخزون جديد بكمية {quantity} {product.get_unit_display()}')
-                    
-                else:
-                    # Stock item already exists
-                    old_quantity = existing_stock.quantity
-                    if location:
-                        existing_stock.location = location
-                        existing_stock.save()
-                    
-                    logger.info(f"Adding to existing stock. Current quantity: {old_quantity}")
-                    
-                    # Create stock movement record - signal will handle quantity update
-                    StockMovement.objects.create(
-                        stock_item=existing_stock,
-                        movement_type='in',
-                        quantity=quantity,
-                        reference_number=f'ADD-{timezone.now().strftime("%Y%m%d%H%M%S")}',
-                        notes=f'إضافة مخزون. الكمية السابقة: {old_quantity}',
-                        created_by=request.user
-                    )
-                    
-                    # Refresh to get updated quantity from signal
-                    existing_stock.refresh_from_db()
-                    
-                    messages.success(
-                        request, 
-                        f'تم إضافة {quantity} {product.get_unit_display()} إلى المخزون الموجود. الكمية الجديدة: {existing_stock.quantity}'
-                    )
-                
-                return redirect('warehouses:stock_list')
-                
-            except Exception as e:
-                logger.error(f"Error in stock creation: {str(e)}")
-                messages.error(request, f'حدث خطأ: {str(e)}')
-                return render(request, self.template_name, {'form': form})
-        
-        else:
-            messages.error(request, 'يرجى تصحيح الأخطاء المذكورة.')
-            return render(request, self.template_name, {'form': form})
 
+                # Determine notes and log message based on whether the item was created or found.
+                if created:
+                    logger.info("Created a new stock item.")
+                    movement_notes = 'إنشاء مخزون جديد'
+                else:
+                    logger.info(f"Found existing stock item. Current quantity: {stock_item.quantity}")
+                    movement_notes = f'إضافة مخزون. الكمية السابقة: {stock_item.quantity}'
+                    # If a new location is provided for an existing item, update it.
+                    if location:
+                        stock_item.location = location
+                        stock_item.save(update_fields=['location'])
+
+                # Create a stock movement record. The post_save signal on StockMovement
+                # will handle the actual quantity update on the StockItem.
+                StockMovement.objects.create(
+                    stock_item=stock_item,
+                    movement_type='in',
+                    quantity=quantity,
+                    reference_number=f'ADD-{timezone.now().strftime("%Y%m%d%H%M%S")}',
+                    notes=movement_notes,
+                    created_by=request.user
+                )
+
+                # Refresh the instance from the database to get the updated quantity from the signal.
+                stock_item.refresh_from_db()
+
+                # Provide clear feedback to the user.
+                if created:
+                    messages.success(request, f'تم إنشاء عنصر مخزون جديد للمنتج "{product.name}" بكمية {stock_item.quantity}.')
+                else:
+                    messages.success(request, f'تم إضافة {quantity} للمنتج "{product.name}". الكمية الإجمالية الآن: {stock_item.quantity}.')
+
+                return redirect('warehouses:stock_list')
+
+            except Exception as e:
+                logger.error(f"An unexpected error occurred during stock creation: {str(e)}")
+                messages.error(request, f'حدث خطأ غير متوقع أثناء معالجة طلبك: {str(e)}')
+                return render(request, self.template_name, {'form': form})
+
+        else:
+            messages.error(request, 'يرجى تصحيح الأخطاء الموجودة في النموذج.')
+            return render(request, self.template_name, {'form': form})
 
 
 
@@ -849,83 +936,154 @@ class OutOfStockView(LoginRequiredMixin, ListView):
 # Stock Movements
 class StockMovementListView(LoginRequiredMixin, ListView):
     model = StockMovement
-    template_name = 'warehouses/movement_list.html'
+    template_name = 'warehouses/movement_list.html' # Your template name
     context_object_name = 'movements'
     paginate_by = 25
-    
+
     def get_queryset(self):
-        queryset = StockMovement.objects.select_related('stock_item__product', 'stock_item__warehouse', 'created_by').all()
+        queryset = StockMovement.objects.select_related(
+            'stock_item__product', 'stock_item__warehouse', 'created_by'
+        ).order_by('-created_at')
+
+        # --- Filtering Logic ---
+        self.warehouse_filter = self.request.GET.get('warehouse')
+        if self.warehouse_filter:
+            queryset = queryset.filter(stock_item__warehouse_id=self.warehouse_filter)
+
+        self.movement_type_filter = self.request.GET.get('movement_type')
+        if self.movement_type_filter:
+            queryset = queryset.filter(movement_type=self.movement_type_filter)
+
+        self.date_from_filter = self.request.GET.get('date_from')
+        if self.date_from_filter:
+            queryset = queryset.filter(created_at__date__gte=self.date_from_filter)
         
-        # البحث
-        search = self.request.GET.get('search')
-        if search:
-            queryset = queryset.filter(
-                Q(stock_item__product__name__icontains=search) |
-                Q(stock_item__warehouse__name__icontains=search) |
-                Q(reference_number__icontains=search)
-            )
-        
-        # فلترة حسب نوع الحركة
-        movement_type = self.request.GET.get('movement_type')
-        if movement_type:
-            queryset = queryset.filter(movement_type=movement_type)
-        
-        # فلترة حسب المخزن
-        warehouse = self.request.GET.get('warehouse')
-        if warehouse:
-            queryset = queryset.filter(stock_item__warehouse_id=warehouse)
-        
-        # فلترة حسب التاريخ
-        date_from = self.request.GET.get('date_from')
-        date_to = self.request.GET.get('date_to')
-        if date_from:
-            queryset = queryset.filter(created_at__date__gte=date_from)
-        if date_to:
-            queryset = queryset.filter(created_at__date__lte=date_to)
-        
-        return queryset.order_by('-created_at')
-    
+        self.date_to_filter = self.request.GET.get('date_to')
+        if self.date_to_filter:
+            queryset = queryset.filter(created_at__date__lte=self.date_to_filter)
+            
+        return queryset
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['movement_types'] = StockMovement.MOVEMENT_TYPES
         context['warehouses'] = Warehouse.objects.filter(is_active=True)
+        
+        # This is the key for cleaner pagination links
+        query_params = self.request.GET.copy()
+        if 'page' in query_params:
+            del query_params['page']
+        context['query_params'] = query_params.urlencode()
+        
+        # Pass filter values back to the template
         context['filters'] = {
-            'search': self.request.GET.get('search', ''),
-            'movement_type': self.request.GET.get('movement_type', ''),
-            'warehouse': self.request.GET.get('warehouse', ''),
-            'date_from': self.request.GET.get('date_from', ''),
-            'date_to': self.request.GET.get('date_to', ''),
+            'warehouse': self.warehouse_filter,
+            'movement_type': self.movement_type_filter,
+            'date_from': self.date_from_filter,
+            'date_to': self.date_to_filter,
         }
         return context
 
 
+@login_required
+def print_stock_movements_pdf(request):
+    """
+    Generates a PDF report of stock movements based on the provided filters.
+    """
+    movements = StockMovement.objects.select_related(
+        'stock_item__product', 'stock_item__warehouse', 'created_by'
+    ).order_by('-created_at')
+
+    filters_applied = {}
+
+    # --- START: FIX for AttributeError ---
+    # The StockMovement model does not have a MOVEMENT_CHOICES attribute.
+    # We define the mapping here based on the values in the template.
+    movement_type_display_names = {
+        'in': 'وارد',
+        'out': 'صادر',
+        'transfer': 'تحويل',
+        'adjustment': 'تسوية',
+        'return': 'مرتجع',
+    }
+    # --- END: FIX ---
+
+    warehouse_id = request.GET.get('warehouse')
+    if warehouse_id:
+        try:
+            movements = movements.filter(stock_item__warehouse_id=warehouse_id)
+            filters_applied['warehouse'] = Warehouse.objects.get(pk=warehouse_id).name
+        except Warehouse.DoesNotExist:
+            pass # Or handle error appropriately
+
+    movement_type = request.GET.get('movement_type')
+    if movement_type:
+        movements = movements.filter(movement_type=movement_type)
+        # Use the locally defined dictionary for the lookup
+        filters_applied['movement_type'] = movement_type_display_names.get(movement_type)
+    
+    date_from = request.GET.get('date_from')
+    if date_from:
+        movements = movements.filter(created_at__date__gte=date_from)
+        filters_applied['date_from'] = date_from
+
+    date_to = request.GET.get('date_to')
+    if date_to:
+        movements = movements.filter(created_at__date__lte=date_to)
+        filters_applied['date_to'] = date_to
+
+    # Prepare context for the PDF template
+    context = {
+        'movements': movements,
+        'filters': filters_applied,
+        'timestamp': timezone.now(),
+        'user': request.user.get_full_name() or request.user.username,
+    }
+
+    # Render the PDF template to an HTML string
+    html_string = render_to_string('pdf/warehouses/movement_report_pdf.html', context)
+    
+    try:
+        pdf_config = pdfkit.configuration(wkhtmltopdf=settings.WKHTMLTOPDF_PATH)
+        pdf = pdfkit.from_string(html_string, False, configuration=pdf_config, options={
+            'encoding': "UTF-8",
+            'page-size': 'A4',
+            'orientation': 'Landscape',
+            'margin-top': '0.5in',
+            'margin-right': '0.5in',
+            'margin-bottom': '0.5in',
+            'margin-left': '0.5in',
+        })
+        
+        response = HttpResponse(pdf, content_type='application/pdf')
+        filename = f"Stock_Movements_{timezone.now().strftime('%Y-%m-%d')}.pdf"
+        response['Content-Disposition'] = f'inline; filename="{filename}"'
+        
+        return response
+    except Exception as e:
+        return HttpResponse(f"Error generating PDF: {e}<br>Please ensure wkhtmltopdf is installed and configured correctly in settings.py.", status=500)
+    
 class StockMovementCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     model = StockMovement
     template_name = 'warehouses/movement_form.html'
     fields = ['stock_item', 'movement_type', 'quantity', 'reference_number', 'notes']
     success_url = reverse_lazy('warehouses:movement_list')
     permission_required = 'warehouses.add_stockmovement'
+    
     def form_valid(self, form):
         form.instance.created_by = self.request.user
-        response = super().form_valid(form)
         
-        # تحديث كمية المخزون
-        stock_item = form.instance.stock_item
-        if form.instance.movement_type == 'in':
-            stock_item.quantity += form.instance.quantity
-        elif form.instance.movement_type == 'out':
-            if stock_item.quantity >= form.instance.quantity:
-                stock_item.quantity -= form.instance.quantity
-            else:
-                messages.error(self.request, 'الكمية المطلوبة غير متوفرة في المخزون')
+        # --- FIX: Removed manual stock update logic ---
+        # The post_save signal in signals.py now handles all quantity updates.
+        
+        # Check for sufficient quantity for 'out' movements BEFORE saving
+        if form.instance.movement_type == 'out':
+            stock_item = form.instance.stock_item
+            if stock_item.available_quantity < form.instance.quantity:
+                messages.error(self.request, 'الكمية المطلوبة غير متوفرة في المخزون.')
                 return self.form_invalid(form)
-        elif form.instance.movement_type == 'adjustment':
-            stock_item.quantity = form.instance.quantity
-        
-        stock_item.save()
-        messages.success(self.request, 'تم إنشاء حركة المخزون بنجاح')
-        return response
 
+        messages.success(self.request, 'تم إنشاء حركة المخزون بنجاح.')
+        return super().form_valid(form)
 
 class StockMovementDetailView(LoginRequiredMixin,PermissionRequiredMixin, DetailView):
     model = StockMovement
@@ -983,47 +1141,33 @@ class StockTransferListView(LoginRequiredMixin, ListView):
         return context
 
 
+# In your StockTransferCreateView
 class StockTransferCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     model = StockTransfer
+    # --- FIX: Use the form_class we just updated ---
+    form_class = StockTransferForm
     template_name = 'warehouses/transfer_form.html'
-    fields = ['from_warehouse', 'to_warehouse', 'product', 'quantity', 'reason']
     success_url = reverse_lazy('warehouses:transfer_list')
-    permission_required = 'warehouses.add_stocktransfer'    
+    permission_required = 'warehouses.add_stocktransfer'
+
     def form_valid(self, form):
+        # The validation logic is now in the form, so form_valid is much cleaner.
         form.instance.requested_by = self.request.user
-        
-        # توليد رقم التحويل
+
         today = timezone.now().date()
         prefix = f"TR{today.strftime('%Y%m%d')}"
-        last_transfer = StockTransfer.objects.filter(
-            transfer_number__startswith=prefix
-        ).order_by('-transfer_number').first()
-        
+        last_transfer = StockTransfer.objects.filter(transfer_number__startswith=prefix).order_by('-transfer_number').first()
+
         if last_transfer:
             last_number = int(last_transfer.transfer_number[-4:])
             new_number = last_number + 1
         else:
             new_number = 1
-        
+
         form.instance.transfer_number = f"{prefix}{new_number:04d}"
-        
-        # التحقق من توفر الكمية
-        try:
-            stock_item = StockItem.objects.get(
-                warehouse=form.instance.from_warehouse,
-                product=form.instance.product
-            )
-            if stock_item.available_quantity < form.instance.quantity:
-                messages.error(self.request, 'الكمية المطلوبة غير متوفرة في المخزن المصدر')
-                return self.form_invalid(form)
-        except StockItem.DoesNotExist:
-            messages.error(self.request, 'المنتج غير موجود في المخزن المصدر')
-            return self.form_invalid(form)
-        
+
         messages.success(self.request, 'تم إنشاء طلب التحويل بنجاح')
         return super().form_valid(form)
-
-
 class StockTransferDetailView(LoginRequiredMixin, DetailView):
     model = StockTransfer
     template_name = 'warehouses/transfer_detail.html'
@@ -2299,3 +2443,265 @@ class ProductDetailPDFView(LoginRequiredMixin, View):
         except Exception as e:
             messages.error(request, f"حدث خطأ غير متوقع أثناء إنشاء ملف PDF: {e}")
             return redirect('warehouses:product_detail', pk=product.pk)
+
+class ProductImportView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    """
+    Handles rendering the product import page and processing the uploaded Excel file.
+    This view now supports both creating new products and updating existing ones.
+    """
+    template_name = 'warehouses/product_import.html'
+    permission_required = 'warehouses.add_product'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'استيراد وتحديث المنتجات من Excel'
+        return context
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        """
+        Handles the POST request with the uploaded Excel file.
+        It validates the file, and for each row, it either updates an
+        existing product or creates a new one.
+        """
+        if 'excel_file' not in request.FILES:
+            messages.error(request, 'لم يتم رفع أي ملف.')
+            return redirect('warehouses:product_import')
+
+        excel_file = request.FILES['excel_file']
+        
+        if not excel_file.name.endswith(('.xls', '.xlsx')):
+            messages.error(request, 'ملف غير صالح. يرجى رفع ملف Excel بصيغة .xls أو .xlsx.')
+            return redirect('warehouses:product_import')
+
+        try:
+            df = pd.read_excel(excel_file, dtype=str).fillna('')
+            df.columns = df.columns.str.strip()
+
+            required_columns = ['اسم المنتج', 'نوع المنتج']
+            if not all(col in df.columns for col in required_columns):
+                messages.error(request, f'الملف يفتقد لأحد الأعمدة المطلوبة: {", ".join(required_columns)}')
+                return redirect('warehouses:product_import')
+
+            errors = []
+            created_count = 0
+            updated_count = 0
+            
+            product_type_map = {v: k for k, v in Product.PRODUCT_TYPES}
+            unit_map = {v: k for k, v in Product.UNIT_CHOICES}
+            quality_grade_map = {v: k for k, v in Product._meta.get_field('quality_grade').choices}
+
+            for index, row in df.iterrows():
+                row_num = index + 2
+                
+                try:
+                    name = str(row.get('اسم المنتج', '')).strip()
+                    if not name:
+                        errors.append(f'صف {row_num}: اسم المنتج فارغ.')
+                        continue
+                    
+                    def get_choice_key(value, choices_map, choices_tuple):
+                        val_str = str(value).strip()
+                        if val_str in [c[0] for c in choices_tuple]: return val_str
+                        return choices_map.get(val_str)
+
+                    product_type_key = get_choice_key(row.get('نوع المنتج', ''), product_type_map, Product.PRODUCT_TYPES)
+                    if not product_type_key:
+                        errors.append(f'صف {row_num}: نوع المنتج "{row.get("نوع المنتج", "")}" غير صالح.')
+                        continue
+
+                    unit_key = get_choice_key(row.get('الوحدة', ''), unit_map, Product.UNIT_CHOICES)
+                    if not unit_key:
+                        errors.append(f'صف {row_num}: الوحدة "{row.get("الوحدة", "")}" غير صالحة.')
+                        continue
+
+                    category_name = str(row.get('الفئة', '')).strip()
+                    category = None
+                    if category_name:
+                        category, _ = Category.objects.get_or_create(name=category_name)
+
+                    cost_price = Decimal(row.get('سعر التكلفة', 0) or 0)
+                    min_stock_level = int(row.get('الحد الأدنى للمخزون', 0) or 0)
+                    
+                    # This dictionary will hold the data for creation or update.
+                    product_defaults = {
+                        'name': name,
+                        'category': category,
+                        'product_type': product_type_key,
+                        'cost_price': cost_price,
+                        'min_stock_level': min_stock_level,
+                        'unit': unit_key,
+                    }
+
+                    if product_type_key == 'fabric':
+                        width = row.get('العرض (سم)')
+                        if not width:
+                            errors.append(f'صف {row_num}: حقل "العرض (سم)" مطلوب للقماش.')
+                            continue
+                        
+                        quality_grade_key = get_choice_key(row.get('درجة الجودة', ''), quality_grade_map, Product._meta.get_field('quality_grade').choices)
+                        if not quality_grade_key:
+                            errors.append(f'صف {row_num}: "درجة الجودة" ({row.get("درجة الجودة", "")}) غير صالحة للقماش.')
+                            continue
+                        product_defaults.update({'width': Decimal(width), 'quality_grade': quality_grade_key})
+
+                    elif product_type_key == 'finished':
+                        selling_price = row.get('سعر البيع')
+                        if not selling_price:
+                            errors.append(f'صف {row_num}: "سعر البيع" مطلوب للمنتجات النهائية.')
+                            continue
+                        product_defaults.update({
+                            'selling_price': Decimal(selling_price),
+                            'colors': str(row.get('الألوان المتاحة', '')).strip(),
+                            'fabric_quantity_per_piece': Decimal(row.get('كمية القماش للقطعة', 0) or 0)
+                        })
+
+                        if PRODUCTION_APP_AVAILABLE:
+                            size_group_name = str(row.get('اسم مجموعة المقاسات', '')).strip()
+                            if size_group_name:
+                                size_group, created_sg = SizeGroup.objects.get_or_create(name=size_group_name)
+                                if created_sg:
+                                    sizes_list = [str(row.get(f'مقاس {i}', '')).strip() for i in range(1, 13) if str(row.get(f'مقاس {i}', '')).strip()]
+                                    if sizes_list:
+                                        size_group.sizes = sizes_list
+                                        size_group.save()
+                                product_defaults['size_group'] = size_group
+                    
+                    code = str(row.get('كود المنتج', '')).strip()
+                    if code:
+                        product_defaults['code'] = code
+                    
+                    # --- CORE LOGIC CHANGE: UPDATE OR CREATE ---
+                    # We use 'name' as the unique identifier to find existing products.
+                    # 'defaults' contains all the data to be set on creation or update.
+                    product, created = Product.objects.update_or_create(
+                        name__iexact=name,
+                        defaults=product_defaults
+                    )
+
+                    # If the product was just created and no code was provided, generate one.
+                    if created and not code:
+                         prefix_map = {'fabric': 'FAB', 'finished': 'FIN', 'accessory': 'ACC', 'thread': 'THR', 'button': 'BTN', 'zipper': 'ZIP'}
+                         prefix = prefix_map.get(product_type_key, 'PROD')
+                         last_product = Product.objects.filter(code__startswith=f'{prefix}-').order_by('code').last()
+                         next_num = 1
+                         if last_product:
+                             try:
+                                 last_num = int(last_product.code.split('-')[-1])
+                                 next_num = last_num + 1
+                             except (ValueError, IndexError): pass
+                         while True:
+                             new_code = f"{prefix}-{next_num:04d}"
+                             if not Product.objects.filter(code=new_code).exists():
+                                 product.code = new_code
+                                 break
+                             next_num += 1
+                         product.save()
+
+                    if created:
+                        created_count += 1
+                    else:
+                        updated_count += 1
+
+                except Exception as e:
+                    errors.append(f'صف {row_num}: خطأ غير متوقع - {e}')
+
+            if errors:
+                transaction.set_rollback(True)
+                messages.error(request, 'حدثت أخطاء أثناء الاستيراد. لم يتم حفظ أي منتجات.')
+                context = self.get_context_data(errors=errors)
+                return self.render_to_response(context)
+
+            # --- UPDATED SUCCESS MESSAGE ---
+            success_message = f"اكتملت المعالجة بنجاح. "
+            if created_count > 0:
+                success_message += f"تم إنشاء {created_count} منتج جديد. "
+            if updated_count > 0:
+                success_message += f"تم تحديث {updated_count} منتج موجود."
+            
+            messages.success(request, success_message)
+            return redirect('warehouses:product_list')
+
+        except Exception as e:
+            messages.error(request, f'حدث خطأ أثناء قراءة الملف: {e}')
+            return redirect('warehouses:product_import')
+
+@login_required
+@permission_required('warehouses.add_product', raise_exception=True)
+def download_product_import_template(request, template_type):
+    """
+    Generates and serves a specific Excel file template for importing products
+    based on the requested type (fabric, finished, other).
+    """
+    base_columns = [
+        'اسم المنتج', 'كود المنتج', 'الفئة', 'نوع المنتج', 
+        'سعر التكلفة', 'الحد الأدنى للمخزون', 'الوحدة',
+    ]
+    
+    base_instructions = {
+        'اسم المنتج': 'مطلوب. سيتم استخدامه للتحديث إذا كان المنتج موجودًا.',
+        'كود المنتج': 'اختياري. سيتم إنشاؤه تلقائيًا للمنتجات الجديدة إذا ترك فارغًا.',
+        'الفئة': 'اختياري. سيتم إنشاء فئة جديدة إذا لم تكن موجودة.',
+        'الوحدة': f"مطلوب. القيم الصالحة: {', '.join([c[1] for c in Product.UNIT_CHOICES])}", # Show Arabic values
+        'سعر التكلفة': 'مطلوب. أدخل 0 إذا لم يكن هناك تكلفة.',
+        'الحد الأدنى للمخزون': 'اختياري. القيمة الافتراضية هي 0.',
+    }
+
+    if template_type == 'fabric':
+        columns = base_columns + ['العرض (سم)', 'درجة الجودة']
+        instructions = base_instructions.copy()
+        instructions.update({
+            'نوع المنتج': "القيمة الثابتة لهذا القالب هي 'قماش'.",
+            'العرض (سم)': "مطلوب للقماش.",
+            'درجة الجودة': f"مطلوب للقماش. القيم الصالحة: {', '.join([c[1] for c in Product._meta.get_field('quality_grade').choices if c[0]])}", # Show Arabic
+        })
+        example_row = {'نوع المنتج': 'قماش', 'الوحدة': 'متر'}
+
+    elif template_type == 'finished':
+        columns = base_columns + [
+            'سعر البيع', 'الألوان المتاحة', 'كمية القماش للقطعة', 
+            'اسم مجموعة المقاسات'
+        ] + [f'مقاس {i}' for i in range(1, 13)]
+        instructions = base_instructions.copy()
+        instructions.update({
+            'نوع المنتج': "القيمة الثابتة لهذا القالب هي 'منتج نهائي'.",
+            'سعر البيع': "مطلوب للمنتج النهائي.",
+            'الألوان المتاحة': 'اختياري. مثال: أزرق, أحمر, أخضر',
+            'كمية القماش للقطعة': 'اختياري. مثال: 1.25',
+            'اسم مجموعة المقاسات': "اختياري. إذا كانت المجموعة غير موجودة، سيتم إنشاؤها مع المقاسات من أعمدة 'مقاس 1' إلى 'مقاس 12'.",
+        })
+        example_row = {'نوع المنتج': 'منتج نهائي', 'الوحدة': 'قطعة'}
+
+    elif template_type == 'other':
+        columns = base_columns
+        instructions = base_instructions.copy()
+        other_types = [c[1] for c in Product.PRODUCT_TYPES if c[0] not in ['fabric', 'finished']] # Show Arabic
+        instructions.update({
+            'نوع المنتج': f"مطلوب. اختر من: {', '.join(other_types)}",
+        })
+        example_row = {}
+
+    else:
+        raise Http404("نوع القالب المحدد غير موجود.")
+
+    df = pd.DataFrame([instructions], columns=columns)
+    
+    for col in columns:
+        if col not in example_row:
+            example_row[col] = ''
+    
+    example_df = pd.DataFrame([example_row], columns=columns)
+    df = pd.concat([df, example_df], ignore_index=True)
+
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Products')
+    output.seek(0)
+
+    response = HttpResponse(
+        output,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="template_{template_type}.xlsx"'
+    
+    return response

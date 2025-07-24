@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .attendance-grid th, .attendance-grid td {
+        text-align: center;
+        vertical-align: middle;
+        min-width: 160px;
+    }
+    .attendance-grid th:first-child, .attendance-grid td:first-child {
+        min-width: 200px;
+        text-align: right;
+        position: sticky;
+        right: 0;
+        background-color: #f8f9fc;
+        z-index: 2;
+    }
+    .attendance-grid thead th {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+    }
+    .table-responsive {
+        max-height: 75vh;
+    }
+    .time-input {
+        border: 1px solid #d1d3e2;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.35rem;
+        width: 100%;
+        margin-bottom: 5px;
+    }
+    .status-badge {
+        font-size: 0.8rem;
+        padding: 0.3em 0.6em;
+        border-radius: 0.25rem;
+        color: white;
+    }
+    .status-حاضر { background-color: #1cc88a; }
+    .status-حضور-متأخر { background-color: #f6c23e; color: #5a5c69 !important; }
+    .status-انصراف-مبكر { background-color: #faddc2; color: #5a5c69 !important; }
+    .status-بصمة-ناقصة { background-color: #36b9cc; }
+    .status-غائب { background-color: #e74a3b; }
+    .status-عطلة { background-color: #858796; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    {% csrf_token %}
+    <!-- Page Heading & Week Navigation -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">{{ page_title }}</h1>
+        <div>
+            <a href="{% url 'hr:manual_attendance' %}?date={{ prev_week_date|date:'Y-m-d' }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-right"></i> الأسبوع السابق
+            </a>
+            <a href="{% url 'hr:manual_attendance' %}?date={{ next_week_date|date:'Y-m-d' }}" class="btn btn-secondary">
+                الأسبوع التالي <i class="fas fa-arrow-left"></i>
+            </a>
+        </div>
+    </div>
+
+    <!-- Attendance Grid Card -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">
+                الأسبوع من {{ week_start_date|date:"d-m-Y" }} إلى {{ week_end_date|date:"d-m-Y" }}
+            </h6>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover attendance-grid" id="attendanceTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>اسم الموظف</th>
+                            {% for day in week_dates %}
+                                <th>
+                                    {% if day.weekday == 5 %}السبت{% elif day.weekday == 6 %}الأحد{% elif day.weekday == 0 %}الاثنين{% elif day.weekday == 1 %}الثلاثاء{% elif day.weekday == 2 %}الأربعاء{% elif day.weekday == 3 %}الخميس{% endif %}
+                                    <br>
+                                    <small>{{ day|date:"d-m" }}</small>
+                                </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in grid_data %}
+                            <tr>
+                                <td>{{ row.employee.full_name }}</td>
+                                {% for day in row.days %}
+                                    <td class="day-cell" data-employee-id="{{ row.employee.id }}" data-date="{{ day.date|date:'Y-m-d' }}">
+                                        <input type="time" class="time-input check-in" value="{{ day.check_in|time:'H:i'|default:'' }}">
+                                        <input type="time" class="time-input check-out" value="{{ day.check_out|time:'H:i'|default:'' }}">
+                                        <div class="status-container mt-1">
+                                            <span class="status-badge status-{{ day.status|cut:' ' }}">{{ day.status }}</span>
+                                        </div>
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // This is the most reliable way to get the CSRF token for AJAX requests
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    $('#attendanceTable').on('change', '.time-input', function() {
+        const input = $(this);
+        const cell = input.closest('.day-cell');
+        const employeeId = cell.data('employee-id');
+        const recordDate = cell.data('date');
+        
+        const checkInVal = cell.find('.check-in').val();
+        const checkOutVal = cell.find('.check-out').val();
+
+        // Add visual feedback
+        input.css('border-color', '#f6c23e'); // Yellow for "saving"
+
+        $.ajax({
+            url: "{% url 'hr:update_manual_attendance' %}",
+            type: 'POST',
+            headers: {'X-CSRFToken': csrftoken},
+            contentType: 'application/json',
+            data: JSON.stringify({
+                employee_id: employeeId,
+                date: recordDate,
+                check_in: checkInVal,
+                check_out: checkOutVal
+            }),
+            success: function(response) {
+                if (response.status === 'success') {
+                    input.css('border-color', '#1cc88a'); // Green for success
+                    setTimeout(() => input.css('border-color', '#d1d3e2'), 2000); // Revert after 2s
+                    
+                    // Update status badge
+                    const statusContainer = cell.find('.status-container');
+                    const newStatus = response.new_status;
+                    const newStatusClass = newStatus.replace(/ /g, '-');
+                    statusContainer.html(`<span class="status-badge status-${newStatusClass}">${newStatus}</span>`);
+
+                } else {
+                    input.css('border-color', '#e74a3b'); // Red for error
+                }
+            },
+            error: function() {
+                input.css('border-color', '#e74a3b'); // Red for error
+                alert('حدث خطأ أثناء الحفظ. يرجى المحاولة مرة أخرى.');
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

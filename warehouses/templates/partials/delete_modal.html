@@ -1,0 +1,55 @@
+<div class="modal fade" id="deleteConfirmationModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i> تأكيد الحذف
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>هل أنت متأكد أنك تريد حذف العنصر التالي؟</p>
+                <p class="fw-bold text-center" id="itemNameToDelete"></p>
+                <p class="text-danger small mt-3"><strong>تحذير:</strong> لا يمكن التراجع عن هذا الإجراء.</p>
+            </div>
+            <div class="modal-footer">
+                <form id="deleteForm" method="post" class="d-flex w-100 justify-content-between">
+                    {% csrf_token %}
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i> إلغاء
+                    </button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash-alt me-1"></i> نعم، قم بالحذف
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const deleteModal = document.getElementById('deleteConfirmationModal');
+    if (deleteModal) {
+        deleteModal.addEventListener('show.bs.modal', function (event) {
+            // Button that triggered the modal
+            const button = event.relatedTarget;
+
+            // Extract info from data-* attributes
+            const deleteUrl = button.getAttribute('data-delete-url');
+            const itemName = button.getAttribute('data-item-name');
+
+            // Update the modal's content
+            const itemNameElement = deleteModal.querySelector('#itemNameToDelete');
+            const deleteForm = deleteModal.querySelector('#deleteForm');
+
+            if (itemNameElement) {
+                itemNameElement.textContent = `"${itemName}"`;
+            }
+            if (deleteForm) {
+                deleteForm.action = deleteUrl;
+            }
+        });
+    }
+});
+</script>

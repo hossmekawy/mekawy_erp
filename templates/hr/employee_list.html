@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    
+    <!-- Modern Header Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between">
+                <div class="mb-3 mb-md-0">
+                    <h1 class="h2 mb-1 text-dark fw-bold">{{ page_title }}</h1>
+                    <p class="text-muted mb-0">إدارة الموظفين ومتابعة الحضور والانصراف</p>
+                </div>
+                
+                <!-- Action Buttons with Modern Design -->
+                <div class="btn-toolbar" role="toolbar">
+                    <div class="btn-group me-2" role="group">
+                        <button type="button" id="sync-employees-btn" 
+                                class="btn btn-outline-warning d-flex align-items-center" 
+                                title="مزامنة قائمة الموظفين من جهاز البصمة إلى النظام">
+                            <i class="fas fa-users-cog me-2"></i>
+                            <span class="d-none d-sm-inline">مزامنة الموظفين</span>
+                        </button>
+                        
+                        <button type="button" id="fetch-attendance-btn" 
+                                class="btn btn-outline-info d-flex align-items-center" 
+                                data-bs-toggle="tooltip" data-bs-placement="top" 
+                                title="هذه العملية قد تستغرق عدة دقائق حسب عدد السجلات الجديدة.">
+                            <i class="fas fa-sync-alt me-2"></i>
+                            <span class="d-none d-sm-inline">سحب البيانات</span>
+                        </button>
+                    </div>
+                    
+                    <div class="btn-group" role="group">
+                        <a href="{% url 'hr:weekly_attendance_report' %}" 
+                           class="btn btn-outline-secondary d-flex align-items-center">
+                            <i class="fas fa-calendar-week me-2"></i>
+                            <span class="d-none d-lg-inline">التقرير الأسبوعي</span>
+                        </a>
+                        <a href="{% url 'hr:manual_attendance' %}" 
+                           class="btn btn-outline-success d-flex align-items-center">
+                            <i class="fas fa-user-clock me-2"></i>
+                            <span class="d-none d-lg-inline">تسجيل يدوي</span>
+                        </a>
+                        
+                        {% if request.user.is_superuser or request.user.role in 'admin,manager' %}
+                        <a href="{% url 'hr:employee_create' %}" 
+                           class="btn btn-primary d-flex align-items-center">
+                            <i class="fas fa-plus me-2"></i>
+                            <span class="d-none d-sm-inline">إضافة موظف</span>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modern Employee List Card -->
+    <div class="row">
+        <div class="col-12">
+            <form method="post" action="{% url 'hr:employee_bulk_delete' %}" id="bulk-delete-form">
+                {% csrf_token %}
+                <div class="card border-0 shadow-sm">
+                    <!-- Card Header with Search and Bulk Delete Button -->
+                    <div class="card-header bg-white border-bottom py-3">
+                        <div class="row align-items-center">
+                            <div class="col-sm-12 col-md-6 mb-2 mb-md-0">
+                                <div class="d-flex align-items-center">
+                                    <h5 class="mb-0 text-dark fw-semibold">
+                                        <i class="fas fa-users text-primary me-2"></i>
+                                        قائمة الموظفين
+                                    </h5>
+                                    {% if request.user.is_superuser or request.user.role in 'admin,manager' %}
+                                    <button type="button" id="bulk-delete-btn" class="btn btn-danger btn-sm ms-3" disabled data-bs-toggle="modal" data-bs-target="#confirm-delete-modal">
+                                        <i class="fas fa-trash-alt me-1"></i> حذف المحدد
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-sm-12 col-md-6">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0">
+                                        <i class="fas fa-search text-muted"></i>
+                                    </span>
+                                    <input type="text" name="q" 
+                                           class="form-control border-start-0 bg-light" 
+                                           placeholder="ابحث عن اسم أو كود الموظف..." 
+                                           value="{{ search_query|default:'' }}"
+                                           form="search-form"> <!-- Link input to the search form -->
+                                    <button class="btn btn-primary" type="submit" form="search-form">
+                                        بحث
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Card Body with Table -->
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="employeeTable">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th class="border-0 py-3 px-4 text-center" style="width: 50px;">
+                                            <input type="checkbox" id="select-all-checkbox" class="form-check-input">
+                                        </th>
+                                        <th class="border-0 fw-semibold text-dark py-3 px-4">الاسم بالكامل</th>
+                                        <th class="border-0 fw-semibold text-dark py-3 px-4">كود الموظف</th>
+                                        <th class="border-0 fw-semibold text-dark py-3 px-4">القسم</th>
+                                        <th class="border-0 fw-semibold text-dark py-3 px-4">المسمى الوظيفي</th>
+                                        <th class="border-0 fw-semibold text-dark py-3 px-4 text-center">الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for employee in employees %}
+                                    <tr class="border-bottom">
+                                        <td class="py-3 px-4 text-center">
+                                            <input type="checkbox" name="employee_ids" value="{{ employee.id }}" class="employee-checkbox form-check-input">
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            <div class="d-flex align-items-center">
+                                                <div class="avatar-circle me-3">
+                                                    {% if employee.photo %}
+                                                        <img src="{{ employee.photo.url }}" alt="{{ employee.full_name }}" class="avatar-img">
+                                                    {% else %}
+                                                        <i class="fas fa-user text-white"></i>
+                                                    {% endif %}
+                                                </div>
+                                                <div>
+                                                    <h6 class="mb-0 fw-semibold">{{ employee.full_name }}</h6>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            <span class="badge bg-light text-dark px-3 py-2">{{ employee.employee_id }}</span>
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            <span class="text-muted">{{ employee.department.name|default:"-" }}</span>
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            <span class="text-muted">{{ employee.job_title }}</span>
+                                        </td>
+                                        <td class="py-3 px-4 text-center">
+                                            <div class="btn-group" role="group">
+                                                <a href="{% url 'hr:employee_detail' employee.id %}" class="btn btn-sm btn-outline-primary" title="عرض التفاصيل"><i class="fas fa-eye"></i></a>
+                                                <a href="{% url 'hr:employee_attendance_detail' employee.id %}" class="btn btn-sm btn-outline-info" title="عرض تقرير الحضور"><i class="fas fa-calendar-alt"></i></a>
+                                                <a href="{% url 'hr:print_employee_id_card' employee.id %}" class="btn btn-sm btn-outline-secondary" title="طباعة البطاقة" target="_blank"><i class="fas fa-id-card"></i></a>
+                                                {% if request.user.is_superuser or request.user.role in 'admin,manager' %}
+                                                <a href="{% url 'hr:employee_update' employee.id %}" class="btn btn-sm btn-outline-warning" title="تعديل بيانات الموظف"><i class="fas fa-edit"></i></a>
+                                                <a href="{% url 'hr:employee_delete' employee.id %}" class="btn btn-sm btn-outline-danger" title="حذف الموظف"><i class="fas fa-trash"></i></a>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="6" class="text-center py-5">
+                                            <div class="empty-state">
+                                                <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                                                <h5 class="text-muted">
+                                                    {% if search_query %}
+                                                        لا توجد نتائج تطابق بحثك عن "{{ search_query }}"
+                                                    {% else %}
+                                                        لا يوجد موظفين لعرضهم
+                                                    {% endif %}
+                                                </h5>
+                                                <p class="text-muted">
+                                                    {% if not search_query %}
+                                                        قم بمزامنة الموظفين أو إضافتهم يدوياً
+                                                    {% endif %}
+                                                </p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Modern Pagination -->
+                        {% if employees.has_other_pages %}
+                        <div class="card-footer bg-white border-top-0">
+                            <nav aria-label="Page navigation">
+                                <ul class="pagination justify-content-center mb-0">
+                                    {% if employees.has_previous %}
+                                        <li class="page-item">
+                                            <a class="page-link rounded-pill me-2" href="?page={{ employees.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">
+                                                <i class="fas fa-chevron-right me-1"></i> السابق
+                                            </a>
+                                        </li>
+                                    {% endif %}
+
+                                    {% for i in employees.paginator.page_range %}
+                                        {% if employees.number == i %}
+                                            <li class="page-item active"><span class="page-link rounded-pill mx-1">{{ i }}</span></li>
+                                        {% else %}
+                                            <li class="page-item"><a class="page-link rounded-pill mx-1" href="?page={{ i }}{% if search_query %}&q={{ search_query }}{% endif %}">{{ i }}</a></li>
+                                        {% endif %}
+                                    {% endfor %}
+
+                                    {% if employees.has_next %}
+                                        <li class="page-item">
+                                            <a class="page-link rounded-pill ms-2" href="?page={{ employees.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">
+                                                التالي <i class="fas fa-chevron-left ms-1"></i>
+                                            </a>
+                                        </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Separate Search Form (for proper GET requests) -->
+<form method="get" action="{% url 'hr:employee_list' %}" id="search-form"></form>
+
+<!-- Confirmation Modal for Bulk Delete -->
+<div class="modal fade" id="confirm-delete-modal" tabindex="-1" aria-labelledby="modalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalLabel">تأكيد الحذف الجماعي</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        هل أنت متأكد أنك تريد حذف الموظفين المحددين؟
+        <p class="text-danger mt-2"><strong>تحذير:</strong> لا يمكن التراجع عن هذا الإجراء.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+        <button type="button" class="btn btn-danger" id="confirm-delete-button">نعم، قم بالحذف</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+    .avatar-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 16px;
+        overflow: hidden; /* Important for circular images */
+    }
+    .avatar-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover; /* Ensures the image covers the circle area */
+    }
+    .empty-state { padding: 2rem; }
+    .card { border-radius: 15px; overflow: hidden; }
+    .table-hover tbody tr:hover { background-color: rgba(0, 123, 255, 0.05); }
+    .page-link { border: none; color: #6c757d; font-weight: 500; padding: 0.5rem 1rem; transition: all 0.3s ease; }
+    .page-link:hover { background-color: #e9ecef; color: #495057; }
+    .page-item.active .page-link { background-color: #007bff; color: white; }
+    .btn-toolbar .btn-group { margin-bottom: 0.5rem; }
+    @media (max-width: 768px) {
+        .btn-toolbar { flex-direction: column; align-items: stretch; }
+        .btn-group { width: 100%; margin-bottom: 0.5rem; }
+        .btn-group .btn { flex: 1; }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // --- Bulk Delete Logic ---
+    const selectAllCheckbox = $('#select-all-checkbox');
+    const employeeCheckboxes = $('.employee-checkbox');
+    const bulkDeleteBtn = $('#bulk-delete-btn');
+
+    function toggleDeleteButton() {
+        const anyChecked = employeeCheckboxes.is(':checked');
+        bulkDeleteBtn.prop('disabled', !anyChecked);
+    }
+
+    selectAllCheckbox.on('change', function() {
+        employeeCheckboxes.prop('checked', this.checked);
+        toggleDeleteButton();
+    });
+
+    employeeCheckboxes.on('change', function() {
+        if (!this.checked) {
+            selectAllCheckbox.prop('checked', false);
+        } else {
+            if (employeeCheckboxes.length === $('.employee-checkbox:checked').length) {
+                selectAllCheckbox.prop('checked', true);
+            }
+        }
+        toggleDeleteButton();
+    });
+
+    $('#confirm-delete-button').on('click', function() {
+        $('#bulk-delete-form').submit();
+    });
+
+    // --- AJAX Logic for Sync/Fetch Buttons ---
+    function handleAjaxClick(buttonId, url, successMessage) {
+        $(buttonId).on('click', function(e) {
+            e.preventDefault();
+            
+            const $this = $(this);
+            const originalHtml = $this.html();
+            let timerInterval;
+            let seconds = 0;
+
+            $this.prop('disabled', true);
+            $this.removeClass('btn-outline-warning btn-outline-info').addClass('btn-secondary');
+
+            timerInterval = setInterval(function() {
+                seconds++;
+                const timerText = `(${seconds} ثانية)`;
+                $this.html(`<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>جاري التنفيذ... ${timerText}`);
+            }, 1000);
+
+            $.ajax({
+                url: url,
+                type: 'GET',
+                dataType: 'json',
+                success: function(data) {
+                    alert(successMessage + '\n\n' + data.message);
+                    location.reload();
+                },
+                error: function(xhr, status, error) {
+                    let errorMessage = 'حدث خطأ غير متوقع.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMessage = xhr.responseJSON.message;
+                    }
+                    alert('خطأ!\n\n' + errorMessage);
+                },
+                complete: function() {
+                    clearInterval(timerInterval);
+                    $this.prop('disabled', false).removeClass('btn-secondary').html(originalHtml);
+                    if (buttonId === '#sync-employees-btn') {
+                        $this.addClass('btn-outline-warning');
+                    } else if (buttonId === '#fetch-attendance-btn') {
+                        $this.addClass('btn-outline-info');
+                    }
+                }
+            });
+        });
+    }
+
+    // Initialize tooltips and attach AJAX handlers
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+
+    handleAjaxClick('#fetch-attendance-btn', "{% url 'hr:fetch_attendance_data' %}", 'تم سحب بيانات الحضور بنجاح!');
+    handleAjaxClick('#sync-employees-btn', "{% url 'hr:sync_employees' %}", 'تمت مزامنة الموظفين بنجاح!');
+});
+</script>
+{% endblock %}

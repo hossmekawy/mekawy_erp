@@ -2,78 +2,30 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block title %}{% if object %}تعديل حركة المخزون{% else %}إضافة حركة مخزون{% endif %}{% endblock %}
+{% block title %}
+    {% if object %}تعديل حركة المخزون{% else %}إضافة حركة مخزون{% endif %}
+{% endblock %}
 
 {% block warehouse_content %}
-<div class="container-fluid">
+<div class="container mt-4">
     <div class="row">
-        <div class="col-md-8 mx-auto">
-            <div class="card">
-                <div class="card-header">
-                    <h4>{% if object %}تعديل حركة المخزون{% else %}إضافة حركة مخزون جديدة{% endif %}</h4>
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">{% if object %}تعديل حركة المخزون{% else %}إضافة حركة مخزون جديدة{% endif %}</h4>
                 </div>
                 <div class="card-body">
-                    <form method="post" novalidate>
+                    <form method="post" novalidate id="movementForm">
                         {% csrf_token %}
                         
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="{{ form.stock_item.id_for_label }}" class="form-label">عنصر المخزون *</label>
-                                {{ form.stock_item }}
-                                {% if form.stock_item.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.stock_item.errors.0 }}
-                                </div>
-                                {% endif %}
-                            </div>
-                            <div class="col-md-6">
-                                <label for="{{ form.movement_type.id_for_label }}" class="form-label">نوع الحركة *</label>
-                                {{ form.movement_type }}
-                                {% if form.movement_type.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.movement_type.errors.0 }}
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
+                        {{ form|crispy }}
                         
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="{{ form.quantity.id_for_label }}" class="form-label">الكمية *</label>
-                                {{ form.quantity }}
-                                {% if form.quantity.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.quantity.errors.0 }}
-                                </div>
-                                {% endif %}
-                            </div>
-                            <div class="col-md-6">
-                                <label for="{{ form.reference_number.id_for_label }}" class="form-label">رقم المرجع</label>
-                                {{ form.reference_number }}
-                                {% if form.reference_number.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.reference_number.errors.0 }}
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="{{ form.notes.id_for_label }}" class="form-label">ملاحظات</label>
-                            {{ form.notes }}
-                            {% if form.notes.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.notes.errors.0 }}
-                            </div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="d-flex justify-content-between">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> حفظ
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="submit" class="btn btn-primary px-4">
+                                <i class="fas fa-save me-2"></i> حفظ
                             </button>
                             <a href="{% url 'warehouses:movement_list' %}" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left"></i> رجوع
+                                <i class="fas fa-times me-2"></i> إلغاء
                             </a>
                         </div>
                     </form>
@@ -85,33 +37,53 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Add form validation
-    const form = document.querySelector('form');
-    const quantityInput = document.getElementById('{{ form.quantity.id_for_label }}');
-    const movementTypeSelect = document.getElementById('{{ form.movement_type.id_for_label }}');
-    const stockItemSelect = document.getElementById('{{ form.stock_item.id_for_label }}');
-    
-    // Validate quantity based on movement type and available stock
-    function validateQuantity() {
-        const quantity = parseFloat(quantityInput.value);
-        const movementType = movementTypeSelect.value;
+    const form = document.getElementById('movementForm');
+    if (!form) return;
+
+    // --- Get form elements ---
+    // Note: Crispy Forms generates predictable IDs, typically 'id_field_name'
+    const stockItemSelect = document.getElementById('id_stock_item');
+    const movementTypeSelect = document.getElementById('id_movement_type');
+    const quantityInput = document.getElementById('id_quantity');
+
+    // --- Function to validate stock for 'out' movements ---
+    const validateStockQuantity = () => {
+        // Only run validation for 'out' movements
+        if (movementTypeSelect.value !== 'out') {
+            quantityInput.setCustomValidity(''); // Clear previous custom errors
+            return;
+        }
         
-        if (movementType === 'out' && stockItemSelect.selectedOptions.length > 0) {
-            const availableQuantity = parseFloat(stockItemSelect.selectedOptions[0].dataset.available || 0);
-            
-            if (quantity > availableQuantity) {
-                quantityInput.setCustomValidity(`الكمية المتاحة هي ${availableQuantity} فقط`);
-                quantityInput.classList.add('is-invalid');
+        const selectedOption = stockItemSelect.options[stockItemSelect.selectedIndex];
+        if (!selectedOption) {
+            quantityInput.setCustomValidity('');
+            return;
+        }
+
+        // Get available quantity from the 'data-available' attribute on the selected option
+        const availableQuantity = parseFloat(selectedOption.dataset.available);
+        const requestedQuantity = parseFloat(quantityInput.value);
+
+        // Check if data is valid for comparison
+        if (!isNaN(availableQuantity) && !isNaN(requestedQuantity)) {
+            if (requestedQuantity > availableQuantity) {
+                // Set a custom error message that the browser will display on submit
+                quantityInput.setCustomValidity(`الكمية المطلوبة أكبر من الرصيد المتاح (${availableQuantity})`);
             } else {
+                // If quantity is valid, clear the custom error message
                 quantityInput.setCustomValidity('');
-                quantityInput.classList.remove('is-invalid');
             }
         }
-    }
-    
-    quantityInput.addEventListener('input', validateQuantity);
-    movementTypeSelect.addEventListener('change', validateQuantity);
-    stockItemSelect.addEventListener('change', validateQuantity);
+    };
+
+    // --- Attach event listeners ---
+    // We listen for changes on all three relevant fields
+    stockItemSelect?.addEventListener('change', validateStockQuantity);
+    movementTypeSelect?.addEventListener('change', validateStockQuantity);
+    quantityInput?.addEventListener('input', validateStockQuantity);
+
+    // Initial validation check in case the form is pre-filled (e.g., on edit)
+    validateStockQuantity();
 });
 </script>
 {% endblock %}

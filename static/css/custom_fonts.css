@@ -1,0 +1,112 @@
+/*
+==================================
+ Cairo Font (Corrected Paths)
+==================================
+*/
+
+@font-face {
+    font-family: 'Cairo';
+    font-style: normal;
+    font-weight: 400;
+    /* Regular */
+    src: url('../fonts/Cairo/Cairo-Regular.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Cairo';
+    font-style: normal;
+    font-weight: 700;
+    /* Bold */
+    src: url('../fonts/Cairo/Cairo-Bold.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Cairo';
+    font-style: normal;
+    font-weight: 300;
+    /* Light */
+    src: url('../fonts/Cairo/Cairo-Light.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Cairo';
+    font-style: normal;
+    font-weight: 500;
+    /* Medium */
+    src: url('../fonts/Cairo/Cairo-Medium.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Cairo';
+    font-style: normal;
+    font-weight: 900;
+    /* Black */
+    src: url('../fonts/Cairo/Cairo-Black.ttf') format('truetype');
+}
+
+
+/*
+==================================
+ Tajawal Font (Corrected Paths)
+==================================
+*/
+
+@font-face {
+    font-family: 'Tajawal';
+    font-style: normal;
+    font-weight: 400;
+    /* Regular */
+    src: url('../fonts/Tajawal/Tajawal-Regular.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Tajawal';
+    font-style: normal;
+    font-weight: 700;
+    /* Bold */
+    src: url('../fonts/Tajawal/Tajawal-Bold.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Tajawal';
+    font-style: normal;
+    font-weight: 500;
+    /* Medium */
+    src: url('../fonts/Tajawal/Tajawal-Medium.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Tajawal';
+    font-style: normal;
+    font-weight: 300;
+    /* Light */
+    src: url('../fonts/Tajawal/Tajawal-Light.ttf') format('truetype');
+}
+
+
+/*
+==================================
+ Amiri Font (Using standard .ttf filename)
+==================================
+*/
+
+@font-face {
+    font-family: 'Amiri';
+    font-style: normal;
+    font-weight: 400;
+    src: url('../fonts/Amiri/Amiri-Regular.ttf') format('truetype');
+}
+
+
+/*
+==================================
+ Noto Sans Arabic Font (Using standard .ttf filename)
+==================================
+*/
+
+@font-face {
+    font-family: 'Noto Sans Arabic';
+    font-style: normal;
+    font-weight: 400;
+    src: url('../fonts/Noto_Sans_Arabic/NotoSansArabic-Regular.ttf') format('truetype');
+}

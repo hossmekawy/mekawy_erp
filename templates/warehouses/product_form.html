@@ -71,7 +71,6 @@
 
 {% block content %}
 <div class="container-fluid">
-    <!-- Page Header -->
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <h1 class="h3 mb-0 text-gray-800">
             <i class="fas fa-box-open text-primary"></i>
@@ -82,13 +81,11 @@
     <form method="post" id="productForm" novalidate>
         {% csrf_token %}
         <div class="row">
-            <!-- Main Form Column -->
             <div class="col-lg-8">
                 <div class="card">
                     <div class="card-header"><i class="fas fa-pencil-alt me-2"></i> بيانات المنتج</div>
                     <div class="card-body p-4">
 
-                        <!-- Basic Information -->
                         <fieldset>
                             <legend>البيانات الأساسية</legend>
                             <div class="row">
@@ -125,7 +122,6 @@
                             </div>
                         </fieldset>
 
-                        <!-- Dynamic sections based on Product Type -->
                         <div id="fabric-fields" class="dynamic-section">
                             <fieldset>
                                 <legend>بيانات القماش</legend>
@@ -157,9 +153,23 @@
                                         <label for="{{ form.colors.id_for_label }}" class="form-label">{{ form.colors.label }}</label>
                                         {% render_field form.colors class+="form-control" placeholder="أزرق, أحمر, أخضر" %}
                                     </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label for="{{ form.size_group.id_for_label }}" class="form-label">{{ form.size_group.label }}</label>
-                                        {% render_field form.size_group class+="form-select" %}
+                                    <div class="col-md-12 mb-3">
+                                        <label class="form-label">{{ form.size_groups.label }}</label>
+                                        <div class="card p-3 bg-light border">
+                                            <div class="row">
+                                                {% for choice in form.size_groups %}
+                                                <div class="col-md-4">
+                                                    <div class="form-check">
+                                                        {{ choice.tag }}
+                                                        <label class="form-check-label" for="{{ choice.id_for_label }}">
+                                                            {{ choice.choice_label }}
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                         {% for error in form.size_groups.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <label for="{{ form.fabric_quantity_per_piece.id_for_label }}" class="form-label">{{ form.fabric_quantity_per_piece.label }}</label>
@@ -169,7 +179,6 @@
                             </fieldset>
                         </div>
                         
-                        <!-- Units and Stock -->
                         <fieldset>
                             <legend>الوحدات والتسعير</legend>
                             <div class="row">
@@ -201,9 +210,7 @@
                 </div>
             </div>
 
-            <!-- Side Column -->
             <div class="col-lg-4">
-                <!-- Actions Card -->
                 <div class="card mb-4">
                     <div class="card-header"><i class="fas fa-cogs me-2"></i> الإجراءات</div>
                     <div class="card-body">
@@ -251,8 +258,19 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = {};
             formFields.forEach(field => {
                 if (field.name) {
-                    if (field.type === 'checkbox') {
-                        data[field.name] = field.checked;
+                    if (field.type === 'checkbox' || field.type === 'radio') {
+                        // For checkboxes and radios, we need to handle them differently
+                        if (field.checked) {
+                            if (data[field.name]) {
+                                if (Array.isArray(data[field.name])) {
+                                    data[field.name].push(field.value);
+                                } else {
+                                    data[field.name] = [data[field.name], field.value];
+                                }
+                            } else {
+                                data[field.name] = field.value;
+                            }
+                        }
                     } else {
                         data[field.name] = field.value;
                     }
@@ -268,8 +286,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = JSON.parse(savedData);
                 formFields.forEach(field => {
                     if (field.name && data[field.name] !== undefined) {
-                        if (field.type === 'checkbox') {
-                            field.checked = data[field.name];
+                         if (field.type === 'checkbox' || field.type === 'radio') {
+                            if (Array.isArray(data[field.name])) {
+                                field.checked = data[field.name].includes(field.value);
+                            } else {
+                                field.checked = data[field.name] === field.value;
+                            }
                         } else {
                             field.value = data[field.name];
                         }
@@ -282,6 +304,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         function clearFormData() {
             localStorage.removeItem(localStorageKey);
+
+            // Manually uncheck all checkboxes for size_groups
+            const sizeGroupCheckboxes = document.querySelectorAll('input[name="size_groups"]');
+            sizeGroupCheckboxes.forEach(cb => cb.checked = false);
+
             productForm.reset();
             productTypeSelect.dispatchEvent(new Event('change')); // Reset dynamic fields
             alert('تم مسح بيانات النموذج.');

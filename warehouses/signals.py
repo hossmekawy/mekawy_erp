@@ -113,18 +113,21 @@ def process_stock_transfer(transfer):
         transfer.save()
         send_transfer_error_notification(transfer, str(e))
 
-# --- KEPT: This signal is useful for automatically creating stock records. ---
-@receiver(post_save, sender=Product)
-def create_initial_stock_items(sender, instance, created, **kwargs):
-    """Creates initial stock items for a new product in all warehouses."""
-    if created:
-        warehouses = Warehouse.objects.filter(is_active=True)
-        for warehouse in warehouses:
-            StockItem.objects.get_or_create(
-                warehouse=warehouse,
-                product=instance,
-                defaults={'quantity': 0}
-            )
+# --- MODIFIED: This signal is now disabled as per your request. ---
+# It no longer automatically creates stock items for a new product in all warehouses.
+# You can now manually create stock items using the 'Add Stock' feature.
+#
+# @receiver(post_save, sender=Product)
+# def create_initial_stock_items(sender, instance, created, **kwargs):
+#     """Creates initial stock items for a new product in all warehouses."""
+#     if created:
+#         warehouses = Warehouse.objects.filter(is_active=True)
+#         for warehouse in warehouses:
+#             StockItem.objects.get_or_create(
+#                 warehouse=warehouse,
+#                 product=instance,
+#                 defaults={'quantity': 0}
+#             )
 
 # --- KEPT: This signal automatically generates transfer numbers. ---
 @receiver(pre_save, sender=StockTransfer)

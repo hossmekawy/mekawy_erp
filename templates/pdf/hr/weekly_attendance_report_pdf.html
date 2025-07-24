@@ -1,0 +1,66 @@
+{% extends "pdf/base_pdf.html" %}
+
+{% block pdf_title %}تقرير الحضور الأسبوعي{% endblock %}
+
+{% block document_main_title %}
+    تقرير الحضور والغياب الأسبوعي
+{% endblock %}
+
+{% block pdf_header %}
+    <h1>تقرير الحضور والغياب الأسبوعي</h1>
+    <div class="meta-info">
+        الأسبوع من {{ week_start_date|date:"d-m-Y" }} إلى {{ week_end_date|date:"d-m-Y" }}
+    </div>
+{% endblock %}
+
+
+{% block pdf_content %}
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background-color: #f2f2f2;">
+                <th style="border: 1px solid #ccc; padding: 8px; font-weight: bold;">اسم الموظف</th>
+                {% for day in week_dates %}
+                    <th style="border: 1px solid #ccc; padding: 8px; font-weight: bold; text-align: center;">
+                        {% if day.weekday == 5 %}السبت{% elif day.weekday == 6 %}الأحد{% elif day.weekday == 0 %}الاثنين{% elif day.weekday == 1 %}الثلاثاء{% elif day.weekday == 2 %}الأربعاء{% elif day.weekday == 3 %}الخميس{% elif day.weekday == 4 %}الجمعة{% endif %}
+                        <br>
+                        <small style="font-weight: normal;">{{ day|date:"d-m" }}</small>
+                    </th>
+                {% endfor %}
+                <th style="border: 1px solid #ccc; padding: 8px; font-weight: bold;">ملخص الأسبوع</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for employee, data in report_data.items %}
+                <tr>
+                    <td style="border: 1px solid #ccc; padding: 8px;">{{ employee.full_name }}</td>
+                    {% for day_date, day_info in data.daily_records.items %}
+                        <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">
+                            {% if day_info.record and day_info.record.check_in %}
+                                <div style="color: #006400;">{{ day_info.record.check_in|date:'H:i' }}</div>
+                                {% if day_info.record.check_out %}
+                                    <div style="color: #d93025;">{{ day_info.record.check_out|date:'H:i' }}</div>
+                                {% else %}
+                                    <div style="color: #f9ab00;">بصمة ناقصة</div>
+                                {% endif %}
+                            {% else %}
+                                <div style="color: #5f6368;">{{ day_info.status }}</div>
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                    <td style="border: 1px solid #ccc; padding: 8px; text-align: right; font-size: 11pt; line-height: 1.4;">
+                        <div><strong>الحضور:</strong> {{ data.summary.attended_days }}/{{ work_days_in_week }}</div>
+                        <div><strong>التأخير:</strong> {{ data.summary.lateness_str }}</div>
+                        <hr style="border: none; border-top: 1px solid #eee; margin: 4px 0;">
+                        <div>تأخير: {{ data.summary.late_days }} | نصف يوم: {{ data.summary.half_days }} | غياب: {{ data.summary.absent_days }}</div>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="{{ week_dates|length|add:2 }}" style="text-align: center; padding: 12px;">
+                        لا توجد سجلات حضور في هذا الأسبوع.
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

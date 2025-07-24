@@ -155,9 +155,6 @@
 
 
 {% block production_content %}
-    <!-- ============================================= -->
-    <!-- === Master Production Workflow Panel      === -->
-    <!-- ============================================= -->
     <div class="workflow-panel">
         <div class="workflow-header">
             <h4><i class="fas fa-project-diagram me-2"></i>مراحل سير عمل الأمر</h4>
@@ -167,13 +164,11 @@
         {% with current_index=status_list|index_of:order.status %}
 
         <div class="workflow-tracker">
-            <!-- Step: Approved -->
             <div class="workflow-step {% if current_index >= 2 %}completed{% endif %} {% if order.status == 'approved' %}active{% endif %}">
                 <div class="step-icon"><i class="fas fa-check-double"></i></div>
                 <div class="step-label">معتمد</div>
             </div>
 
-            <!-- Step: Cutting -->
             <div class="workflow-step {% if current_index >= 3 %}completed{% endif %} {% if order.status == 'in_cutting' %}active{% endif %}">
                 {% if order.status == 'approved' %}
                     <a href="{% url 'production:cutting_create' %}?order_id={{ order.pk }}" class="step-link" title="بدء عملية القص">
@@ -191,7 +186,6 @@
                 {% endif %}
             </div>
 
-            <!-- Step: Assembly -->
             <div class="workflow-step {% if current_index >= 4 %}completed{% endif %} {% if order.status == 'in_assembly' %}active{% endif %}">
                 {% if order.status == 'in_assembly' and not order.assembly_processes.exists %}
                      <a href="{% url 'production:assembly_create' %}?order_id={{ order.pk }}" class="step-link" title="بدء عملية التجميع">
@@ -209,7 +203,6 @@
                 {% endif %}
             </div>
             
-            <!-- Step: Dyeing -->
             <div class="workflow-step {% if current_index >= 5 %}completed{% endif %} {% if order.status == 'in_dyeing' %}active{% endif %}">
                 {% with assembly_process=order.assembly_processes.first %}
                     {% if order.status == 'in_dyeing' and assembly_process and not assembly_process.dyeing_processes.exists %}
@@ -229,7 +222,6 @@
                 {% endwith %}
             </div>
 
-            <!-- Step: Finishing -->
             <div class="workflow-step {% if current_index >= 6 %}completed{% endif %} {% if order.status == 'in_finishing' %}active{% endif %}">
                 {% with dyeing_process=order.assembly_processes.first.dyeing_processes.first %}
                     {% if order.status == 'in_finishing' and dyeing_process and not dyeing_process.finishing_process %}
@@ -249,7 +241,6 @@
                 {% endwith %}
             </div>
 
-            <!-- Step: Completed -->
             <div class="workflow-step {% if order.status == 'completed' %}completed active{% endif %}">
                 <div class="step-icon"><i class="fas fa-star"></i></div>
                 <div class="step-label">مكتمل</div>
@@ -283,7 +274,6 @@
 
 
     <div class="row">
-        <!-- Main Details Column -->
         <div class="col-lg-8">
             <div class="production-card mb-4">
                 <div class="production-card-header d-flex justify-content-between">
@@ -294,12 +284,49 @@
                         <div class="col-md-4 mb-3"><strong>رقم الأمر:</strong><p>{{ order.order_number }}</p></div>
                         <div class="col-md-4 mb-3"><strong>رقم الباتش:</strong><p>{{ order.batch_number }}</p></div>
                         <div class="col-md-4 mb-3"><strong>الأولوية:</strong><p><span class="badge bg-{{ order.priority|status_color }}">{{ order.get_priority_display }}</span></p></div>
+
                         <div class="col-md-4 mb-3"><strong>المنتج:</strong><p><a href="#">{{ order.product.name }}</a></p></div>
-                        <div class="col-md-4 mb-3"><strong>الكمية المطلوبة:</strong><p>{{ order.quantity_ordered }} قطعة</p></div>
-                        <div class="col-md-4 mb-3"><strong>القماش المخصص:</strong><p>{{ order.fabric_meters_allocated }} متر</p></div>
+<div class="col-md-4 mb-3">
+    <strong>مجموعة المقاسات:</strong>
+    <p>
+        {% if order.product.size_groups.all %}
+            {% for sg in order.product.size_groups.all %}
+                {{ sg.name }}{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+        {% else %}
+            غير محدد
+        {% endif %}
+    </p>
+</div>                        <div class="col-md-4 mb-3"><strong>الكمية المطلوبة:</strong><p>{{ order.quantity_ordered }} قطعة</p></div>
+
+                        <div class="col-md-12 mb-3">
+    <strong>المقاسات:</strong>
+    <p class="mb-0">
+        {% with all_sizes="" %}
+            {% for sg in order.product.size_groups.all %}
+                {% for sz in sg.sizes %}
+                    {{ sz }}{% if not forloop.last or not forloop.parentloop.last %}, {% endif %}
+                {% endfor %}
+            {% empty %}
+                -
+            {% endfor %}
+        {% endwith %}
+    </p>
+</div>
+                        <div class="col-md-12 mb-3">
+                            <strong>تفاصيل القماش:</strong>
+                            <p class="mb-0 lh-sm">
+                                <span class="me-3"><i class="fas fa-layer-group text-muted"></i> {{ order.textile_stock.product.name }}</span>
+                                <span class="me-3"><small class="text-muted">المخصص: {{ order.fabric_meters_allocated }} متر</small></span>
+                                {% if order.cutting_process and order.cutting_process.total_fabric_used > 0 %}
+                                    <span class="me-3"><small class="text-success fw-bold">المستخدم فعلياً: {{ order.cutting_process.total_fabric_used }} متر</small></span>
+                                {% endif %}
+                            </p>
+                        </div>
+
                         <div class="col-md-4 mb-3"><strong>تاريخ البدء:</strong><p>{{ order.start_date|date:"Y-m-d" }}</p></div>
                         <div class="col-md-4 mb-3"><strong>الإنجاز المتوقع:</strong><p>{{ order.expected_completion_date|date:"Y-m-d" }}</p></div>
-                         {% if order.actual_completion_date %}
+                        {% if order.actual_completion_date %}
                         <div class="col-md-4 mb-3"><strong>الإنجاز الفعلي:</strong><p class="text-success">{{ order.actual_completion_date|date:"Y-m-d" }}</p></div>
                         {% endif %}
                     </div>
@@ -311,7 +338,6 @@
                 </div>
             </div>
 
-            <!-- Bill of Materials Used -->
             <div class="production-card mb-4">
                 <div class="production-card-header">
                     <i class="fas fa-cogs me-2"></i>
@@ -360,7 +386,6 @@
             </div>
         </div>
 
-        <!-- Sidebar Column -->
         <div class="col-lg-4">
             <div class="production-card mb-4">
                  <div class="production-card-header">

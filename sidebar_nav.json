@@ -82,6 +82,23 @@
             }
         }
     },
+    "الموارد_البشرية": {
+    "title": "الموارد البشرية",
+    "icon": "fas fa-users",
+    "roles": ["admin", "manager"],
+    "submenu": {
+        "قائمة_الموظفين": {
+            "url_name": "hr:employee_list",
+            "icon": "fas fa-user-friends",
+            "roles": ["admin", "manager", "employee"]
+        },
+        "إضافة_موظف": {
+            "url_name": "hr:employee_create",
+            "icon": "fas fa-user-plus",
+            "roles": ["admin", "manager"]
+        }
+    }
+},
     "الماليات والتقييم": {
         "title": "الماليات والتقييم",
         "icon": "fas fa-coins",
@@ -96,6 +113,55 @@
                 "url_name": "suppliers:all_ratings",
                 "icon": "fas fa-star-half-alt",
                 "roles": ["admin", "manager", "employee"]
+            }
+        }
+    },
+    "المالية": {
+        "title": "المالية",
+        "icon": "fas fa-coins",
+        "roles": ["admin", "manager"],
+        "submenu": {
+            "لوحة التحكم المالية": {
+                "url_name": "finance:dashboard",
+                "icon": "fas fa-chart-pie",
+                "roles": ["admin", "manager"]
+            },
+            "دليل الحسابات": {
+                "url_name": "finance:chart_of_accounts",
+                "icon": "fas fa-sitemap",
+                "roles": ["admin", "manager"]
+            },
+            "دفتر اليومية العام": {
+                "url_name": "finance:journal",
+                "icon": "fas fa-book",
+                "roles": ["admin", "manager"]
+            },
+            "الفواتير": {
+                "url_name": "finance:invoice_list",
+                "icon": "fas fa-file-invoice-dollar",
+                "roles": ["admin", "manager"]
+            },
+            "المدفوعات": {
+                "url_name": "finance:payment_list",
+                "icon": "fas fa-money-bill-wave",
+                "roles": ["admin", "manager"]
+            },
+            "التقارير المالية": {
+                "title": "التقارير المالية",
+                "icon": "fas fa-file-signature",
+                "roles": ["admin", "manager"],
+                "submenu": {
+                    "قائمة الدخل": {
+                        "url_name": "finance:income_statement",
+                        "icon": "fas fa-file-invoice",
+                        "roles": ["admin", "manager"]
+                    },
+                    "الميزانية العمومية": {
+                        "url_name": "finance:balance_sheet",
+                        "icon": "fas fa-balance-scale",
+                        "roles": ["admin", "manager"]
+                    }
+                }
             }
         }
     },
@@ -338,6 +404,7 @@
             }
         }
     },
+    
     "الإعدادات": {
         "الإعدادات العامة": {
             "url_name": "settings:general",

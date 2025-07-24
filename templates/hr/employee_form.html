@@ -1,0 +1,444 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    .card-header {
+        background-color: #f8f9fc;
+        border-bottom: 1px solid #e3e6f0;
+    }
+    .image-preview-container {
+        border: 2px dashed #ddd;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        background-color: #f8f9fc;
+        margin: auto;
+    }
+    .profile-pic-container {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+    }
+    .id-pic-container {
+        width: 250px;
+        height: 150px;
+        border-radius: 10px;
+    }
+    .image-preview {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    /* Custom Toggle Switch Styles */
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 34px;
+    }
+    .switch input { 
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 34px;
+    }
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 26px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+    input:checked + .slider {
+        background-color: #1cc88a; /* Success Green */
+    }
+    input:focus + .slider {
+        box-shadow: 0 0 1px #1cc88a;
+    }
+    input:checked + .slider:before {
+        transform: translateX(26px);
+    }
+    .countdown-timer {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #0d6efd;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">{{ page_title }}</h1>
+        <a href="{% url 'hr:employee_list' %}" class="btn btn-secondary shadow-sm">
+            <i class="fas fa-arrow-left fa-sm"></i> العودة إلى القائمة
+        </a>
+    </div>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="row">
+            <!-- Form Fields Column -->
+            <div class="col-lg-8">
+                <!-- Basic Information Card -->
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">المعلومات الأساسية</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 form-group">
+                                {{ form.full_name.label_tag }}
+                                {{ form.full_name }}
+                            </div>
+                            <div class="col-md-6 form-group">
+                                {{ form.employee_id.label_tag }}
+                                {{ form.employee_id }}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 form-group">
+                                <label for="{{ form.department.id_for_label }}" class="form-label">{{ form.department.label }}</label>
+                                <div class="input-group">
+                                    {{ form.department }}
+                                    <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#addDepartmentModal">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-6 form-group">
+                                {{ form.job_title.label_tag }}
+                                {{ form.job_title }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contact & Personal Info Card -->
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">معلومات الاتصال والمعلومات الشخصية</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 form-group">
+                                {{ form.phone_number.label_tag }}
+                                {{ form.phone_number }}
+                            </div>
+                            <div class="col-md-6 form-group">
+                                {{ form.email.label_tag }}
+                                {{ form.email }}
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            {{ form.address.label_tag }}
+                            {{ form.address }}
+                        </div>
+                         <div class="row">
+                            <div class="col-md-6 form-group">
+                                {{ form.gender.label_tag }}
+                                {{ form.gender }}
+                            </div>
+                            <div class="col-md-6 form-group">
+                                {{ form.birth_date.label_tag }}
+                                {{ form.birth_date }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Job & Schedule Info Card -->
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">المعلومات الوظيفية والدوام</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 form-group">
+                                {{ form.hire_date.label_tag }}
+                                {{ form.hire_date }}
+                            </div>
+                            <div class="col-md-6 form-group">
+                                {{ form.salary.label_tag }}
+                                {{ form.salary }}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 form-group">
+                                {{ form.work_start_time.label_tag }}
+                                {{ form.work_start_time }}
+                            </div>
+                             <div class="col-md-6 form-group">
+                                {{ form.work_end_time.label_tag }}
+                                {{ form.work_end_time }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Official Documents Card -->
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">المستندات الرسمية (اختياري)</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 form-group text-center">
+                                {{ form.id_face_image.label_tag }}
+                                <div class="image-preview-container id-pic-container mb-3">
+                                    <i id="idFacePlaceholder" class="fas fa-id-card fa-5x text-gray-400" {% if employee.id_face_image %}style="display:none;"{% endif %}></i>
+                                    <img id="idFacePreview" src="{% if employee.id_face_image %}{{ employee.id_face_image.url }}{% endif %}" alt="ID Face Preview" class="image-preview" {% if not employee.id_face_image %}style="display:none;"{% endif %}>
+                                </div>
+                                {{ form.id_face_image }}
+                            </div>
+                            <div class="col-md-6 form-group text-center">
+                                {{ form.id_back_image.label_tag }}
+                                <div class="image-preview-container id-pic-container mb-3">
+                                    <i id="idBackPlaceholder" class="fas fa-id-card fa-5x text-gray-400" {% if employee.id_back_image %}style="display:none;"{% endif %}></i>
+                                    <img id="idBackPreview" src="{% if employee.id_back_image %}{{ employee.id_back_image.url }}{% endif %}" alt="ID Back Preview" class="image-preview" {% if not employee.id_back_image %}style="display:none;"{% endif %}>
+                                </div>
+                                {{ form.id_back_image }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Profile Picture and Status Column -->
+            <div class="col-lg-4">
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-primary">الصورة الشخصية والحالة</h6>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="image-preview-container profile-pic-container mb-3">
+                            <i id="imagePlaceholder" class="fas fa-user fa-5x text-gray-400" {% if employee.photo %}style="display:none;"{% endif %}></i>
+                            <img id="imagePreview" src="{% if employee.photo %}{{ employee.photo.url }}{% endif %}" alt="Profile Preview" class="image-preview" {% if not employee.photo %}style="display:none;"{% endif %}>
+                        </div>
+                        <div class="form-group">
+                            {{ form.photo }}
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-center align-items-center">
+                            <label class="switch">
+                                {{ form.is_active }}
+                                <span class="slider"></span>
+                            </label>
+                            <label class="ms-3" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card shadow">
+                    <div class="card-body d-grid gap-2">
+                         <button type="submit" class="btn btn-primary btn-lg">{{ button_text }}</button>
+                         {% if employee %}
+                         <button type="button" id="enroll-fingerprint-btn" class="btn btn-info btn-lg" data-enroll-url="{% url 'hr:employee_enroll_fingerprint' employee.id %}">
+                             <i class="fas fa-fingerprint"></i> تسجيل بصمة
+                         </button>
+                         {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Add Department Modal -->
+<div class="modal fade" id="addDepartmentModal" tabindex="-1" aria-labelledby="addDepartmentModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addDepartmentModalLabel">إضافة قسم جديد</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="addDepartmentForm" action="{% url 'hr:department_create' %}" method="post">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label for="id_department_name" class="form-label">اسم القسم</label>
+                <input type="text" name="name" class="form-control" id="id_department_name" required>
+                <div class="invalid-feedback" id="department-error"></div>
+            </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+        <button type="button" class="btn btn-primary" id="saveDepartmentBtn">حفظ القسم</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Enrollment Status Modal -->
+<div class="modal fade" id="enrollmentStatusModal" tabindex="-1" aria-labelledby="enrollmentStatusModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="enrollmentStatusModalLabel">الجهاز جاهز للتسجيل</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center">
+        <i class="fas fa-fingerprint fa-4x text-info mb-3"></i>
+        <div id="modal-status-message"></div>
+        <p>يرجى وضع الإصبع على الماسح الضوئي في الجهاز الآن.</p>
+        <p class="text-muted">سيتم إلغاء العملية تلقائياً بعد:</p>
+        <div id="countdown-timer" class="countdown-timer">60</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Generic function for live image preview
+    function readURL(input, previewElement, placeholderElement) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                $(placeholderElement).hide();
+                $(previewElement).attr('src', e.target.result).show();
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    // Live preview for profile picture
+    $('#{{ form.photo.id_for_label }}').on('change', function() {
+        readURL(this, '#imagePreview', '#imagePlaceholder');
+    });
+
+    // Live preview for ID Face picture
+    $('#{{ form.id_face_image.id_for_label }}').on('change', function() {
+        readURL(this, '#idFacePreview', '#idFacePlaceholder');
+    });
+
+    // Live preview for ID Back picture
+    $('#{{ form.id_back_image.id_for_label }}').on('change', function() {
+        readURL(this, '#idBackPreview', '#idBackPlaceholder');
+    });
+
+    // Handle saving new department from modal
+    $('#saveDepartmentBtn').on('click', function() {
+        var form = $('#addDepartmentForm');
+        var url = form.attr('action');
+        var data = form.serialize();
+        var nameInput = $('#id_department_name');
+        var errorDiv = $('#department-error');
+
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: data,
+            success: function(response) {
+                if (response.status === 'success') {
+                    var newOption = new Option(response.department.name, response.department.id, true, true);
+                    $('#{{ form.department.id_for_label }}').append(newOption).trigger('change');
+                    var modal = bootstrap.Modal.getInstance(document.getElementById('addDepartmentModal'));
+                    modal.hide();
+                    form[0].reset();
+                    nameInput.removeClass('is-invalid');
+                }
+            },
+            error: function(xhr) {
+                if (xhr.status === 400) {
+                    var errors = xhr.responseJSON.errors;
+                    if (errors.name) {
+                        nameInput.addClass('is-invalid');
+                        errorDiv.text(errors.name);
+                    }
+                } else {
+                    alert('An unexpected error occurred.');
+                }
+            }
+        });
+    });
+
+    // Clear modal errors when it's closed
+    $('#addDepartmentModal').on('hidden.bs.modal', function () {
+        $('#addDepartmentForm')[0].reset();
+        $('#id_department_name').removeClass('is-invalid');
+    });
+
+    // --- NEW Fingerprint Enrollment Logic ---
+    let countdownInterval;
+    const enrollmentModal = new bootstrap.Modal(document.getElementById('enrollmentStatusModal'));
+    const countdownElement = document.getElementById('countdown-timer');
+    const statusMessageElement = document.getElementById('modal-status-message');
+
+    $('#enroll-fingerprint-btn').on('click', function() {
+        var $this = $(this);
+        var originalHtml = $this.html();
+        var enrollUrl = $this.data('enroll-url');
+        
+        $this.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> جاري الاتصال...');
+
+        $.ajax({
+            url: enrollUrl,
+            type: 'GET',
+            dataType: 'json',
+            success: function(data) {
+                if (data.status === 'success') {
+                    statusMessageElement.innerHTML = `<p class="lead">${data.message}</p>`;
+                    enrollmentModal.show();
+                    
+                    let timeLeft = 60;
+                    countdownElement.textContent = timeLeft;
+                    countdownInterval = setInterval(() => {
+                        timeLeft--;
+                        countdownElement.textContent = timeLeft;
+                        if (timeLeft <= 0) {
+                            clearInterval(countdownInterval);
+                            enrollmentModal.hide();
+                        }
+                    }, 1000);
+                } else {
+                    alert('خطأ: ' + data.message);
+                }
+            },
+            error: function(xhr) {
+                var errorMessage = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'حدث خطأ غير متوقع.';
+                alert('خطأ!\n\n' + errorMessage);
+            },
+            complete: function() {
+                $this.prop('disabled', false).html(originalHtml);
+            }
+        });
+    });
+
+    $('#enrollmentStatusModal').on('hidden.bs.modal', function () {
+        clearInterval(countdownInterval);
+    });
+});
+</script>
+{% endblock %}

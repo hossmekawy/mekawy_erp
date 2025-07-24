@@ -31,10 +31,10 @@ def category_size_management_view(request):
     categories_page_obj = category_paginator.get_page(category_page_number)
     
     # Get size groups with pagination
-    size_groups_list = SizeGroup.objects.all().order_by('name')
-    size_paginator = Paginator(size_groups_list, 10)
+    size_group_list = SizeGroup.objects.all().order_by('name')
+    size_paginator = Paginator(size_group_list, 10)
     size_page_number = request.GET.get('size_page', 1)
-    size_groups_page_obj = size_paginator.get_page(size_page_number)
+    size_group_page_obj = size_paginator.get_page(size_page_number)
     
     # Forms for creating new entries in the modals
     category_form = CategoryForm()
@@ -42,7 +42,7 @@ def category_size_management_view(request):
     
     context = {
         'categories': categories_page_obj,
-        'size_groups': size_groups_page_obj,
+        'size_groups': size_group_page_obj,
         'category_form': category_form,
         'size_group_form': size_group_form,
         'parent_categories': WarehouseCategory.objects.filter(is_active=True),
@@ -158,12 +158,16 @@ def update_size_group_ajax(request, size_group_id):
         })
     return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 
+
+# production/blueprints/category_size_blueprint.py
+
 @login_required
 @require_http_methods(["POST"])
 def delete_size_group_ajax(request, size_group_id):
     """Deletes a SizeGroup via an AJAX request after checking for usage."""
     size_group = get_object_or_404(SizeGroup, id=size_group_id)
-    if Product.objects.filter(size_group=size_group).exists():
+    # Corrected line
+    if Product.objects.filter(size_groups=size_group).exists():
         return JsonResponse({
             'success': False,
             'message': 'لا يمكن حذف مجموعة المقاسات لأنها مستخدمة في منتجات حالية.'
@@ -172,7 +176,6 @@ def delete_size_group_ajax(request, size_group_id):
     size_group_name = size_group.name
     size_group.delete()
     return JsonResponse({'success': True, 'message': f'تم حذف مجموعة المقاسات "{size_group_name}" بنجاح'})
-
 @login_required
 def get_size_group_ajax(request, size_group_id):
     """Fetches data for a single SizeGroup to populate an edit modal."""
@@ -194,7 +197,7 @@ def get_size_group_ajax(request, size_group_id):
 def export_size_groups(request):
     """Exports all Size Groups to a CSV file."""
     response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
-    response['Content-Disposition'] = f'attachment; filename="size_groups_{timezone.now().strftime("%Y%m%d")}.csv"'
+    response['Content-Disposition'] = f'attachment; filename="size_group_{timezone.now().strftime("%Y%m%d")}.csv"'
     
     writer = csv.writer(response)
     writer.writerow(['ID', 'اسم المجموعة', 'المقاسات', 'عدد المنتجات المستخدمة'])

@@ -28,7 +28,6 @@
                     <tr>
                         <th>اسم المصنع</th>
                         <th>الشخص المسؤول</th>
-                        <th class="text-center">سعر القطعة</th>
                         <th class="text-center">المهام النشطة</th>
                         <th class="text-center">قيمة الأعمال المكتملة</th>
                         <th class="text-center">تقييم الجودة</th>
@@ -43,12 +42,11 @@
                             <small class="text-muted">{{ manufacturer.phone }}</small>
                         </td>
                         <td>{{ manufacturer.contact_person }}</td>
-                        <td class="text-center fw-bold">{{ manufacturer.price_per_piece|intcomma }} جنيه</td>
                         <td class="text-center">
                             <span class="badge bg-warning text-dark fs-6 rounded-pill">{{ manufacturer.active_jobs_count }}</span>
                         </td>
                         <td class="text-center text-success fw-bold">
-                            {{ manufacturer.total_value_of_completed_jobs|intcomma }} جنيه
+                            {{ manufacturer.total_value_of_completed_jobs|default:0|intcomma }} جنيه 
                         </td>
                         <td class="text-center">
                              <span class="badge 
@@ -75,7 +73,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center py-5">
+                        <td colspan="6" class="text-center py-5">
                             <div class="production-empty">
                                 <i class="fas fa-industry fs-1 text-light mb-3"></i>
                                 <h5 class="mb-1">لا توجد مصانع خارجية</h5>

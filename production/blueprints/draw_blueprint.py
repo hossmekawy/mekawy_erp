@@ -124,7 +124,6 @@ def get_sizes_for_bom_ajax(request):
         except BillOfMaterials.DoesNotExist:
             pass
     return JsonResponse({'sizes': sizes})
-
 def get_draws_for_bom_ajax(request):
     bom_id = request.GET.get('bom_id')
     draws_dict = {}

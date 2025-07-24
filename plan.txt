@@ -1,0 +1,190 @@
+Detailed Plan for Finance App - Version 2.0
+1. Core Philosophy and Guiding Principles
+The system will be built entirely on the principle of Double-Entry Accounting. This is the global professional standard that ensures financial records are always balanced. For every financial transaction, there will be at least one debit entry and one credit entry, and the sum of debits must always equal the sum of credits.
+
+Debit: Represents an increase in Assets or Expenses.
+
+Credit: Represents an increase in Liabilities, Equity, or Revenue.
+
+This structure provides a complete and auditable trail for every pound that moves within the factory's financial ecosystem, ensuring accuracy and transparency.
+
+2. Data Structure and Models
+We will design a set of flexible and interconnected models to form the financial structure.
+
+A. AccountCategory:
+
+Purpose: To classify accounts hierarchically (Chart of Accounts) and facilitate the easy addition of new account types. This is the foundation for financial reports.
+
+Fields:
+
+name: The category name (e.g., Assets, Liabilities, Revenue, Expenses).
+
+parent: A link to the parent category to create a tree structure (e.g., "Current Assets" under "Assets").
+
+category_type: A fundamental type (Asset, Liability, Equity, Revenue, Expense) to ensure correct classification in key financial statements.
+
+B. Account (Account / Ledger):
+
+Purpose: Represents an individual ledger where transactions are recorded. It will be flexible enough to represent anything from the factory's cash box to a specific supplier's account.
+
+Fields:
+
+name: The account name (e.g., "Main Factory Treasury," "Supplier Account: United Textiles Co.").
+
+code: A unique code for the account for easy searching and auditing.
+
+category (ForeignKey): A link to AccountCategory for precise classification.
+
+balance: The current balance of the account (will be calculated and updated automatically via ledger entries).
+
+owner (GenericForeignKey): A smart link that can point to other entities in the system like a Supplier or ExternalManufacturer, or be left null for internal accounts (like expense accounts).
+
+C. Transaction (Financial Transaction):
+
+Purpose: Represents a single, complete financial event (e.g., "Paying July's electricity bill").
+
+Fields:
+
+timestamp: The exact date and time the transaction occurred.
+
+description: A clear description of the transaction.
+
+created_by (ForeignKey to User): The user who recorded the transaction (part of the audit trail).
+
+source_document (GenericForeignKey): A link to the business document that triggered this transaction (e.g., an Invoice or Expense).
+
+D. LedgerEntry (Journal Entry):
+
+Purpose: The heart of the double-entry system. Every Transaction will have two or more LedgerEntry records.
+
+Fields:
+
+transaction: A link to the parent Transaction.
+
+account: A link to the affected Account.
+
+entry_type: DEBIT or CREDIT.
+
+amount: The value of the entry.
+
+E. Invoice:
+
+Purpose: A formal document requesting payment, essential for suppliers and manufacturers.
+
+Fields:
+
+invoice_number: A unique invoice number.
+
+recipient (GenericForeignKey): A link to the entity receiving the invoice (supplier or manufacturer).
+
+issue_date and due_date: The date of issue and the date payment is due.
+
+total_amount and paid_amount: The total value and the amount paid so far.
+
+status: (Draft, Sent, Partially Paid, Paid, Overdue).
+
+attachment (FileField): A field to upload a scanned copy of the invoice for electronic archiving.
+
+F. Payment:
+
+Purpose: To record the actual act of paying money.
+
+Fields:
+
+invoice: A link to the invoice(s) being paid.
+
+source_account: The factory account from which the money is being paid (e.g., "National Bank Account").
+
+amount, payment_date, payment_method (cash, bank, Instapay, or smart wallet).
+
+attachment (FileField): To upload the transfer slip or payment receipt.
+
+G. Expense (General Expenses):
+
+Purpose: To track expenses that don't have a direct supplier invoice (e.g., salaries, rent, maintenance).
+
+Fields:
+
+expense_account (ForeignKey to Account): A link to the specific expense account (e.g., "Electricity Expenses Account").
+
+description, amount, expense_date.
+
+attachment (FileField): To upload the bill or related document.
+
+H. AuditLog (Audit Log):
+
+Purpose: To record all significant financial actions to ensure security and traceability.
+
+Fields:
+
+user: The user who performed the action.
+
+action_type: The type of action (Create, Update, Delete).
+
+timestamp: The time the action occurred.
+
+details: A detailed description of the change (e.g., "Changed status of Invoice INV-002 from 'Sent' to 'Paid'").
+
+target_object (GenericForeignKey): A link to the object that was acted upon (Invoice, Payment, etc.).
+
+3. Compliance, Security, and Reporting (New Requirements)
+A. Compliance and Accounting Standards:
+
+Egyptian Standards: The AccountCategory (Chart of Accounts) will be designed to be compatible with the Egyptian Unified Accounting System, which will simplify the generation of required financial statements.
+
+Electronic Archiving: The attachment field in the Invoice, Payment, and Expense models will allow for the upload of original documents, providing a complete and easily accessible electronic archive.
+
+Regulatory Reports: Based on the sound accounting structure, custom reports can be designed to meet the requirements of tax authorities or other regulatory bodies.
+
+B. Security and Permissions:
+
+Roles: The existing role system in the users app (accountant, manager, etc.) will be leveraged to assign granular permissions for the finance app.
+
+Access Control:
+
+Accountant: Can create journal entries, invoices, and payments, but cannot approve payments exceeding a certain limit. Can view reports but cannot modify system settings.
+
+Finance Manager: Has full authority over the finance app, including approving all payments, closing accounting periods, and modifying the Chart of Accounts.
+
+General Manager: Has read-only access to all reports and data for oversight purposes, without modification rights.
+
+Audit Trail: The AuditLog model will record every important action, providing full transparency on "who did what, and when."
+
+C. Advanced Financial Reports:
+
+Income Statement: Will be generated by aggregating the balances of all "Revenue" and "Expense" accounts over a specific period. (Net Profit = Revenue - Expenses).
+
+Balance Sheet: Will be generated for a specific date by displaying the balances of "Assets" on one side, and "Liabilities" and "Equity" on the other, while verifying the accounting equation: Assets = Liabilities + Equity.
+
+Cash Flow Statement: Will analyze all transactions that affected "Cash" accounts (treasury and banks) and classify them into operating, investing, and financing activities.
+
+Comparative Reports: All reports will be customizable by date range, allowing for easy comparison of the current month's performance with the previous month, or the current quarter with the same quarter last year.
+
+4. User Interfaces and User Experience (Views & Templates)
+Finance Base Template (finance_base.html): A dedicated template will be created for the finance section, inheriting from the main site template (base.html), and will include a custom sidebar for quick access to invoices, accounts, and reports.
+
+Finance Dashboard: A main screen displaying key financial performance indicators (KPIs) such as:
+
+Cash and bank balances.
+
+Total Accounts Payable to suppliers and manufacturers.
+
+A chart of expenses by category.
+
+A list of due and overdue invoices.
+
+Account Statement: A dedicated page for each account showing a detailed, chronological list of all its debit and credit entries with a running balance after each transaction.
+
+Invoice Management: A comprehensive interface to view, filter, and manage all invoices, with functionality to print as PDF, send, and record associated payments.
+
+5. Smart Workflows
+The smart workflows connecting the finance module with other departments will be maintained:
+
+Upon completion of an external manufacturing process (AssemblyProcess, DyeingProcess, FinishingProcess): A draft invoice for the manufacturer is automatically generated.
+
+Upon approval of the invoice: A journal entry is automatically created to recognize the liability to the manufacturer (Credit) against the manufacturing expense (Debit).
+
+Upon recording a payment: A journal entry is automatically created reflecting the cash outflow from the treasury (Credit) and the reduction of the liability to the manufacturer (Debit).
+
+Next Steps
+This comprehensive plan establishes a solid and scalable foundation for the finance app. If this plan is approved, the next step is to begin writing the code for the models.py file based on this detailed structure.

@@ -153,7 +153,15 @@ class Product(models.Model):
 
     # == Fields for Finished Product (منتج نهائي) ==
     selling_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="سعر البيع")
-    size_group = models.ForeignKey('production.SizeGroup', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="مجموعة المقاسات")
+    # The code `size_groups` is not a valid Python code snippet. It seems like it is just a
+    # placeholder or a comment. It does not perform any specific operation or functionality in Python.
+    # The code `size_groups` is not doing anything as it is just a variable name. It is not assigned
+    # any value or used in any operation in the provided snippet.
+    size_groups = models.ManyToManyField(
+        'production.SizeGroup', 
+        blank=True, 
+        verbose_name="مجموعات المقاسات المتاحة"
+    )    
     fabric_quantity_per_piece = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, verbose_name="كمية القماش للقطعة")
 
     class Meta:

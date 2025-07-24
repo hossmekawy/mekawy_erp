@@ -1,0 +1,84 @@
+{% extends 'pdf/base_pdf.html' %}
+
+{% block pdf_title %}تقرير حركات المخزون{% endblock %}
+
+{% block document_main_title %}تقرير حركات المخزون{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .filter-summary {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 5px;
+        font-size: 11pt;
+    }
+    .filter-summary h3 {
+        margin-top: 0;
+        font-size: 14pt;
+        border-bottom: 1px solid #ccc;
+        padding-bottom: 5px;
+        margin-bottom: 10px;
+    }
+    .filter-summary ul {
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+    }
+    .filter-summary li {
+        margin-bottom: 5px;
+    }
+</style>
+{% endblock %}
+
+
+{% block pdf_content %}
+    <div class="filter-summary">
+        <h3>الفلاتر المطبقة</h3>
+        {% if filters %}
+            <ul>
+                {% if filters.warehouse %}<li><strong>المخزن:</strong> {{ filters.warehouse }}</li>{% endif %}
+                {% if filters.movement_type %}<li><strong>نوع الحركة:</strong> {{ filters.movement_type }}</li>{% endif %}
+                {% if filters.date_from %}<li><strong>من تاريخ:</strong> {{ filters.date_from }}</li>{% endif %}
+                {% if filters.date_to %}<li><strong>إلى تاريخ:</strong> {{ filters.date_to }}</li>{% endif %}
+            </ul>
+        {% else %}
+            <p>لا توجد فلاتر مطبقة.</p>
+        {% endif %}
+        <p style="font-size: 9pt; color: #555; margin-top: 10px;">
+            تم إنشاء التقرير بواسطة: {{ user }} في {{ timestamp|date:"Y-m-d h:i A" }}
+        </p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>المنتج</th>
+                <th>المخزن</th>
+                <th>نوع الحركة</th>
+                <th>الكمية</th>
+                <th>المرجع</th>
+                <th>بواسطة</th>
+                <th>التاريخ</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for movement in movements %}
+            <tr>
+                <td>{{ movement.stock_item.product.name }}</td>
+                <td>{{ movement.stock_item.warehouse.name }}</td>
+                <td>{{ movement.get_movement_type_display }}</td>
+                <td>{{ movement.quantity|floatformat:"-2" }}</td>
+                <td>{{ movement.reference_number|default:"-" }}</td>
+                <td>{{ movement.created_by.get_full_name|default:movement.created_by.username }}</td>
+                <td>{{ movement.created_at|date:"Y-m-d H:i" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 20px;">لا توجد حركات لعرضها.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

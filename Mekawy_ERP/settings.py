@@ -46,43 +46,6 @@ CSRF_TRUSTED_ORIGINS = [
     'http://192.168.1.200:8000', # Your local network IP
 
 ]
-# Application definition
-if DEBUG:
-    try:
-        # Make a request to the ngrok client API to get the tunnel information
-        response = requests.get(
-            "http://127.0.0.1:4040/api/tunnels", 
-            timeout=2, 
-            headers={"ngrok-skip-browser-warning": "true"}
-        )
-        response.raise_for_status()  # Raise an exception for bad status codes
-        tunnels = response.json().get("tunnels", [])
-        
-        # Find the https tunnel URL
-        https_tunnel_url = None
-        for tunnel in tunnels:
-            if tunnel.get("proto") == "https":
-                https_tunnel_url = tunnel.get("public_url")
-                break
-        
-        if https_tunnel_url:
-            # Add the ngrok URL to CSRF_TRUSTED_ORIGINS
-            if https_tunnel_url not in CSRF_TRUSTED_ORIGINS:
-                CSRF_TRUSTED_ORIGINS.append(https_tunnel_url)
-
-            # Also add the hostname to ALLOWED_HOSTS if you have a specific list (good practice)
-            ngrok_hostname = https_tunnel_url.split("://")[1]
-            if ngrok_hostname not in ALLOWED_HOSTS and ALLOWED_HOSTS != ['*']:
-                ALLOWED_HOSTS.append(ngrok_hostname)
-            
-            print(f"✅ Ngrok tunnel '{https_tunnel_url}' added to CSRF_TRUSTED_ORIGINS.")
-
-    except (requests.ConnectionError, requests.Timeout):
-        # This will happen if ngrok is not running or the API is slow. It's not a critical error.
-        print("⚠️ Could not connect to ngrok API. Skipping dynamic URL configuration.")
-    except Exception as e:
-        # Catch any other unexpected errors during the process
-        print(f"An unexpected error occurred while fetching ngrok URL: {e}")
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -145,6 +108,8 @@ TEMPLATES = [
                 'core.context_processors.global_context',
                 'core.context_processors.sidebar_context', 
                 'core.context_processors.theme_context',  
+                'core.context_processors.project_paths',
+
 
             ],
         },
@@ -203,11 +168,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 # Static files (CSS, JavaScript, Images)
-STATIC_URL = '/static/'
+STATIC_URL = 'static/'
 STATICFILES_DIRS = [
-    BASE_DIR / 'static',
+    os.path.join(BASE_DIR, 'static')
 ]
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Media files
 MEDIA_URL = '/media/'

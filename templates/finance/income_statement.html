@@ -1,0 +1,57 @@
+{% extends "finance/base.html" %}
+{% load static finance_tags %}
+
+{% block title %}قائمة الدخل{% endblock %}
+
+{% block content %}
+<div class="card shadow">
+    <div class="card-header py-3">
+        <h6 class="m-0 fw-bold text-primary">قائمة الدخل للفترة من {{ start_date }} إلى {{ end_date }}</h6>
+    </div>
+    <div class="card-body">
+        <!-- Revenues -->
+        <h5 class="mb-3">الإيرادات</h5>
+        <table class="table table-sm table-borderless mb-4">
+            <tbody>
+                {% for account in revenues %}
+                <tr>
+                    <td>{{ account.name }}</td>
+                    <td class="text-end">{{ account.balance|currency }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="border-top">
+                    <td class="fw-bold">إجمالي الإيرادات</td>
+                    <td class="text-end fw-bold">{{ total_revenue|currency }}</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <!-- Expenses -->
+        <h5 class="mb-3">المصروفات</h5>
+        <table class="table table-sm table-borderless mb-4">
+            <tbody>
+                {% for account in expenses %}
+                <tr>
+                    <td>{{ account.name }}</td>
+                    <td class="text-end">({{ account.balance|currency }})</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="border-top">
+                    <td class="fw-bold">إجمالي المصروفات</td>
+                    <td class="text-end fw-bold">({{ total_expenses|currency }})</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <!-- Net Income -->
+        <div class="bg-light p-3 rounded d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 fw-bold">صافي الربح / الخسارة</h5>
+            <h5 class="mb-0 fw-bold {% if net_income >= 0 %}text-success{% else %}text-danger{% endif %}">{{ net_income|neg_currency }}</h5>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,5 +1,5 @@
 {% extends 'production/production_base.html' %}
-{% load widget_tweaks %}
+{% load widget_tweaks i18n %}
 
 {% block production_title %}
     {% if object %}
@@ -36,6 +36,20 @@
         .btn-production:hover {
             background-color: #0b5ed7;
         }
+        .price-form {
+            background-color: #f8f9fa;
+            transition: background-color 0.3s;
+        }
+        .price-form:hover {
+            background-color: #f1f3f5;
+        }
+        .remove-price-form-btn {
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+        .price-form:hover .remove-price-form-btn {
+            opacity: 1;
+        }
     </style>
 {% endblock %}
 
@@ -44,7 +58,8 @@
     {% csrf_token %}
 
     <div class="row g-4">
-        <div class="col-lg-7">
+        <!-- Manufacturer Info Card -->
+        <div class="col-lg-8">
             <div class="card h-100 shadow-sm">
                 <div class="card-header bg-light d-flex align-items-center">
                     <i class="fas fa-industry card-header-icon me-2"></i>
@@ -53,22 +68,22 @@
                 <div class="card-body p-4">
                     <div class="row g-4">
                         <div class="col-md-6">
-                            <label for="{{ form.name.id_for_label }}" class="form-label">اسم المصنع</label>
+                            <label for="{{ form.name.id_for_label }}" class="form-label">{% trans "Manufacturer Name" %}</label>
                             {% render_field form.name class="form-control form-control-lg" placeholder="مثال: مصنع الأمانة للخياطة" required=True %}
                         </div>
                         <div class="col-md-6">
-                            <label for="{{ form.contact_person.id_for_label }}" class="form-label">الشخص المسؤول</label>
+                            <label for="{{ form.contact_person.id_for_label }}" class="form-label">{% trans "Contact Person" %}</label>
                             {% render_field form.contact_person class="form-control form-control-lg" placeholder="اسم الشخص المسؤول" required=True %}
                         </div>
                         <div class="col-12">
-                            <label for="{{ form.phone.id_for_label }}" class="form-label">الهاتف</label>
+                            <label for="{{ form.phone.id_for_label }}" class="form-label">{% trans "Phone" %}</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-phone-alt"></i></span>
                                 {% render_field form.phone class="form-control form-control-lg" dir="ltr" placeholder="01xxxxxxxxx" %}
                             </div>
                         </div>
                         <div class="col-12">
-                             <label for="{{ form.address.id_for_label }}" class="form-label">العنوان</label>
+                             <label for="{{ form.address.id_for_label }}" class="form-label">{% trans "Address" %}</label>
                              <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-map-marker-alt"></i></span>
                                 {% render_field form.address class="form-control form-control-lg" placeholder="عنوان المصنع بالتفصيل" %}
@@ -79,38 +94,23 @@
             </div>
         </div>
 
-        <div class="col-lg-5">
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-light d-flex align-items-center">
-                    <i class="fas fa-dollar-sign card-header-icon me-2"></i>
-                    <h5 class="mb-0">التفاصيل المالية</h5>
-                </div>
-                <div class="card-body p-4">
-                    <div class="mb-3">
-                        <label for="{{ form.price_per_piece.id_for_label }}" class="form-label">السعر للقطعة</label>
-                        <div class="input-group">
-                            {% render_field form.price_per_piece class="form-control" type="number" step="0.01" %}
-                            <span class="input-group-text">جنيه</span>
-                        </div>
-                    </div>
-                    <div>
-                        <label for="{{ form.payment_terms_days.id_for_label }}" class="form-label">مدة السداد</label>
-                        <div class="input-group">
-                             {% render_field form.payment_terms_days class="form-control" type="number" %}
-                            <span class="input-group-text">أيام</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
+        <!-- Financial & Operational Details Card -->
+        <div class="col-lg-4">
             <div class="card shadow-sm">
                  <div class="card-header bg-light d-flex align-items-center">
                     <i class="fas fa-sliders-h card-header-icon me-2"></i>
-                    <h5 class="mb-0">التفاصيل التشغيلية</h5>
+                    <h5 class="mb-0">التفاصيل التشغيلية والمالية</h5>
                 </div>
                  <div class="card-body p-4">
                     <div class="mb-3">
-                        <label for="{{ form.quality_rating.id_for_label }}" class="form-label">تقييم الجودة (من 5)</label>
+                        <label for="{{ form.payment_terms_days.id_for_label }}" class="form-label">{% trans "Payment Terms" %}</label>
+                        <div class="input-group">
+                             {% render_field form.payment_terms_days class="form-control" type="number" %}
+                            <span class="input-group-text">{% trans "days" %}</span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="{{ form.quality_rating.id_for_label }}" class="form-label">{% trans "Quality Rating (out of 5)" %}</label>
                          <div class="input-group">
                             <span class="input-group-text"><i class="fas fa-star"></i></span>
                             {% render_field form.quality_rating class="form-control" type="number" step="0.5" min="0" max="5" %}
@@ -118,13 +118,88 @@
                     </div>
                      <div class="form-check form-switch fs-5">
                         {% render_field form.is_active class="form-check-input" role="switch" %}
-                        <label for="{{ form.is_active.id_for_label }}" class="form-check-label">حالة المصنع (نشط)</label>
+                        <label for="{{ form.is_active.id_for_label }}" class="form-check-label">{% trans "Factory Status (Active)" %}</label>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Product Prices Formset Card -->
+    <div class="card shadow-sm mt-4">
+        <div class="card-header bg-light d-flex align-items-center justify-content-between">
+            <div>
+                <i class="fas fa-tags card-header-icon me-2"></i>
+                <h5 class="mb-0 d-inline-block">أسعار منتجات المصنع</h5>
+            </div>
+            <button type="button" id="add-price-form" class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-plus me-2"></i>إضافة سعر منتج جديد
+            </button>
+        </div>
+        <div class="card-body p-4">
+            {{ product_price_formset.management_form }}
+            {% for error in product_price_formset.non_form_errors %}
+                <div class="alert alert-danger">{{ error }}</div>
+            {% endfor %}
+            
+            <div id="price-form-list">
+                {% for price_form in product_price_formset %}
+                <div class="row price-form align-items-center mb-3 p-2 border rounded" id="price-row-{{ forloop.counter0 }}">
+                    <div style="display:none;">{{ price_form.id }}</div>
+                    <div class="col-md-6">
+                        <label class="form-label visually-hidden">المنتج</label>
+                        {% render_field price_form.product class="form-select" %}
+                        {% for error in price_form.product.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label visually-hidden">السعر</label>
+                        <div class="input-group">
+                            {% render_field price_form.price class="form-control" placeholder="السعر" %}
+                            <span class="input-group-text">جنيه</span>
+                        </div>
+                        {% for error in price_form.price.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-1 text-end">
+                        {% if price_form.instance.pk %}
+                            <div class="form-check form-switch" title="تحديد للحذف عند الحفظ">
+                                {{ price_form.DELETE|add_class:"form-check-input" }}
+                                <label class="form-check-label" for="{{ price_form.DELETE.id_for_label }}">{% trans "Delete" %}</label>
+                            </div>
+                        {% else %}
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-price-form-btn" title="إزالة هذا الصف">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- This is the template for new forms added by JavaScript -->
+            <div id="empty-price-form" style="display: none;">
+                <div class="row price-form align-items-center mb-3 p-2 border rounded" id="price-row-__prefix__">
+                    <div class="col-md-6">
+                        <label class="form-label visually-hidden">المنتج</label>
+                        {% render_field product_price_formset.empty_form.product class="form-select" %}
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label visually-hidden">السعر</label>
+                        <div class="input-group">
+                             {% render_field product_price_formset.empty_form.price class="form-control" placeholder="السعر" %}
+                            <span class="input-group-text">جنيه</span>
+                        </div>
+                    </div>
+                    <div class="col-md-1 text-end">
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-price-form-btn" title="إزالة هذا الصف">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
     <div class="row mt-4">
         <div class="col-12 d-flex justify-content-end gap-2 border-top pt-3">
             <a href="{% if object %}{% url 'production:manufacturers:manufacturer_detail' object.pk %}{% else %}{% url 'production:manufacturers:manufacturer_list' %}{% endif %}" class="btn btn-secondary btn-lg">
@@ -136,4 +211,40 @@
         </div>
     </div>
 </form>
+{% endblock %}
+
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const addFormBtn = document.getElementById('add-price-form');
+    const formList = document.getElementById('price-form-list');
+    const emptyFormHtml = document.getElementById('empty-price-form').innerHTML;
+    const totalFormsInput = document.getElementById('id_prices-TOTAL_FORMS');
+
+    addFormBtn.addEventListener('click', function() {
+        let formIdx = parseInt(totalFormsInput.value);
+        const newForm = emptyFormHtml.replace(/__prefix__/g, formIdx);
+        
+        // Use insertAdjacentHTML to add the new form row
+        formList.insertAdjacentHTML('beforeend', newForm);
+        
+        totalFormsInput.value = formIdx + 1;
+    });
+
+    formList.addEventListener('click', function(e) {
+        // Use .closest to find the button, making it work even if the icon is clicked
+        const removeBtn = e.target.closest('.remove-price-form-btn');
+        if (removeBtn) {
+            // Find the parent form row and remove it
+            removeBtn.closest('.price-form').remove();
+            
+            // Note: We don't decrement totalFormsInput.value. Django's formset processing
+            // on the backend can handle gaps in the form indices, so it's safer
+            // to just let it manage the count upon submission.
+        }
+    });
+});
+</script>
 {% endblock %}

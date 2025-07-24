@@ -59,7 +59,7 @@ class CuttingProcessAdmin(admin.ModelAdmin):
 
 @admin.register(ExternalManufacturer)
 class ExternalManufacturerAdmin(admin.ModelAdmin):
-    list_display = ['name', 'contact_person', 'phone', 'price_per_piece', 'quality_rating', 'is_active', 'created_at']
+    list_display = ['name', 'contact_person', 'phone',  'quality_rating', 'is_active', 'created_at']
     list_filter = ['is_active', 'quality_rating']
     search_fields = ['name', 'contact_person', 'phone']
     readonly_fields = ['created_at']

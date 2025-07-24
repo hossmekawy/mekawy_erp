@@ -4,7 +4,7 @@ from django.utils.safestring import mark_safe
 from .models import (
     AssemblyComponent, CutPiece, ProductionOrder, ReceiptConfirmation, SizeGroup, CuttingProcess,
     AssemblyProcess, DyeingProcess, FinishingProcess, ExternalManufacturer,
-    ExitPermit, QualityControlCheck, ProductionCostAnalysis, BillOfMaterials, CuttingTable, BOMItem, GarmentDraw, DrawPiece, FinishingComponent
+    ExitPermit, QualityControlCheck, ProductionCostAnalysis, BillOfMaterials, CuttingTable, BOMItem, GarmentDraw, DrawPiece, FinishingComponent , ManufacturerProductPrice  
 )
 from warehouses.models import Product, StockItem, Warehouse
 from django.forms import inlineformset_factory, formset_factory
@@ -104,36 +104,41 @@ class ProductionOrderForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['product'].queryset = Product.objects.filter(is_active=True, product_type='finished').order_by('name')
         self.fields['textile_stock'].queryset = StockItem.objects.filter(product__is_active=True, product__product_type='fabric').select_related('product', 'warehouse').order_by('product__name')
-        self.fields['textile_stock'].label = "مخزون القماش المحدد"
-        self.fields['product'].label = "المنتج النهائي"
+        self.fields['textile_stock'].label = "Selected Fabric Stock"
+        self.fields['product'].label = "Final Product"
 
     def clean(self):
         cleaned_data = super().clean()
         product = cleaned_data.get('product')
         quantity_ordered = cleaned_data.get('quantity_ordered')
         textile_stock = cleaned_data.get('textile_stock')
-        
-        if product and quantity_ordered:
-            # Get the fabric quantity per piece from the product model.
-            fabric_per_piece = product.fabric_quantity_per_piece
 
-            # FIX: Check if fabric_quantity_per_piece is set on the product.
-            # If it's None or 0, it's invalid for this calculation.
-            if not fabric_per_piece or fabric_per_piece <= 0:
-                self.add_error('product', f"المنتج '{product.name}' ليس له كمية قماش محددة للقطعة. يرجى تحديث بيانات المنتج.")
-                # Stop further validation for this form if this check fails.
+        if product and quantity_ordered:
+            fabric_per_piece = Decimal('0.0')
+            try:
+                # CORRECTED LOGIC: Get fabric quantity from the active BOM
+                active_bom = BillOfMaterials.objects.get(product=product, is_active=True)
+                fabric_bom_item = active_bom.items.get(material__product_type='fabric')
+                fabric_per_piece = fabric_bom_item.quantity
+
+            except BillOfMaterials.DoesNotExist:
+                self.add_error('product', f"The product '{product.name}' does not have an active Bill of Materials (BOM).")
+                return cleaned_data
+            except BOMItem.DoesNotExist:
+                self.add_error('product', f"The active BOM for '{product.name}' does not contain a material marked as 'fabric'.")
+                return cleaned_data
+            except BOMItem.MultipleObjectsReturned:
+                self.add_error('product', f"The active BOM for '{product.name}' has multiple fabric materials. Please correct the BOM.")
                 return cleaned_data
 
-            # Now it's safe to perform the multiplication.
+            # The rest of the calculation now uses the correct value from the BOM
             required_fabric = fabric_per_piece * quantity_ordered
-            cleaned_data['fabric_meters_allocated'] = required_fabric
+            cleaned_data['fabric_meters_allocated'] = required_fabric.quantize(Decimal('0.01'))
 
-            # Check if the selected textile stock has enough fabric.
             if textile_stock and textile_stock.available_quantity < required_fabric:
-                self.add_error('textile_stock', f'الكمية المطلوبة من القماش ({required_fabric} متر) أكبر من الكمية المتاحة في هذا المخزون ({textile_stock.available_quantity} متر).')
+                self.add_error('textile_stock', f'The required fabric quantity ({required_fabric:.2f} meters) is greater than the available quantity in this stock ({textile_stock.available_quantity} meters).')
 
         return cleaned_data
-
 
 class CuttingProcessForm(forms.ModelForm):
     class Meta:
@@ -287,7 +292,7 @@ class DyeingProcessForm(forms.ModelForm):
         fields = [
             'assembly_process', 'dyeing_facility', 'color_specification',
             'quantity_sent', 'quantity_received', 'losses_count',
-            'dyeing_cost_per_piece', 'sent_date', 'expected_return_date',
+             'sent_date', 'expected_return_date',
             'notes',
             # NEW: Image fields are now part of the form
         ]
@@ -347,7 +352,7 @@ class ExternalManufacturerForm(forms.ModelForm):
     class Meta:
         model = ExternalManufacturer
         fields = [
-            'name', 'contact_person', 'phone', 'address', 'price_per_piece',
+            'name', 'contact_person', 'phone', 'address',
             'payment_terms_days', 'quality_rating', 'is_active'
         ]
         widgets = {
@@ -355,11 +360,35 @@ class ExternalManufacturerForm(forms.ModelForm):
             'contact_person': forms.TextInput(attrs={'class': 'form-control'}),
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
             'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'price_per_piece': forms.NumberInput(attrs={'class': 'form-control'}),
             'payment_terms_days': forms.NumberInput(attrs={'class': 'form-control'}),
             'quality_rating': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.1', 'min': '0', 'max': '5'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+
+class ManufacturerProductPriceForm(forms.ModelForm):
+    class Meta:
+        model = ManufacturerProductPrice
+        fields = ['product', 'price']
+        widgets = {
+            'product': forms.Select(attrs={'class': 'form-select product-select'}),
+            'price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'السعر'}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Populate the product dropdown with only finished goods
+        self.fields['product'].queryset = Product.objects.filter(is_active=True, product_type='finished').order_by('name')
+        self.fields['product'].empty_label = "--- اختر منتج ---"
+
+ManufacturerProductPriceFormSet = inlineformset_factory(
+    ExternalManufacturer,
+    ManufacturerProductPrice,
+    form=ManufacturerProductPriceForm,
+    extra=1,
+    can_delete=True,
+    fk_name='manufacturer' # Explicitly define the foreign key relationship
+)
+
 
 class ExitPermitForm(forms.ModelForm):
     """
@@ -529,19 +558,18 @@ class BillOfMaterialsForm(forms.ModelForm):
         self.fields['product'].label = "المنتج النهائي"
         
         # This logic remains good, just ensure it works with the new product model
-        self.fields['size_group'].queryset = SizeGroup.objects.none()
+        self.fields['size_group'].queryset = SizeGroup.objects.all() # Show all size groups
         if 'product' in self.data:
             try:
                 product_id = int(self.data.get('product'))
                 product = Product.objects.get(id=product_id)
-                if product.size_group:
-                    self.fields['size_group'].queryset = SizeGroup.objects.filter(pk=product.size_group.pk)
+                if product.size_groups.exists():
+                    self.fields['size_group'].queryset = product.size_groups.all()
             except (ValueError, TypeError, Product.DoesNotExist):
                 pass
         elif self.instance and self.instance.pk and self.instance.product:
-            if self.instance.product.size_group:
-                self.fields['size_group'].queryset = SizeGroup.objects.filter(pk=self.instance.product.size_group.pk)
-
+            if self.instance.product.size_groups.exists():
+                self.fields['size_group'].queryset = self.instance.product.size_groups.all()
     def clean(self):
         cleaned_data = super().clean()
         product = cleaned_data.get('product')
@@ -833,7 +861,7 @@ class FinishingSendForm(forms.ModelForm):
         fields = [
             'dyeing_process',
             'finishing_type', 'external_manufacturer',
-            'finisher', 'destination_warehouse', 'supervisor',
+            'finisher', 'destination_warehouse', 'supervisor','quantity_input',
             'start_date', 'expected_completion_date', 'notes'
         ]
         widgets = {
@@ -860,11 +888,11 @@ class FinishingSendForm(forms.ModelForm):
 
 
         # Filter destination warehouses to only 'finished_product' type
-        self.fields['destination_warehouse'].queryset = Warehouse.objects.filter(is_active=True, type='finished_product')
+        self.fields['destination_warehouse'].queryset = Warehouse.objects.filter(is_active=True, warehouse_type='finished_goods')
 
         # Add a check for available destination warehouses
         if not self.fields['destination_warehouse'].queryset.exists():
-            add_warehouse_url = reverse('warehouses:warehouse_create')
+            add_warehouse_url = reverse('warehouses:warehouse_add')
             self.fields['destination_warehouse'].help_text = mark_safe(
                 f'لا توجد مستودعات للمنتجات النهائية. <a href="{add_warehouse_url}" target="_blank">أضف مستودعاً جديداً</a>.'
             )

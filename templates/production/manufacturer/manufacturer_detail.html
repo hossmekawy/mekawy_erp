@@ -1,5 +1,5 @@
 {% extends 'production/production_base.html' %}
-{% load static i18n humanize %}
+{% load static i18n humanize widget_tweaks %}
 
 {% block production_title %}
     تفاصيل المصنع - {{ manufacturer.name }}
@@ -12,6 +12,7 @@
 
 {% block extra_css %}
     {{ block.super }}
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <style>
         .profile-header-card {
             background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
@@ -20,6 +21,13 @@
         .metric-box {
             padding: 1rem;
             text-align: center;
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: .375rem;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
         .metric-box .metric-value {
             font-size: 1.75rem;
@@ -54,6 +62,14 @@
             border-color: var(--bs-primary);
             color: var(--bs-primary);
         }
+        .select2-container--default .select2-selection--single {
+            height: calc(1.5em + .75rem + 2px);
+            padding: .375rem .75rem;
+            border: 1px solid #ced4da;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: calc(1.5em + .75rem);
+        }
     </style>
 {% endblock %}
 
@@ -62,7 +78,7 @@
 <div class="card shadow-sm mb-4 profile-header-card">
     <div class="card-body p-4">
         <div class="row align-items-center g-4">
-            <div class="col-lg-6 col-md-12">
+            <div class="col-lg-5 col-md-12">
                 <h2 class="mb-3">{{ manufacturer.name }}</h2>
                 <div class="contact-info">
                     <div class="info-item">
@@ -80,32 +96,51 @@
                 </div>
             </div>
 
-            <div class="col-lg-6 col-md-12">
+            <div class="col-lg-7 col-md-12">
                 <div class="row">
-                    <div class="col-lg-4 col-md-6 mb-2">
+                    <!-- Financial Balance Metric -->
+                    <div class="col-lg-6 col-md-6 mb-3">
+                        <div class="metric-box">
+                            {% with manufacturer.financial_account as account %}
+                                {% if account %}
+                                    <div class="metric-value {% if account.balance > 0 %}text-danger{% elif account.balance < 0 %}text-success{% else %}text-dark{% endif %}">{{ account.balance|floatformat:2|intcomma }}</div>
+                                    <div class="metric-label">الرصيد المالي (جنيه)</div>
+                                    <small class="text-muted d-block" style="font-size: 0.75rem;">
+                                        {% if account.balance > 0 %}مستحق لهم{% elif account.balance < 0 %}مستحق لنا{% else %}متوازن{% endif %}
+                                    </small>
+                                {% else %}
+                                    <div class="metric-value text-secondary">--</div>
+                                    <div class="metric-label">لا يوجد حساب مالي</div>
+                                {% endif %}
+                            {% endwith %}
+                        </div>
+                    </div>
+                    <!-- Completed Jobs Value -->
+                    <div class="col-lg-6 col-md-6 mb-3">
                         <div class="metric-box">
                             <div class="metric-value text-success">{{ manufacturer.total_value_of_completed_jobs|intcomma }}</div>
                             <div class="metric-label">قيمة الأعمال المكتملة (جنيه)</div>
                         </div>
                     </div>
-                    <div class="col-lg-4 col-md-6 mb-2">
+                    <!-- Active Jobs Value -->
+                    <div class="col-lg-6 col-md-6 mb-3">
                         <div class="metric-box">
                              <div class="metric-value text-warning">{{ manufacturer.total_value_of_active_jobs|intcomma }}</div>
                             <div class="metric-label">قيمة الأعمال النشطة (جنيه)</div>
                         </div>
                     </div>
-                    <div class="col-lg-4 col-md-12 mb-2">
+                    <!-- Total Pieces Completed -->
+                    <div class="col-lg-6 col-md-6 mb-3">
                         <div class="metric-box">
                             <div class="metric-value text-info">{{ manufacturer.total_pieces_completed|intcomma }}</div>
                             <div class="metric-label">إجمالي القطع المنجزة</div>
-                            <small class="text-muted d-block" style="font-size: 0.75rem;">(تم ازالة عدد القطع المفقودة من الحسبة)</small>
                         </div>
                     </div>
                 </div>
                 <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
                      <a href="{% url 'production:manufacturers:manufacturer_update' manufacturer.pk %}" class="btn btn-primary">
-                        <i class="fas fa-edit me-2"></i>تعديل بيانات المصنع
-                    </a>
+                         <i class="fas fa-edit me-2"></i>تعديل بيانات المصنع
+                     </a>
                 </div>
             </div>
         </div>
@@ -123,9 +158,19 @@
             <i class="fas fa-history me-2"></i>سجل المهام <span class="badge bg-secondary rounded-pill ms-1">{{ job_history.count }}</span>
         </button>
     </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="prices-tab" data-bs-toggle="tab" data-bs-target="#prices-pane" type="button" role="tab">
+            <i class="fas fa-tags me-2"></i>الأسعار <span class="badge bg-secondary rounded-pill ms-1">{{ product_prices.count }}</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="financials-tab" data-bs-toggle="tab" data-bs-target="#financials-pane" type="button" role="tab">
+            <i class="fas fa-file-invoice-dollar me-2"></i>البيانات المالية
+        </button>
+    </li>
 </ul>
 
-<div class="tab-content bg-white" id="manufacturerTabsContent">
+<div class="tab-content bg-white border border-top-0" id="manufacturerTabsContent">
     <div class="tab-pane fade show active" id="active-jobs-pane" role="tabpanel">
         <div class="list-group list-group-flush">
             {% for job in active_jobs %}
@@ -193,8 +238,70 @@
             </table>
         </div>
     </div>
+
+    <div class="tab-pane fade" id="prices-pane" role="tabpanel">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>المنتج</th>
+                        <th>كود المنتج</th>
+                        <th class="text-end">سعر القطعة (جنيه)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in product_prices %}
+                        <tr>
+                            <td><strong>{{ item.product.name }}</strong></td>
+                            <td>{{ item.product.code }}</td>
+                            <td class="text-end fw-bold">{{ item.price|floatformat:2|intcomma }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted p-5">
+                                <i class="fas fa-tag fa-2x mb-2"></i>
+                                <p>لم يتم تسجيل أسعار منتجات لهذا المصنع بعد.</p>
+                                <a href="{% url 'production:manufacturers:manufacturer_update' manufacturer.pk %}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-plus me-1"></i> أضف الأسعار الآن
+                                </a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="financials-pane" role="tabpanel">
+        <div class="p-4">
+            {% with manufacturer.financial_account as account %}
+                {% if account %}
+                    <h4 class="mb-3">الملخص المالي</h4>
+                    <p><strong>الرصيد الحالي للحساب:</strong> 
+                        <span class="fw-bold fs-5 {% if account.balance > 0 %}text-danger{% elif account.balance < 0 %}text-success{% else %}text-dark{% endif %}">
+                            {{ account.balance|floatformat:2|intcomma }} جنيه
+                        </span>
+                        <small class="text-muted">
+                            ({% if account.balance > 0 %}مستحق لهم{% elif account.balance < 0 %}مستحق لنا{% else %}متوازن{% endif %})
+                        </small>
+                    </p>
+                    <p class="text-muted">هذا هو الرصيد النهائي لجميع الفواتير والدفعات المسجلة لهذا المصنع.</p>
+                    <hr>
+                    <a href="{% url 'finance:manufacturer-statement' manufacturer.pk %}" class="btn btn-info">
+                        <i class="fas fa-file-alt me-2"></i> عرض كشف الحساب التفصيلي
+                    </a>
+                {% else %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        لا يوجد حساب مالي مرتبط بهذا المصنع حتى الآن. سيتم إنشاؤه تلقائياً عند إضافة المصنع.
+                    </div>
+                {% endif %}
+            {% endwith %}
+        </div>
+    </div>
 </div>
 
+<!-- Modal for sending additional materials -->
 <div class="modal fade" id="sendMaterialsModal" tabindex="-1" aria-labelledby="sendMaterialsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
@@ -240,7 +347,6 @@
         </div>
     </div>
 </div>
-
 {% endblock %}
 
 
@@ -248,7 +354,6 @@
 {{ block.super }}
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 
 <script>
 $(document).ready(function() {
@@ -304,7 +409,7 @@ $(document).ready(function() {
 
     function formatRepo(repo) {
         if (repo.loading) return repo.text;
-        return $(`<div><strong>${repo.name}</strong> (${repo.code})<br><small class="text-muted">المتاح: ${repo.available} | التكلفة: ${repo.cost}</small></div>`);
+        return $(`<div><strong>${repo.name}</strong> (${repo.code})<br><small class="text-muted">المتاح: ${repo.available}</small></div>`);
     }
 
     function formatRepoSelection(repo) {
@@ -318,7 +423,6 @@ $(document).ready(function() {
 
     function addMaterialRow(data) {
         if ($(`#material-row-${data.id}`).length > 0) {
-            // This is a placeholder for a toast notification
             alert('هذه المادة تم إضافتها بالفعل.');
             return;
         }

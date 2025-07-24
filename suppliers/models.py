@@ -407,7 +407,7 @@ class Payment(models.Model):
     notes = models.TextField(blank=True, verbose_name="ملاحظات")
     
     # المسؤول
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="أنشأ بواسطة")
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="أنشأ بواسطة" , related_name='supplier_payments')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الإنشاء")
     
     class Meta:

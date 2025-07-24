@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% load static %}
+{% load tz %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .profile-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 0.5rem;
+    }
+    .profile-pic {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        border: 5px solid rgba(255, 255, 255, 0.5);
+        object-fit: cover;
+    }
+    .profile-pic-icon {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        border: 5px solid rgba(255, 255, 255, 0.5);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background-color: rgba(0,0,0,0.1);
+    }
+    .info-card .card-header {
+        background-color: #f8f9fc;
+    }
+    .info-list {
+        list-style: none;
+        padding: 0;
+    }
+    .info-list li {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #e3e6f0;
+    }
+    .info-list li:last-child {
+        border-bottom: none;
+    }
+    .info-list .info-label {
+        font-weight: bold;
+        color: #5a5c69;
+    }
+    .info-list .info-value {
+        color: #333;
+    }
+    .id-image {
+        width: 100%;
+        max-width: 400px;
+        border-radius: 10px;
+        border: 1px solid #ddd;
+        padding: 5px;
+        background-color: #fff;
+    }
+    .no-image-placeholder {
+        width: 100%;
+        max-width: 400px;
+        height: 200px;
+        border-radius: 10px;
+        background-color: #f8f9fc;
+        border: 2px dashed #ddd;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        color: #858796;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">{{ page_title }}</h1>
+        <div>
+            <a href="{% url 'hr:employee_list' %}" class="btn btn-secondary shadow-sm">
+                <i class="fas fa-arrow-left fa-sm"></i> العودة للقائمة
+            </a>
+            <a href="{% url 'hr:employee_update' employee.id %}" class="btn btn-warning shadow-sm">
+                <i class="fas fa-edit fa-sm"></i> تعديل
+            </a>
+            <a href="{% url 'hr:print_employee_id_card' employee.id %}" class="btn btn-info shadow-sm" target="_blank">
+                <i class="fas fa-id-card fa-sm"></i> طباعة البطاقة
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <!-- Profile Header -->
+            <div class="card shadow mb-4">
+                <div class="card-body profile-header text-center">
+                    {% if employee.photo %}
+                        <img src="{{ employee.photo.url }}" alt="{{ employee.full_name }}" class="profile-pic mb-3">
+                    {% else %}
+                        <div class="profile-pic-icon mb-3">
+                            <i class="fas fa-user fa-5x" style="color: rgba(255, 255, 255, 0.7);"></i>
+                        </div>
+                    {% endif %}
+                    <h2 class="h4 font-weight-bold mb-1">{{ employee.full_name }}</h2>
+                    <p class="mb-0">{{ employee.job_title }}</p>
+                    <div class="mt-2">
+                        <span class="badge {% if employee.is_active %}bg-success{% else %}bg-danger{% endif %} me-2">
+                            {% if employee.is_active %}نشط{% else %}غير نشط{% endif %}
+                        </span>
+                        {% if today_attendance %}
+                            <span class="badge bg-info">
+                                <i class="fas fa-check-circle me-1"></i>
+                                حاضر اليوم ({{ today_attendance.check_in|localtime|time:"h:i A" }})
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary">
+                                <i class="fas fa-times-circle me-1"></i>
+                                لم يحضر اليوم
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Left Column: Info -->
+        <div class="col-lg-6">
+            <!-- Basic Info -->
+            <div class="card shadow mb-4 info-card">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">المعلومات الأساسية والشخصية</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="info-list">
+                        <li><span class="info-label">كود الموظف</span> <span class="info-value">{{ employee.employee_id }}</span></li>
+                        <li><span class="info-label">القسم</span> <span class="info-value">{{ employee.department.name|default:"-" }}</span></li>
+                        <li><span class="info-label">تاريخ الميلاد</span> <span class="info-value">{{ employee.birth_date|date:"d-m-Y"|default:"-" }}</span></li>
+                        <li><span class="info-label">الجنس</span> <span class="info-value">{{ employee.get_gender_display }}</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Contact Info -->
+            <div class="card shadow mb-4 info-card">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">معلومات الاتصال</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="info-list">
+                        <li><span class="info-label">رقم الهاتف</span> <span class="info-value">{{ employee.phone_number|default:"-" }}</span></li>
+                        <li><span class="info-label">البريد الإلكتروني</span> <span class="info-value">{{ employee.email|default:"-" }}</span></li>
+                        <li><span class="info-label">العنوان</span> <span class="info-value">{{ employee.address|default:"-" }}</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Job Info -->
+            <div class="card shadow mb-4 info-card">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">المعلومات الوظيفية</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="info-list">
+                        <li><span class="info-label">تاريخ التعيين</span> <span class="info-value">{{ employee.hire_date|date:"d-m-Y" }}</span></li>
+                        <li><span class="info-label">الراتب</span> <span class="info-value">{{ employee.salary|default:"-" }}</span></li>
+                        <li><span class="info-label">وقت بدء العمل</span> <span class="info-value">{{ employee.work_start_time|time:"H:i" }}</span></li>
+                        <li><span class="info-label">وقت انتهاء العمل</span> <span class="info-value">{{ employee.work_end_time|time:"H:i" }}</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Documents -->
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">المستندات الرسمية</h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <h5 class="mb-3">صورة وجه البطاقة</h5>
+                        {% if employee.id_face_image %}
+                            <a href="{{ employee.id_face_image.url }}" target="_blank">
+                                <img src="{{ employee.id_face_image.url }}" alt="صورة وجه البطاقة" class="id-image">
+                            </a>
+                        {% else %}
+                            <div class="no-image-placeholder">
+                                <i class="fas fa-id-card fa-3x mb-2"></i>
+                                <span>لا توجد صورة</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <hr>
+                    <div class="text-center mt-4">
+                        <h5 class="mb-3">صورة ظهر البطاقة</h5>
+                        {% if employee.id_back_image %}
+                            <a href="{{ employee.id_back_image.url }}" target="_blank">
+                                <img src="{{ employee.id_back_image.url }}" alt="صورة ظهر البطاقة" class="id-image">
+                            </a>
+                        {% else %}
+                             <div class="no-image-placeholder">
+                                <i class="fas fa-id-card fa-3x mb-2"></i>
+                                <span>لا توجد صورة</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- No custom JS needed for this page anymore -->
+{% endblock %}

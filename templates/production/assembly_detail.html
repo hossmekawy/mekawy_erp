@@ -38,7 +38,6 @@
 
 {% block production_content %}
 <div class="row">
-    <!-- Main Details Column -->
     <div class="col-lg-8 mb-4">
         <div class="production-card h-100">
             <div class="production-card-header d-flex justify-content-between align-items-center">
@@ -84,7 +83,6 @@
                         <span class="badge bg-info-subtle text-info-emphasis">{{ assembly_process.get_assembly_type_display }}</span>
                     </div>
 
-                    <!-- Exit Permit Section -->
                     {% if assembly_process.assembly_type == 'outsourced' %}
                     <div class="list-group-item d-flex justify-content-between align-items-center px-0">
                         <strong class="text-secondary">المصنع الخارجي:</strong>
@@ -185,7 +183,6 @@
         </div>
     </div>
 
-    <!-- Metrics Column -->
     <div class="col-lg-4">
         <div class="production-metric mb-4">
             <div class="production-metric-icon success"><i class="fas fa-check"></i></div>
@@ -209,17 +206,17 @@
 {% block production_modals %}
 {{ block.super }}
 
-<!-- Create Exit Permit Modal -->
 {% if assembly_process.assembly_type == 'outsourced' and not exit_permit %}
 <div class="modal fade" id="createExitPermitModal" tabindex="-1" aria-labelledby="createExitPermitModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <form id="createExitPermitForm" method="post">
                 {% csrf_token %}
-                <input type="hidden" name="assembly_id" value="{{ assembly_process.pk }}">
                 
-                <!-- FIX: Add the missing hidden field for permit_type -->
+                {{ exit_permit_form.production_order.as_hidden }}
                 {{ exit_permit_form.permit_type.as_hidden }}
+
+                <input type="hidden" name="assembly_id" value="{{ assembly_process.pk }}">
 
                 <div class="modal-header bg-success text-white">
                     <h5 class="modal-title" id="createExitPermitModalLabel">
@@ -275,7 +272,6 @@
 </div>
 {% endif %}
 
-<!-- Receive Items Modal (Existing Modal) -->
 <div class="modal fade" id="receiveAssemblyModal" tabindex="-1" aria-labelledby="receiveAssemblyModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">

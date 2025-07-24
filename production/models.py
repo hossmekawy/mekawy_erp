@@ -7,7 +7,7 @@ from django.db.models import Sum, F, Q, Count, DecimalField
 from django.db.models.functions import Coalesce
 from django.urls import reverse
 from django.utils import timezone
-
+from django.contrib.contenttypes.models import ContentType # FIX: This import was missing
 # Standard library imports
 import datetime
 from decimal import Decimal
@@ -89,6 +89,30 @@ class BOMItem(models.Model):
     @property
     def cost(self):
         return self.quantity * self.material.cost_price
+
+class ManufacturerProductPrice(models.Model):
+    """
+    Stores the specific price a manufacturer charges for a specific product.
+    """
+    manufacturer = models.ForeignKey('ExternalManufacturer', on_delete=models.CASCADE, related_name='product_prices', verbose_name="المصنع")
+    product = models.ForeignKey(
+        'warehouses.Product',
+        on_delete=models.CASCADE,
+        related_name='manufacturer_prices',
+        limit_choices_to={'product_type': 'finished'},
+        verbose_name="المنتج"
+    )
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="سعر القطعة")
+
+    class Meta:
+        verbose_name = "سعر منتج المصنع"
+        verbose_name_plural = "أسعار منتجات المصنع"
+        # Ensure a manufacturer can only have one price for a specific product
+        unique_together = ('manufacturer', 'product')
+        ordering = ['manufacturer', 'product__name']
+
+    def __str__(self):
+        return f"{self.manufacturer.name} - {self.product.name}: {self.price}"
 
 
 class ProductionOrder(models.Model):
@@ -321,7 +345,6 @@ class ExternalManufacturer(models.Model):
     contact_person = models.CharField(max_length=100, verbose_name="الشخص المسؤول")
     phone = models.CharField(max_length=20, verbose_name="رقم الهاتف")
     address = models.TextField(verbose_name="العنوان")
-    price_per_piece = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="سعر القطعة")
     payment_terms_days = models.PositiveIntegerField(default=30, verbose_name="مدة السداد بالأيام")
     quality_rating = models.DecimalField(
         max_digits=3, decimal_places=2, default=0,
@@ -365,13 +388,35 @@ class ExternalManufacturer(models.Model):
         return self.assembly_processes.filter(is_completed=True).count()
 
     @property
-    def total_value_of_completed_jobs(self):
-        """Calculates the total monetary value of all completed jobs."""
-        total = self.assembly_processes.filter(is_completed=True).aggregate(
-            total_value=Coalesce(Sum(F('assembly_cost')), Decimal('0.0'), output_field=DecimalField())
-        )['total_value']
-        return total
-    
+    def total_value_of_active_jobs(self):
+        """Calculates the potential total value of all active jobs."""
+        # MODIFIED: This calculation now requires iterating through active jobs
+        # and looking up the specific price for each product.
+        active_processes = self.assembly_processes.filter(is_completed=False).select_related('production_order__product')
+        total_value = Decimal('0.0')
+        for process in active_processes:
+            try:
+                price_obj = ManufacturerProductPrice.objects.get(
+                    manufacturer=self,
+                    product=process.production_order.product
+                )
+                total_value += process.quantity_sent * price_obj.price
+            except ManufacturerProductPrice.DoesNotExist:
+                # If a price isn't set for an active job's product, it's not included in the total value.
+                pass
+        return total_value
+    @property
+    def financial_account(self):
+        """
+        Returns the associated finance Account for this manufacturer, if it exists.
+        Returns None otherwise.
+        This is used to easily access the account balance from manufacturer templates.
+        """
+        # Use a local import to prevent circular dependency errors
+        from finance.models import Account 
+        content_type = ContentType.objects.get_for_model(self)
+        return Account.objects.filter(owner_content_type=content_type, owner_object_id=self.pk).first()
+
     @property
     def total_pieces_completed(self):
         """Calculates the total number of pieces successfully received from completed jobs."""
@@ -379,13 +424,7 @@ class ExternalManufacturer(models.Model):
             total_pieces=Coalesce(Sum('quantity_received'), 0)
         )['total_pieces']
         return total
-    @property
-    def total_value_of_active_jobs(self):
-        """Calculates the potential total value of all active jobs."""
-        # This is an estimate based on sent quantity and price per piece
-        active_processes = self.assembly_processes.filter(is_completed=False)
-        total_value = sum(process.quantity_sent * self.price_per_piece for process in active_processes)
-        return total_value
+
     
     
 
@@ -438,11 +477,23 @@ class AssemblyProcess(models.Model):
     
     @property
     def external_manufacturing_cost(self):
-        """Calculates the manufacturing cost based on the price per piece."""
-        if self.assembly_type == 'outsourced' and self.external_manufacturer:
-            # Use quantity_received for completed jobs, quantity_sent as fallback
-            quantity = self.quantity_received if self.is_completed and self.quantity_received > 0 else self.quantity_sent
-            return quantity * self.external_manufacturer.price_per_piece
+        """
+        MODIFIED: Calculates the manufacturing cost by looking up the specific price
+        for the product from the ManufacturerProductPrice table.
+        """
+        if self.assembly_type == 'outsourced' and self.external_manufacturer and self.production_order.product:
+            try:
+                # Look up the price in the new through-model
+                price_obj = ManufacturerProductPrice.objects.get(
+                    manufacturer=self.external_manufacturer,
+                    product=self.production_order.product
+                )
+                # Use quantity_received for completed jobs, quantity_sent as fallback
+                quantity = self.quantity_received if self.is_completed and self.quantity_received > 0 else self.quantity_sent
+                return quantity * price_obj.price
+            except ManufacturerProductPrice.DoesNotExist:
+                # If no specific price is set, the cost is zero.
+                return Decimal('0.00')
         return Decimal('0.00')
 
     def calculate_assembly_cost(self):
@@ -476,12 +527,7 @@ class AssemblyProcess(models.Model):
             return 0
         return (self.losses_count / self.quantity_sent) * 100
     
-    def calculate_assembly_cost(self):
-        """حساب تكلفة التجميع"""
-        if self.assembly_type == 'outsourced' and self.external_manufacturer:
-            self.assembly_cost = self.quantity_sent * self.external_manufacturer.price_per_piece
-        self.assembly_cost += self.thread_cost
-        self.save(update_fields=['assembly_cost'])
+
 
 class AssemblyComponent(models.Model):
     """
@@ -544,7 +590,6 @@ class DyeingProcess(models.Model):
     losses_count = models.PositiveIntegerField(default=0, verbose_name="عدد الفاقد")
     
     # التكاليف
-    dyeing_cost_per_piece = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="تكلفة الصباغة للقطعة")
     total_dyeing_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="إجمالي تكلفة الصباغة")
     
     # التواريخ
@@ -570,11 +615,26 @@ class DyeingProcess(models.Model):
         return (self.losses_count / self.quantity_sent) * 100
     
     def calculate_total_cost(self):
-        """حساب إجمالي التكلفة based on quantity received"""
-        # Cost should be based on what was received and processed.
-        quantity_to_cost = self.quantity_received if self.quantity_received > 0 else self.quantity_sent
-        self.total_dyeing_cost = quantity_to_cost * self.dyeing_cost_per_piece
-        self.save(update_fields=['total_dyeing_cost'])
+        """
+        MODIFIED: Calculates total cost by looking up the product-specific price
+        from the ManufacturerProductPrice table.
+        """
+        cost = Decimal('0.00')
+        if self.dyeing_facility and self.assembly_process.production_order.product:
+            try:
+                price_obj = ManufacturerProductPrice.objects.get(
+                    manufacturer=self.dyeing_facility,
+                    product=self.assembly_process.production_order.product
+                )
+                quantity_to_cost = self.quantity_received if self.quantity_received > 0 else self.quantity_sent
+                cost = quantity_to_cost * price_obj.price
+            except ManufacturerProductPrice.DoesNotExist:
+                # If no price is set for this product at this facility, cost remains zero
+                pass
+        
+        self.total_dyeing_cost = cost
+        # The view will handle saving the instance
+
         
 class DyedGarment(models.Model):
     """الملابس المصبوغة"""
@@ -685,7 +745,16 @@ class FinishingProcess(models.Model):
 
         # 2. External Manufacturer Cost (if outsourced)
         if self.finishing_type == 'outsourced' and self.external_manufacturer:
-            total_cost += self.quantity_input * self.external_manufacturer.price_per_piece
+            try:
+                # Look up the product-specific price
+                price_obj = ManufacturerProductPrice.objects.get(
+                    manufacturer=self.external_manufacturer,
+                    product=production_order.product
+                )
+                total_cost += self.quantity_input * price_obj.price
+            except ManufacturerProductPrice.DoesNotExist:
+                # If no price is set, no cost is added for external manufacturing
+                pass
 
         self.total_finishing_cost = total_cost
  

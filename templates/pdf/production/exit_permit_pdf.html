@@ -26,8 +26,8 @@
             <td>{{ permit.quantity }}</td>
         </tr>
         <tr>
-            <td><strong>الوجهة:</strong></td>
-            <td colspan="3">{{ permit.destination }}</td>
+            <td><strong >الوجهة:</strong></td>
+            <td colspan="3"><span style="font-weight: bold; font-size: 1.2em;">{{ permit.destination }}</span></td>
         </tr>
         <tr>
             <td><strong>الغرض:</strong></td>
@@ -36,6 +36,10 @@
         <tr>
             <td><strong>وصف المواد:</strong></td>
             <td colspan="3">{{ permit.items_description|linebreaksbr }}</td>
+        </tr>
+        <tr>
+            <td><strong>ملاحظات:</strong></td>
+            <td colspan="3">{{ permit.notes|default:"لا يوجد" }}</td>
         </tr>
     </table>
 
@@ -64,9 +68,9 @@
     <div style="margin-top: 60px; text-align: center;">
         <table style="border: none;">
             <tr style="border: none;">
-                <td style="border: none; width: 33%;"><strong>توقيع مسؤول المخزن:</strong><br><br>...........................</td>
+                <td style="border: none; width: 33%;"><strong>توقيع مسؤول المصنع:</strong><br><br>...........................</td>
                 <td style="border: none; width: 33%;"><strong>توقيع السائق/المستلم:</strong><br><br>...........................</td>
-                <td style="border: none; width: 33%;"><strong>توقيع الأمن:</strong><br><br>...........................</td>
+                <td style="border: none; width: 33%;"><strong>توقيع المدير:</strong><br><br>...........................</td>
             </tr>
         </table>
     </div>

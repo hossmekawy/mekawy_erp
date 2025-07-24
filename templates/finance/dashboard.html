@@ -1,0 +1,132 @@
+{% extends "finance/base.html" %}
+{% load static finance_tags %}
+
+{% block title %}لوحة التحكم المالية{% endblock %}
+
+{% block content %}
+<!-- KPI Cards -->
+<div class="row">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-start-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col me-2">
+                        <div class="text-xs fw-bold text-success text-uppercase mb-1">صافي الربح / الخسارة</div>
+                        <div class="h5 mb-0 fw-bold {% if kpis.profit_loss >= 0 %}text-gray-800{% else %}text-danger{% endif %}">{{ kpis.profit_loss|neg_currency }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-start-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col me-2">
+                        <div class="text-xs fw-bold text-primary text-uppercase mb-1">إجمالي الإيرادات</div>
+                        <div class="h5 mb-0 fw-bold text-gray-800">{{ kpis.total_revenues|currency }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-start-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col me-2">
+                        <div class="text-xs fw-bold text-warning text-uppercase mb-1">إجمالي المصروفات</div>
+                        <div class="h5 mb-0 fw-bold text-gray-800">{{ kpis.total_expenses|currency }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-file-invoice-dollar fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-start-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col me-2">
+                        <div class="text-xs fw-bold text-info text-uppercase mb-1">صافي الأصول</div>
+                        <div class="h5 mb-0 fw-bold text-gray-800">{{ kpis.net_worth|currency }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-building fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Transactions & Invoices Due -->
+<div class="row">
+    <div class="col-lg-7 mb-4">
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 fw-bold text-primary">أحدث الحركات المالية</h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>التاريخ</th>
+                                <th>الوصف</th>
+                                <th class="text-end">المبلغ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tx in recent_transactions %}
+                            <tr>
+                                <td>{{ tx.date }}</td>
+                                <td>{{ tx.description }}</td>
+                                <td class="text-end fw-bold">{{ tx.total_debit|currency }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center py-4">لا توجد حركات مالية مسجلة بعد.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5 mb-4">
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 fw-bold text-danger">فواتير مستحقة قريباً</h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    {% for invoice in invoices_due %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <a href="{% url 'finance:invoice_detail' invoice.pk %}" class="fw-bold text-decoration-none">{{ invoice.invoice_number }}</a>
+                            <small class="d-block text-muted">تستحق في: {{ invoice.due_date }}</small>
+                        </div>
+                        <span class="badge bg-danger rounded-pill">{{ invoice.balance_due|currency }}</span>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item text-center py-4">لا توجد فواتير مستحقة.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

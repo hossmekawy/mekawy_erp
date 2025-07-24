@@ -1,146 +1,214 @@
-{% extends 'warehouses/base.html' %}
+{% extends 'base.html' %}
 {% load static %}
+{% load widget_tweaks %}
 
-{% block title %}طلب تحويل مخزون{% endblock %}
+{% block title %}إنشاء تحويل مخزون جديد{% endblock %}
 
-{% block warehouse_content %}
+{% block extra_css %}
+<style>
+    body {
+        background-color: #f0f2f5; /* A softer, more modern background */
+    }
+    .card {
+        border: none;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+    }
+    .form-label {
+        font-weight: 600;
+        color: #5a5c69;
+        margin-bottom: .5rem;
+    }
+    .form-control-lg, .form-select-lg {
+        font-size: 1rem;
+        border-radius: 6px;
+    }
+    .btn-lg {
+        padding: .75rem 1.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+    /* Styling for the info panel */
+    #stockInfoPanel {
+        background: linear-gradient(to right, #e3f2fd, #e8f5e9);
+        border: 1px solid #b3e5fc;
+        color: #01579b;
+        border-radius: 6px;
+    }
+    #stockInfoPanel .quantity-highlight {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e88e5;
+    }
+    #warehouse-error {
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
 <div class="container-fluid">
-    <div class="row">
-        <div class="col-md-8 mx-auto">
-            <div class="card">
-                <div class="card-header">
-                    <h4>طلب تحويل مخزون جديد</h4>
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">إنشاء طلب تحويل مخزون جديد</h1>
+        <a href="{% url 'warehouses:transfer_list' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-arrow-left fa-sm"></i> العودة إلى القائمة
+        </a>
+    </div>
+
+    <form method="post" id="transferForm" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+            {% for error in form.non_field_errors %}
+                <p class="mb-0">{{ error }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+
+                <div class="card mb-4">
+                    <div class="card-header bg-white py-3">
+                        <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-exchange-alt me-2"></i>1. تحديد المخازن</h6>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="{{ form.from_warehouse.id_for_label }}" class="form-label"><i class="fas fa-warehouse text-secondary me-1"></i> من المخزن</label>
+                                {% render_field form.from_warehouse class="form-select form-select-lg" %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.to_warehouse.id_for_label }}" class="form-label"><i class="fas fa-dolly text-secondary me-1"></i> إلى المخزن</label>
+                                {% render_field form.to_warehouse class="form-select form-select-lg" %}
+                            </div>
+                        </div>
+                        <div id="warehouse-error" class="alert alert-danger mt-3 d-none">لا يمكن التحويل إلى نفس المخزن.</div>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <form method="post" novalidate>
-                        {% csrf_token %}
-                        
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="{{ form.from_warehouse.id_for_label }}" class="form-label">من المخزن *</label>
-                                {{ form.from_warehouse }}
-                                {% if form.from_warehouse.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.from_warehouse.errors.0 }}
-                                </div>
-                                {% endif %}
-                            </div>
-                            <div class="col-md-6">
-                                <label for="{{ form.to_warehouse.id_for_label }}" class="form-label">إلى المخزن *</label>
-                                {{ form.to_warehouse }}
-                                {% if form.to_warehouse.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.to_warehouse.errors.0 }}
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="{{ form.product.id_for_label }}" class="form-label">المنتج *</label>
-                                {{ form.product }}
-                                {% if form.product.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.product.errors.0 }}
-                                </div>
-                                {% endif %}
-                            </div>
-                            <div class="col-md-6">
-                                <label for="{{ form.quantity.id_for_label }}" class="form-label">الكمية *</label>
-                                <div class="input-group">
-                                    {{ form.quantity }}
-                                    <span class="input-group-text" id="unit-display">-</span>
-                                </div>
-                                {% if form.quantity.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ form.quantity.errors.0 }}
-                                </div>
-                                {% endif %}
-                                <div class="form-text">
-                                    <span id="available-quantity">الكمية المتاحة: -</span>
-                                </div>
-                            </div>
-                        </div>
-                        
+
+                <div class="card mb-4">
+                    <div class="card-header bg-white py-3">
+                        <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-box-open me-2"></i>2. تحديد المنتج والكمية</h6>
+                    </div>
+                    <div class="card-body p-4">
                         <div class="mb-3">
-                            <label for="{{ form.reason.id_for_label }}" class="form-label">سبب التحويل *</label>
-                            {{ form.reason }}
-                            {% if form.reason.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.reason.errors.0 }}
+                            <label for="{{ form.product.id_for_label }}" class="form-label"><i class="fas fa-tag text-secondary me-1"></i> المنتج</label>
+                             {% render_field form.product class="form-select form-select-lg" %}
+                        </div>
+
+                        <div id="stockInfoPanel" class="p-3 mb-3 d-none">
+                            <div class="d-flex align-items-center">
+                                <div class="me-3"><i class="fas fa-info-circle fa-2x"></i></div>
+                                <div>
+                                    <h6 class="mb-0">الكمية المتاحة في المخزن المصدر</h6>
+                                    <div id="availableQuantity" class="quantity-highlight">...</div>
+                                </div>
                             </div>
-                            {% endif %}
                         </div>
-                        
-                        <div class="d-flex justify-content-between">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-paper-plane"></i> إرسال الطلب
-                            </button>
-                            <a href="{% url 'warehouses:transfer_list' %}" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left"></i> رجوع
-                            </a>
+
+                        <div class="mb-3">
+                             <label for="{{ form.quantity.id_for_label }}" class="form-label"><i class="fas fa-sort-numeric-up text-secondary me-1"></i> الكمية المطلوبة للتحويل</label>
+                             {% render_field form.quantity class="form-control form-control-lg" placeholder="مثال: 50" %}
                         </div>
-                    </form>
+                    </div>
                 </div>
+                
+                <div class="card mb-4">
+                     <div class="card-header bg-white py-3">
+                        <h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-pen-alt me-2"></i>3. سبب التحويل</h6>
+                    </div>
+                    <div class="card-body p-4">
+                        {% render_field form.reason class="form-control" placeholder="ادخل سبب واضح لطلب التحويل..." rows="4" %}
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <button type="submit" id="submitBtn" class="btn btn-primary btn-lg">
+                        <i class="fas fa-check-circle me-2"></i> إنشاء طلب التحويل
+                    </button>
+                </div>
+
             </div>
         </div>
-    </div>
+    </form>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const fromWarehouseSelect = document.getElementById('{{ form.from_warehouse.id_for_label }}');
-    const productSelect = document.getElementById('{{ form.product.id_for_label }}');
-    const quantityInput = document.getElementById('{{ form.quantity.id_for_label }}');
-    const unitDisplay = document.getElementById('unit-display');
-    const availableQuantityDisplay = document.getElementById('available-quantity');
-    
-    // Update available quantity when warehouse or product changes
-    function updateAvailableQuantity() {
-        const warehouseId = fromWarehouseSelect.value;
-        const productId = productSelect.value;
-        
-        if (warehouseId && productId) {
-            fetch(`/warehouses/api/stock/check/?warehouse=${warehouseId}&product=${productId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.stock_item) {
-                        availableQuantityDisplay.textContent = `الكمية المتاحة: ${data.stock_item.available_quantity}`;
-                        unitDisplay.textContent = data.product.unit;
-                        
-                        // Set max quantity
-                        quantityInput.max = data.stock_item.available_quantity;
-                    } else {
-                        availableQuantityDisplay.textContent = 'الكمية المتاحة: 0';
-                        unitDisplay.textContent = '-';
-                        quantityInput.max = 0;
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    availableQuantityDisplay.textContent = 'خطأ في جلب البيانات';
-                });
+$(document).ready(function() {
+    // Cache jQuery selectors for performance
+    const fromWarehouse = $('#id_from_warehouse');
+    const toWarehouse = $('#id_to_warehouse');
+    const productSelect = $('#id_product');
+    const stockInfoPanel = $('#stockInfoPanel');
+    const availableQuantitySpan = $('#availableQuantity');
+    const warehouseError = $('#warehouse-error');
+    const transferForm = $('#transferForm');
+
+    // This function now ONLY shows or hides the visual warning.
+    function validateWarehouses() {
+        if (fromWarehouse.val() && fromWarehouse.val() === toWarehouse.val()) {
+            warehouseError.removeClass('d-none');
         } else {
-            availableQuantityDisplay.textContent = 'الكمية المتاحة: -';
-            unitDisplay.textContent = '-';
+            warehouseError.addClass('d-none');
+        }
+        // REMOVED: The logic that disabled the submit button is gone from here.
+    }
+
+    // This function fetches stock info (no changes here).
+    function fetchStockInfo() {
+        const fromWarehouseId = fromWarehouse.val();
+        const productId = productSelect.val();
+
+        if (fromWarehouseId && productId) {
+            stockInfoPanel.removeClass('d-none');
+            availableQuantitySpan.text('جاري البحث...');
+            const apiUrl = `/warehouses/api/product/${productId}/stock/`;
+
+            $.ajax({
+                url: apiUrl,
+                success: function(data) {
+                    let quantity = 0;
+                    if (data.success && data.stock_items.length > 0) {
+                        const stockItem = data.stock_items.find(item => item.warehouse_id == fromWarehouseId);
+                        if (stockItem) {
+                            quantity = stockItem.available_quantity;
+                        }
+                    }
+                    availableQuantitySpan.text(quantity);
+                },
+                error: function() {
+                    availableQuantitySpan.text('خطأ في الاتصال');
+                }
+            });
+        } else {
+            stockInfoPanel.addClass('d-none');
         }
     }
-    
-    fromWarehouseSelect.addEventListener('change', updateAvailableQuantity);
-    productSelect.addEventListener('change', updateAvailableQuantity);
-    
-    // Validate quantity
-    quantityInput.addEventListener('input', function() {
-        const quantity = parseFloat(this.value);
-        const maxQuantity = parseFloat(this.max);
-        
-        if (quantity > maxQuantity) {
-            this.setCustomValidity(`الكمية المتاحة هي ${maxQuantity} فقط`);
-            this.classList.add('is-invalid');
-        } else {
-            this.setCustomValidity('');
-            this.classList.remove('is-invalid');
+
+    // Attach event listeners to dropdowns
+    fromWarehouse.on('change', validateWarehouses);
+    toWarehouse.on('change', validateWarehouses);
+    fromWarehouse.on('change', fetchStockInfo);
+    productSelect.on('change', fetchStockInfo);
+
+    // --- FIX: Add a submit event handler to the form for final validation ---
+    transferForm.on('submit', function(event) {
+        // Run the validation one last time before submitting.
+        validateWarehouses();
+
+        // Check if the error message is visible.
+        if (!warehouseError.hasClass('d-none')) {
+            // If the error is visible, prevent the form from submitting.
+            event.preventDefault();
+            
+            // Optional: Shake the error message to draw attention.
+            warehouseError.css('animation', 'shake 0.5s');
+            setTimeout(() => warehouseError.css('animation', ''), 500);
+
+            // You can also add a message to the console for debugging.
+            console.log("Form submission blocked due to validation error.");
         }
     });
 });

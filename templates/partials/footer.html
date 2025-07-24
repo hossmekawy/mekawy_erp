@@ -1,31 +1,30 @@
-<footer class="sticky-footer bg-white">
+{% load static %}
+
+<footer class="footer bg-white">
     <div class="container my-auto">
         <div class="copyright text-center my-auto">
             <div class="row">
                 <div class="col-md-6 text-md-start text-center">
                     <span class="text-muted">
-                        &copy; {{ current_year|default:"2023" }} 
+                        &copy; {% now "Y" %} 
                         <strong>Mekawy ERP</strong> - جميع الحقوق محفوظة
                     </span>
                 </div>
                 <div class="col-md-6 text-md-end text-center">
                     <span class="text-muted">
-                        الإصدار 1.0.0 | 
-                        <a href="#" class="text-decoration-none">الدعم الفني</a> | 
-                        <a href="#" class="text-decoration-none">سياسة الخصوصية</a>
+                        الإصدار {{ app_version|default:"1.0.0" }} | 
+                        
                     </span>
                 </div>
             </div>
             
             <!-- System Status -->
             <div class="row mt-2">
-                <div class="col-12 text-center">
+                <div class="col-10 text-center">
                     <small class="text-muted">
-                        <i class="fas fa-circle text-success"></i> النظام يعمل بشكل طبيعي
-                        <span class="mx-2">|</span>
                         <i class="fas fa-users"></i> المستخدمين المتصلين: <span class="badge bg-primary">{{ online_users_count|default:"0" }}</span>
                         <span class="mx-2">|</span>
-                        <i class="fas fa-clock"></i> آخر تحديث: <span id="lastUpdate">{{ last_update|default:"الآن" }}</span>
+                        <i class="fas fa-clock"></i> آخر تحديث: <span id="lastUpdate">{% now "H:i:s" %}</span>
                     </small>
                 </div>
             </div>
@@ -34,7 +33,7 @@
 </footer>
 
 <style>
-.sticky-footer {
+.footer {
     position: sticky;
     bottom: 0;
     width: 100%;
@@ -48,11 +47,11 @@
 }
 
 .copyright a {
-    color: var(--primary-color);
+    color: #858796;
 }
 
 .copyright a:hover {
-    color: var(--primary-color);
+    color: #5a5c69;
     text-decoration: underline !important;
 }
 </style>
@@ -66,7 +65,10 @@ function updateLastUpdateTime() {
         minute: '2-digit',
         second: '2-digit'
     });
-    document.getElementById('lastUpdate').textContent = timeString;
+    const lastUpdateEl = document.getElementById('lastUpdate');
+    if (lastUpdateEl) {
+        lastUpdateEl.textContent = timeString;
+    }
 }
 
 // Update every minute

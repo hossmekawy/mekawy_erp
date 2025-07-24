@@ -25,9 +25,9 @@
         </button>
         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="quickActionsDropdown">
             <li><a class="dropdown-item" href="{% url 'production:order_create' %}"><i class="fas fa-plus-circle text-primary me-2"></i>أمر إنتاج جديد</a></li>
-            <li><a class="dropdown-item" href="{% url 'production:textile_stock_create' %}"><i class="fas fa-layer-group text-info me-2"></i>إضافة مخزون قماش</a></li>
+            {% comment %} <li><a class="dropdown-item" href="{% url 'production:textile_stock_create' %}"><i class="fas fa-layer-group text-info me-2"></i>إضافة مخزون قماش</a></li> {% endcomment %}
             <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item" href="{% url 'production:daily_report' %}"><i class="fas fa-chart-line text-success me-2"></i>عرض التقارير</a></li>
+            {% comment %} <li><a class="dropdown-item" href="{% url 'production:daily_report' %}"><i class="fas fa-chart-line text-success me-2"></i>عرض التقارير</a></li> {% endcomment %}
         </ul>
     </div>
 </div>

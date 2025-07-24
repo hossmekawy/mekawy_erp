@@ -1,0 +1,59 @@
+{% extends "pdf/base_pdf.html" %}
+
+{% block pdf_title %}تقرير قائمة المنتجات{% endblock %}
+
+{% block document_main_title %}قائمة المنتجات{% endblock %}
+
+{% block pdf_header %}
+    <h1>قائمة المنتجات</h1>
+    <div class="meta-info" style="font-size: 11pt; color: #555;">
+        تاريخ الطباعة: {{ timestamp|date:"d-m-Y" }}
+        <br>
+        {% if filters.search %}
+            <strong>بحث:</strong> {{ filters.search }}
+        {% endif %}
+        {% if filters.category_name %}
+            <strong>| التصنيف:</strong> {{ filters.category_name }}
+        {% endif %}
+        {% if filters.product_type_name %}
+            <strong>| النوع:</strong> {{ filters.product_type_name }}
+        {% endif %}
+    </div>
+{% endblock %}
+
+
+{% block pdf_content %}
+    <p>هذا التقرير يعرض قائمة المنتجات بناءً على الفلاتر المحددة.</p>
+    <table>
+        <thead>
+            <tr>
+                <th>الكود</th>
+                <th>اسم المنتج</th>
+                <th>التصنيف</th>
+                <th>النوع</th>
+                <th>الوحدة</th>
+                <th>سعر التكلفة</th>
+                <th>سعر البيع</th>
+                <th>المخزون الكلي</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in products %}
+            <tr>
+                <td><code>{{ product.code }}</code></td>
+                <td>{{ product.name }}</td>
+                <td>{{ product.category.name|default:"-" }}</td>
+                <td>{{ product.get_product_type_display }}</td>
+                <td>{{ product.get_unit_display }}</td>
+                <td style="text-align: left;">{{ product.cost_price|floatformat:2 }} ج.م</td>
+                <td style="text-align: left;">{{ product.selling_price|floatformat:2|default:"-" }}</td>
+                <td style="text-align: center;">{{ product.total_stock|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 20px;">لا توجد منتجات تطابق معايير البحث.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

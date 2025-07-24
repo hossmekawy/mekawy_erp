@@ -60,7 +60,7 @@ class ProductAdmin(admin.ModelAdmin):
     readonly_fields = ['created_at', 'total_stock_display']
     # --- FIX: 'unit' is not a ForeignKey, so it cannot be an autocomplete_field. ---
     # Note: For 'size_group' to work, its admin class in production/admin.py must have search_fields.
-    autocomplete_fields = ['category', 'size_group']
+    autocomplete_fields = ['category', 'size_groups']
     
     fieldsets = (
         ('معلومات أساسية', {
@@ -74,7 +74,7 @@ class ProductAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
         }),
         ('خصائص المنتج النهائي (إن وجد)', {
-            'fields': ('size_group', 'fabric_quantity_per_piece'),
+            'fields': ('size_groups', 'fabric_quantity_per_piece'),
             'classes': ('collapse',),
         }),
         ('الحالة والإحصائيات', {

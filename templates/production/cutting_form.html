@@ -1,6 +1,5 @@
 {% extends 'production/production_base.html' %}
-{% load static %}
-{% load widget_tweaks %}
+{% load static i18n widget_tweaks %}
 
 {% block production_title %}{% if form.instance.pk %}تعديل عملية قص{% else %}إضافة عملية قص جديدة{% endif %}{% endblock %}
 
@@ -36,7 +35,7 @@
     {% csrf_token %}
     <div class="row">
         <!-- Main Details Column -->
-        <div class="col-lg-8">
+        <div class="col-lg-8 mb-4 mb-lg-0">
             <div class="production-card">
                 <div class="production-card-body">
                     <!-- Section 1: Main Process Details -->
@@ -83,29 +82,28 @@
                     <!-- Single Layer Calculator Widget -->
                     <hr class="my-4">
                     <h4 class="mb-3">حساب ميتراج الطبقة الواحدة</h4>
-                     <div class="card bg-light mb-4">
+                    <div class="card bg-light mb-4">
                         <div class="card-body">
                             <div class="row g-3 align-items-center">
                                 <div class="col-md-3">
-                                    <label for="{{ form.single_layer_pieces.id_for_label }}" class="form-label">عدد القطع في الطبقة</label>
+                                    <label for="{{ form.single_layer_pieces.id_for_label }}" class="form-label">عدد القطع</label>
                                     {% render_field form.single_layer_pieces class="form-control" id="single-layer-pieces-input" %}
                                 </div>
                                 <div class="col-md-3">
-                                    <label for="{{ form.single_layer_fabric_length.id_for_label }}" class="form-label">طول الفرشة (متر)</label>
+                                    <label for="{{ form.single_layer_fabric_length.id_for_label }}" class="form-label">طول الفرشة (م)</label>
                                     {% render_field form.single_layer_fabric_length class="form-control" step="0.01" id="single-layer-length-input" %}
                                 </div>
                                 <div class="col-md-3">
-                                    <label for="{{ form.single_layer_width.id_for_label }}" class="form-label">عرض الفرشة (متر)</label>
+                                    <label for="{{ form.single_layer_width.id_for_label }}" class="form-label">عرض الفرشة (م)</label>
                                     {% render_field form.single_layer_width class="form-control" step="0.01" required=True %}
                                 </div>
                                 <div class="col-md-3">
-                                    <label for="{{ form.single_layer_meterage.id_for_label }}" class="form-label">ميتراج القطعة المحسوب</label>
+                                    <label for="{{ form.single_layer_meterage.id_for_label }}" class="form-label">ميتراج القطعة</label>
                                     {% render_field form.single_layer_meterage class="form-control calculated-output" readonly=True id="single-layer-output" %}
                                 </div>
                             </div>
                         </div>
                     </div>
-
 
                     <!-- Section 3: Cutting Tables (Farshat) -->
                     <h4 class="mb-3">جداول القص (الفرشات)</h4>
@@ -114,7 +112,7 @@
                         <table class="table production-table" id="cutting-tables-table">
                             <thead>
                                 <tr>
-                                    <th>طول الثوب (متر)</th>
+                                    <th>طول الثوب (م)</th>
                                     <th>عدد الطبقات</th>
                                     <th>المنتجات لكل طبقة</th>
                                     <th>ملاحظات</th>
@@ -151,10 +149,7 @@
         <div class="col-lg-4">
             <div class="production-card">
                 <div class="production-card-header d-flex justify-content-between align-items-center">
-                    <span>
-                        <i class="fas fa-book-open me-2"></i>
-                        مرجع قطع الرسمة
-                    </span>
+                    <span><i class="fas fa-book-open me-2"></i> مرجع قطع الرسمة</span>
                     <a id="add-draw-link" href="javascript:void(0);" class="btn btn-sm btn-outline-success disabled" target="_blank" title="يجب اختيار أمر إنتاج أولاً">
                         <i class="fas fa-plus"></i> إضافة رسمة
                     </a>
@@ -174,19 +169,16 @@
     <!-- Bottom Section -->
     <div class="production-card mt-4">
         <div class="production-card-body">
-            <!-- Totals and Notes -->
             <h4 class="mb-3">الإجماليات والملاحظات</h4>
             <div class="row g-3 align-items-end">
-                <div class="col-md-3"><label class="form-label fw-bold">إجمالي القماش المستخدم (متر)</label><input type="text" id="total-fabric-used" class="form-control-plaintext fs-5" readonly></div>
+                <div class="col-md-3"><label class="form-label fw-bold">إجمالي القماش المستخدم (م)</label><input type="text" id="total-fabric-used" class="form-control-plaintext fs-5" readonly></div>
                 <div class="col-md-3"><label class="form-label fw-bold">إجمالي المنتجات المقصوصة</label><input type="text" id="total-pieces-cut" class="form-control-plaintext fs-5" readonly></div>
-                <div class="col-md-3"><label for="{{ form.fabric_waste.id_for_label }}" class="form-label fw-bold">الهدر المحسوب (متر)</label>{% render_field form.fabric_waste class="form-control calculated-output" readonly=True %}</div>
+                <div class="col-md-3"><label for="{{ form.fabric_waste.id_for_label }}" class="form-label fw-bold">الهدر المحسوب (م)</label>{% render_field form.fabric_waste class="form-control calculated-output" readonly=True %}</div>
                 <div class="col-md-3"><label for="{{ form.notes.id_for_label }}" class="form-label">ملاحظات عامة</label>{% render_field form.notes class="form-control" rows="1" %}</div>
             </div>
-
-            <!-- Form Actions -->
             <div class="mt-4 pt-3 border-top">
                 <button type="submit" class="btn btn-production"><i class="fas fa-save me-2"></i> حفظ التغييرات</button>
-                <a href="{% if form.instance.pk %}{% url 'production:cutting_detail' form.instance.pk %}{% else %}{% url 'production:cutting_list' %}{% endif %}" class="btn btn-secondary"><i class="fas fa-times me-2"></i> إلغاء</a>
+                <a href="{% if form.instance.pk %}{% url 'production:cutting_detail' form.instance.pk %}{% else %}{% url 'production:cutting_list' %}{% endif %}" class="btn btn-secondary" id="cancel-button"><i class="fas fa-times me-2"></i> إلغاء</a>
             </div>
         </div>
     </div>
@@ -208,6 +200,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // --- Element Selectors ---
+    const form = document.getElementById('cutting-form');
     const productionOrderSelect = document.getElementById('id_production_order');
     const availableSizesContainer = document.getElementById('available-sizes-container');
     const selectedSizesContainer = document.getElementById('selected-sizes-container');
@@ -219,15 +212,86 @@ document.addEventListener('DOMContentLoaded', function() {
     const totalTableFormsInput = document.querySelector(`input[name="tables-TOTAL_FORMS"]`);
     const drawPiecesPreview = document.getElementById('draw-pieces-preview');
     const addDrawLink = document.getElementById('add-draw-link');
-
     const singleLayerPiecesInput = document.getElementById('single-layer-pieces-input');
     const singleLayerLengthInput = document.getElementById('single-layer-length-input');
     const singleLayerOutput = document.getElementById('single-layer-output');
-
-    // New selector for the waste field
     const fabricWasteInput = document.getElementById('id_fabric_waste');
+    const cancelBtn = document.getElementById('cancel-button');
+    const isNewObject = !Boolean("{{ form.instance.pk }}");
 
+    // --- State Management (Save data on refresh) ---
+    const sessionStorageKey = `cuttingFormState_{{ request.user.id }}_{{ form.instance.pk|default:0 }}`;
 
+    const saveState = () => {
+        if (!isNewObject) return; // Only save state for new forms
+        const tables = [];
+        tableBody.querySelectorAll('.cutting-table-form').forEach(row => {
+            const isMarkedForDeletion = row.querySelector('.delete-checkbox')?.checked;
+            if (isMarkedForDeletion) return;
+            tables.push({
+                fabric_length: row.querySelector('[name$="-fabric_length"]').value,
+                layers_count: row.querySelector('[name$="-layers_count"]').value,
+                notes: row.querySelector('[name$="-notes"]').value,
+            });
+        });
+
+        const state = {
+            production_order: form.elements['production_order']?.value,
+            cutter: form.elements['cutter']?.value,
+            cutting_date: form.elements['cutting_date']?.value,
+            marker_sizes: form.elements['marker_sizes']?.value,
+            single_layer_pieces: form.elements['single_layer_pieces']?.value,
+            single_layer_fabric_length: form.elements['single_layer_fabric_length']?.value,
+            single_layer_width: form.elements['single_layer_width']?.value,
+            main_notes: form.elements['notes']?.value,
+            tables: tables,
+        };
+        sessionStorage.setItem(sessionStorageKey, JSON.stringify(state));
+    };
+
+    const loadState = () => {
+        if (!isNewObject) return;
+        const savedState = sessionStorage.getItem(sessionStorageKey);
+        if (!savedState) return;
+        const state = JSON.parse(savedState);
+        
+        for (const key in state) {
+            if (key !== 'tables' && form.elements[key]) {
+                form.elements[key].value = state[key];
+            }
+        }
+        
+        if (state.tables && state.tables.length > 0) {
+            tableBody.innerHTML = '';
+            state.tables.forEach(() => addTableRow());
+            const rows = tableBody.querySelectorAll('.cutting-table-form');
+            rows.forEach((row, index) => {
+                const tableData = state.tables[index];
+                if (tableData) {
+                    row.querySelector('[name$="-fabric_length"]').value = tableData.fabric_length || '';
+                    row.querySelector('[name$="-layers_count"]').value = tableData.layers_count || '';
+                    row.querySelector('[name$="-notes"]').value = tableData.notes || '';
+                }
+            });
+        }
+        
+        if (productionOrderSelect && productionOrderSelect.value) {
+            fetchOrderDetails(productionOrderSelect.value);
+        }
+        initializeMarker();
+        updateAllCalculations();
+    };
+
+    const clearState = () => sessionStorage.removeItem(sessionStorageKey);
+
+    const addTableRow = () => {
+        if (!totalTableFormsInput || !tableTemplate) return;
+        let formIndex = parseInt(totalTableFormsInput.value);
+        tableBody.insertAdjacentHTML('beforeend', tableTemplate.innerHTML.replace(/__prefix__/g, formIndex));
+        totalTableFormsInput.value = formIndex + 1;
+        updateMarkerPieces();
+    };
+    
     // --- Marker and Size Management ---
     function updateHiddenInput() {
         if (!selectedSizesContainer || !hiddenMarkerInput) return;
@@ -273,26 +337,23 @@ document.addEventListener('DOMContentLoaded', function() {
         const pieces = parseFloat(singleLayerPiecesInput.value) || 0;
         const length = parseFloat(singleLayerLengthInput.value) || 0;
         let result = 0;
-        if (length > 0) {
-            result = length/pieces ;
+        if (length > 0 && pieces > 0) {
+            result = length / pieces;
         }
         singleLayerOutput.value = result.toFixed(3);
-        updateWasteCalculation(); // Update waste whenever meterage changes
+        updateWasteCalculation();
     }
 
     function updateWasteCalculation() {
         if (!fabricWasteInput) return;
-        
         const totalFabric = parseFloat(document.getElementById('total-fabric-used').value) || 0;
         const totalPieces = parseFloat(document.getElementById('total-pieces-cut').value) || 0;
         const meterage = parseFloat(singleLayerOutput.value) || 0;
-
         let waste = 0;
         if (totalFabric > 0 && totalPieces > 0 && meterage > 0) {
             const needed = meterage * totalPieces;
             waste = totalFabric - needed;
         }
-        
         fabricWasteInput.value = waste.toFixed(2);
     }
 
@@ -313,7 +374,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const fabricLength = parseFloat(fabricLengthInput.value) || 0;
                 const layersCount = parseInt(layersCountInput.value) || 0;
                 const piecesPerLayer = parseInt(piecesPerLayerInput.value) || 0;
-
                 totalFabric += fabricLength;
                 totalPieces += layersCount * piecesPerLayer;
             }
@@ -321,8 +381,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         document.getElementById('total-fabric-used').value = totalFabric.toFixed(2);
         document.getElementById('total-pieces-cut').value = totalPieces;
-        
-        updateWasteCalculation(); // Update waste whenever main totals change
+        updateWasteCalculation();
     }
 
     // --- Button State Management ---
@@ -338,54 +397,6 @@ document.addEventListener('DOMContentLoaded', function() {
             addDrawLink.classList.add('disabled');
             addDrawLink.setAttribute('title', 'أمر الإنتاج هذا غير مرتبط بقائمة مواد (BOM) أو لم يتم اختياره بعد');
         }
-    }
-
-    // --- Event Listeners ---
-    if (availableSizesContainer) {
-        availableSizesContainer.addEventListener('click', (e) => {
-            if (e.target.classList.contains('size-selector-btn')) addSizeToMarker(e.target.dataset.size);
-        });
-    }
-    if (selectedSizesContainer) {
-        selectedSizesContainer.addEventListener('click', (e) => {
-            if (e.target.classList.contains('remove-size-btn')) {
-                e.target.parentElement.remove();
-                updateHiddenInput();
-            }
-        });
-    }
-    
-    if (addTableButton) {
-        addTableButton.addEventListener('click', () => {
-            if (!totalTableFormsInput || !tableTemplate) return;
-            let formIndex = parseInt(totalTableFormsInput.value);
-            tableBody.insertAdjacentHTML('beforeend', tableTemplate.innerHTML.replace(/__prefix__/g, formIndex));
-            totalTableFormsInput.value = formIndex + 1;
-            updateMarkerPieces();
-        });
-    }
-    
-    if (tableBody) {
-        tableBody.addEventListener('click', (e) => {
-            if (e.target.closest('.remove-table-form')) {
-                e.target.closest('.cutting-table-form').remove();
-                updateAllCalculations();
-            } else if (e.target.matches('.delete-checkbox')) {
-                e.target.closest('.cutting-table-form').style.display = e.target.checked ? 'none' : '';
-                updateAllCalculations();
-            }
-        });
-        tableBody.addEventListener('input', (e) => {
-            if (e.target.classList.contains('calculation-input')) {
-                updateAllCalculations();
-            }
-        });
-    }
-
-    if (singleLayerPiecesInput || singleLayerLengthInput) {
-        [singleLayerPiecesInput, singleLayerLengthInput].forEach(input => {
-            if(input) input.addEventListener('input', calculateSingleLayerMeterage);
-        });
     }
 
     // --- AJAX and Data Fetching ---
@@ -419,7 +430,7 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch(`{% url 'production:get_order_details_ajax' %}?order_id=${orderId}`)
             .then(response => response.ok ? response.json() : Promise.reject('Network error'))
             .then(data => {
-                if (!data.error) {
+                if (data.success) {
                     if (availableSizesContainer) {
                         availableSizesContainer.innerHTML = '';
                         if (data.size_group && data.size_group.sizes.length > 0) {
@@ -441,20 +452,56 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
     
-    // --- Initialization ---
+    // --- Event Listeners Setup ---
+    if (form) {
+        form.addEventListener('input', saveState);
+        form.addEventListener('change', saveState);
+        form.addEventListener('submit', clearState);
+    }
+    if (cancelBtn) cancelBtn.addEventListener('click', clearState);
+    if (addTableButton) addTableButton.addEventListener('click', addTableRow);
+
+    if (availableSizesContainer) {
+        availableSizesContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('size-selector-btn')) addSizeToMarker(e.target.dataset.size);
+        });
+    }
+    if (selectedSizesContainer) {
+        selectedSizesContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-size-btn')) {
+                e.target.parentElement.remove();
+                updateHiddenInput();
+            }
+        });
+    }
+    
+    if (tableBody) {
+        tableBody.addEventListener('click', (e) => {
+            if (e.target.closest('.remove-table-form')) {
+                e.target.closest('.cutting-table-form').remove();
+                updateAllCalculations();
+            } else if (e.target.matches('.delete-checkbox')) {
+                e.target.closest('.cutting-table-form').style.display = e.target.checked ? 'none' : '';
+                updateAllCalculations();
+            }
+        });
+        tableBody.addEventListener('input', (e) => {
+            if (e.target.classList.contains('calculation-input')) {
+                updateAllCalculations();
+            }
+        });
+    }
+
+    [singleLayerPiecesInput, singleLayerLengthInput].forEach(input => {
+        if(input) input.addEventListener('input', calculateSingleLayerMeterage);
+    });
+    
     if (productionOrderSelect) {
         productionOrderSelect.addEventListener('change', (e) => fetchOrderDetails(e.target.value));
-        const initialOrderId = `{% if form.instance.pk %}{{ form.instance.production_order.pk }}{% endif %}`;
-        if(initialOrderId) {
-            fetchOrderDetails(initialOrderId);
-        } else if (productionOrderSelect.value) {
-            fetchOrderDetails(productionOrderSelect.value);
-        } else {
-            updateAddDrawLinkState(null);
-        }
     }
-    initializeMarker();
-    updateAllCalculations();
+    
+    // --- Initial Load ---
+    loadState();
 });
 </script>
 {% endblock %}

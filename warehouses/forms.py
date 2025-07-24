@@ -201,7 +201,7 @@ class ProductForm(forms.ModelForm):
             'cost_price', 'selling_price', 'min_stock_level', 
             'unit',  'is_active',
             'colors', 'width', 'quality_grade', 
-            'size_group', 'fabric_quantity_per_piece'
+            'size_groups', 'fabric_quantity_per_piece'
         ]
         widgets = {
             # General Fields
@@ -225,7 +225,7 @@ class ProductForm(forms.ModelForm):
             
             # Finished Product fields
             'selling_price': forms.NumberInput(attrs={'class': 'form-control'}),
-            'size_group': forms.Select(attrs={'class': 'form-select'}),
+            'size_groups': forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}), # <--- CHANGE THIS
             'fabric_quantity_per_piece': forms.NumberInput(attrs={'class': 'form-control'}),
         }
 
@@ -251,14 +251,12 @@ class ProductForm(forms.ModelForm):
             self.fields['category'].queryset = Category.objects.filter(is_active=True)
 
         # Handle the size_group field safely
-        if 'size_group' in self.fields:
+        if 'size_groups' in self.fields: # <--- CHANGE THIS
             if PRODUCTION_APP_AVAILABLE:
-                self.fields['size_group'].queryset = SizeGroup.objects.all()
+                self.fields['size_groups'].queryset = SizeGroup.objects.all() # <--- CHANGE THIS
             else:
-                # If the production app isn't available, hide the field
-                self.fields['size_group'].widget = forms.HiddenInput()
-                self.fields['size_group'].disabled = True
-
+                self.fields['size_groups'].widget = forms.HiddenInput() # <--- CHANGE THIS
+                self.fields['size_groups'].disabled = True # <--- CHANGE THIS
 
     def clean(self):
         """
@@ -333,6 +331,7 @@ class StockMovementForm(forms.ModelForm):
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'ملاحظات'}),
         }
 
+# In your StockTransferForm
 class StockTransferForm(forms.ModelForm):
     class Meta:
         model = StockTransfer
@@ -344,17 +343,35 @@ class StockTransferForm(forms.ModelForm):
             'quantity': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'reason': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'سبب التحويل'}),
         }
-    
+
     def clean(self):
         cleaned_data = super().clean()
         from_warehouse = cleaned_data.get('from_warehouse')
         to_warehouse = cleaned_data.get('to_warehouse')
-        
+        product = cleaned_data.get('product')
+        quantity = cleaned_data.get('quantity')
+
         if from_warehouse and to_warehouse and from_warehouse == to_warehouse:
+            # This validation for same warehouse is already correct
             raise forms.ValidationError('لا يمكن التحويل من نفس المخزن إلى نفسه')
-        
+
+        # --- FIX: Add quantity and stock validation here ---
+        if from_warehouse and product and quantity:
+            try:
+                stock_item = StockItem.objects.get(
+                    warehouse=from_warehouse,
+                    product=product
+                )
+                if stock_item.available_quantity < quantity:
+                    # This error will now be attached to the form
+                    raise forms.ValidationError(
+                        f"الكمية المطلوبة ({quantity}) غير متوفرة في المخزن المصدر. الكمية المتاحة: {stock_item.available_quantity}"
+                    )
+            except StockItem.DoesNotExist:
+                # This error will also be attached to the form
+                raise forms.ValidationError(f"المنتج '{product.name}' غير موجود في المخزن المصدر.")
+
         return cleaned_data
-    
 # Add these new forms to your existing forms.py
 
 class UnitForm(forms.ModelForm):

@@ -1,0 +1,44 @@
+{% extends "finance/base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 fw-bold text-primary">{{ page_title }}</h6>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="{{ form.name.id_for_label }}" class="form-label">اسم الحساب</label>
+                        {{ form.name }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="{{ form.code.id_for_label }}" class="form-label">كود الحساب</label>
+                        {{ form.code }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="{{ form.category.id_for_label }}" class="form-label">الفئة</label>
+                        {{ form.category }}
+                    </div>
+                    <div class="form-check mb-3">
+                        {{ form.is_active }}
+                        <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                            نشط
+                        </label>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-end">
+                        <a href="{% url 'finance:chart_of_accounts' %}" class="btn btn-secondary me-2">إلغاء</a>
+                        <button type="submit" class="btn btn-primary">حفظ الحساب</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

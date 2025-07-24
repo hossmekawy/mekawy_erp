@@ -104,3 +104,15 @@ def sidebar_context(request):
             }
 
     return {'sidebar_nav_items': resolved_nav}
+
+
+from django.conf import settings
+
+def project_paths(request):
+    """
+    Adds the project's base directory path to the template context.
+    This is used to construct absolute file paths for resources like fonts in PDF generation.
+    """
+    return {
+        'BASE_DIR': settings.BASE_DIR
+    }

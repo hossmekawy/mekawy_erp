@@ -62,6 +62,7 @@ urlpatterns = [
     path('ajax/categories/<int:category_id>/delete/', category_size_blueprint.delete_category_ajax, name='delete_category_ajax'),
     path('ajax/categories/<int:category_id>/get/', category_size_blueprint.get_category_ajax, name='get_category_ajax'),
     path('ajax/categories/<int:category_id>/toggle-status/', category_size_blueprint.toggle_category_status_ajax, name='toggle_category_status_ajax'),
+    path('ajax/get-dyeing-process-details/', views.ajax_get_dyeing_process_details, name='ajax_get_dyeing_process_details'),
 
     path('ajax/size-groups/create/', category_size_blueprint.create_size_group_ajax, name='create_size_group_ajax'),
     path('ajax/size-groups/<int:size_group_id>/update/', category_size_blueprint.update_size_group_ajax, name='update_size_group_ajax'),
@@ -143,6 +144,7 @@ urlpatterns = [
     
     path('ajax/calculate-fabric-requirement/', views.calculate_fabric_requirement_ajax, name='calculate_fabric_requirement_ajax'),
     path('ajax/get-draws-for-order/', views.get_draws_for_order_ajax, name='ajax_get_draws_for_order'),
+    path('ajax/exit-permits/create/', views.create_exit_permit_ajax, name='ajax_create_exit_permit'),
 
     # =============================================================================
     #  FIX: ADD THE MISSING AJAX URL PATTERNS HERE

@@ -1,0 +1,81 @@
+{% extends "finance/base.html" %}
+{% load static finance_tags %}
+
+{% block title %}الميزانية العمومية{% endblock %}
+
+{% block content %}
+<div class="card shadow">
+    <div class="card-header py-3">
+        <h6 class="m-0 fw-bold text-primary">الميزانية العمومية كما في تاريخ {{ report_date }}</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <!-- Assets Column -->
+            <div class="col-lg-6">
+                <h4 class="mb-3">الأصول</h4>
+                {% for category in asset_categories %}
+                    <h6 class="text-muted">{{ category.name }}</h6>
+                    <ul class="list-group list-group-flush mb-3">
+                        {% for account in category.accounts.all %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>{{ account.name }}</span>
+                            <span>{{ account.balance|currency }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% endfor %}
+                <div class="list-group-item d-flex justify-content-between bg-light fw-bold p-3">
+                    <span>إجمالي الأصول</span>
+                    <span>{{ total_assets|currency }}</span>
+                </div>
+            </div>
+
+            <!-- Liabilities & Equity Column -->
+            <div class="col-lg-6">
+                <h4 class="mb-3">الخصوم وحقوق الملكية</h4>
+                
+                <!-- Liabilities -->
+                {% for category in liability_categories %}
+                    <h6 class="text-muted">{{ category.name }}</h6>
+                    <ul class="list-group list-group-flush mb-3">
+                        {% for account in category.accounts.all %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>{{ account.name }}</span>
+                            <span>{{ account.balance|currency }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% endfor %}
+                <div class="list-group-item d-flex justify-content-between bg-light-subtle fw-bold p-2">
+                    <span>إجمالي الخصوم</span>
+                    <span>{{ total_liabilities|currency }}</span>
+                </div>
+
+                <!-- Equity -->
+                {% for category in equity_categories %}
+                    <h6 class="text-muted mt-4">{{ category.name }}</h6>
+                    <ul class="list-group list-group-flush mb-3">
+                        {% for account in category.accounts.all %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>{{ account.name }}</span>
+                            <span>{{ account.balance|currency }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% endfor %}
+                <div class="list-group-item d-flex justify-content-between bg-light-subtle fw-bold p-2">
+                    <span>إجمالي حقوق الملكية</span>
+                    <span>{{ total_equity|currency }}</span>
+                </div>
+
+                <!-- Total -->
+                <div class="list-group-item d-flex justify-content-between bg-light fw-bold p-3 mt-4">
+                    <span>إجمالي الخصوم وحقوق الملكية</span>
+                    <span>{{ total_liabilities_and_equity|currency }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

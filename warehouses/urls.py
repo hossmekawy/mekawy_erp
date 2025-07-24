@@ -37,10 +37,13 @@ urlpatterns = [
     # Products
     path('products/', views.ProductListView.as_view(), name='product_list'),
     path('products/add/', views.ProductCreateView.as_view(), name='product_add'),
+    path('products/import/', views.ProductImportView.as_view(), name='product_import'),
+    path('products/import/template/<str:template_type>/', views.download_product_import_template, name='product_import_template'),
     path('products/<int:pk>/', views.ProductDetailView.as_view(), name='product_detail'),
     path('products/<int:pk>/edit/', views.ProductUpdateView.as_view(), name='product_edit'),
     path('products/<int:pk>/delete/', views.ProductDeleteView.as_view(), name='product_delete'),
     path('products/<int:pk>/export/pdf/', views.ProductDetailPDFView.as_view(), name='product_detail_pdf'),
+    path('products/export/pdf/', views.ProductListPDFView.as_view(), name='product_list_pdf'), # <-- ADD THIS LINE
 
     # Stock
     path('stock/', views.StockListView.as_view(), name='stock_list'),
@@ -50,6 +53,7 @@ urlpatterns = [
     path('stock/low/', views.LowStockView.as_view(), name='low_stock'),
     path('stock/out/', views.OutOfStockView.as_view(), name='out_of_stock'),
     path('stock/low/export/pdf/', views.LowStockPDFView.as_view(), name='low_stock_pdf'), # New URL
+    path('movements/print/', views.print_stock_movements_pdf, name='movement_print'),
 
     path('stock/<int:pk>/export/pdf/', views.StockItemDetailPDFView.as_view(), name='stock_detail_pdf'), # New URL
 

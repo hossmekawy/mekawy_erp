@@ -78,7 +78,6 @@
 
 {% block content %}
 <div class="container-fluid">
-    <!-- Page Header -->
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <h1 class="h3 mb-0 text-gray-800">
             <i class="fas fa-box text-primary"></i>
@@ -98,7 +97,6 @@
     </div>
 
     <div class="row">
-        <!-- Product Details Column -->
         <div class="col-lg-5">
             <div class="card shadow mb-4 details-card">
                 <div class="card-header py-3">
@@ -155,13 +153,22 @@
                     <ul class="list-group list-group-flush">
                         <li class="list-group-item"><strong>الألوان:</strong> {{ product.colors|default:"-" }}</li>
                         <li class="list-group-item">
-                            <strong>مجموعة المقاسات:</strong> {{ product.size_group.name|default:"-" }}
-                            {% if product.size_group and product.size_group.sizes.all %}
+                            <strong>مجموعات المقاسات المتاحة:</strong>
+                            {% if product.size_groups.all %}
                                 <div class="mt-2">
-                                    {% for size in product.size_group.sizes.all %}
-                                        <span class="badge bg-secondary me-1">{{ size.name }}</span>
+                                    {% for group in product.size_groups.all %}
+                                        <span class="badge bg-primary me-1 mb-1 fs-6">
+                                            {{ group.name }}
+                                            {% if group.sizes.all %}
+                                            <small class="d-block">
+                                                ({% for size in group.sizes.all %}{{ size.name }}{% if not forloop.last %}, {% endif %}{% endfor %})
+                                            </small>
+                                            {% endif %}
+                                        </span>
                                     {% endfor %}
                                 </div>
+                            {% else %}
+                                -
                             {% endif %}
                         </li>
                         <li class="list-group-item"><strong>كمية القماش للقطعة:</strong> {{ product.fabric_quantity_per_piece|default:"-" }}</li>
@@ -171,7 +178,6 @@
             {% endif %}
         </div>
 
-        <!-- Stock and Movements Column -->
         <div class="col-lg-7">
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
@@ -259,7 +265,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- Data passed safely from Django to JavaScript -->
 <script id="chart-data" type="application/json">
 {
     "total_stock": {{ product.total_stock|floatformat:"-10" }},

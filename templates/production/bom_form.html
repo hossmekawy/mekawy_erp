@@ -374,19 +374,22 @@ $(document).ready(function() {
     function formatMaterialResult(data) {
         if (data.loading) return data.text;
         if (!data.name) return data.text;
-
+        const code = data.code || '{% trans "غير محدد" %}';
+    const cost = parseFloat(data.cost || 0).toFixed(2);
+    const unit = data.unit || '';
+    const available = data.available != null ? data.available : '--'; // Check for null/undefined
         return $(
             `<div class="select2-result-material">
                 <div class="select2-result-material__meta">
                     <div class="select2-result-material__title">${data.name}</div>
-                    <div class="select2-result-material__description">الكود: ${data.code}</div>
+                    <div class="select2-result-material__description">الكود: ${code}</div>
                 </div>
                 <div class="select2-result-material__statistics">
                     <div class="select2-result-material__cost">
-                        <i class="fas fa-tag"></i> ${data.cost} / ${data.unit}
+                        <i class="fas fa-tag"></i> ${cost} / ${unit}
                     </div>
                     <div class="select2-result-material__available">
-                        <i class="fas fa-boxes"></i> ${data.available}
+                        <i class="fas fa-boxes"></i> ${available}
                     </div>
                 </div>
             </div>`
