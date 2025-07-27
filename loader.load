@@ -1,0 +1,9 @@
+LOAD DATABASE
+    FROM sqlite:///root/db.sqlite3
+    INTO postgresql://mekawy_user:Sahs223344@localhost:5433/mekawy_erp
+
+WITH
+    include drop,
+    create tables,
+    create indexes,
+    reset sequences;

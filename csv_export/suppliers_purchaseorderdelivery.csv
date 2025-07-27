@@ -1,0 +1,1 @@
+id,delivery_number,delivery_date,delivery_notes,quality_check_passed,quality_notes,is_complete,created_at,purchase_order_id,received_by_id,warehouse_id

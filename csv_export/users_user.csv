@@ -1,0 +1,3 @@
+id,password,last_login,is_superuser,username,first_name,last_name,is_staff,date_joined,email,phone,role,department,profile_picture,is_active,created_at,updated_at
+1,pbkdf2_sha256$1000000$yaWKOg1lEvUnvylnkhEUed$L97BM4Gnb6JblXz3/LcsgAw6efGiXf0i74noOmq7dUY=,2025-07-26 13:54:02.383177,1,hussien,hussien,mekawy,1,2025-07-05 11:31:32.869042,hussienemawy38@gmail.com,,admin,,,1,2025-07-05 11:31:33.509303,2025-07-05 11:31:33.509303
+2,pbkdf2_sha256$1000000$6G4cnkkhf50t5PuHgNEwSh$enccH0ERfVYJawB6D+jh1uktEkFMLiY95ZUg5pOxrf0=,,0,ahmedhamada,Ahmed,Hamada,0,2025-07-12 11:18:02.770533,ahmedhamada@gmail.com,,employee,,,1,2025-07-12 11:18:03.426628,2025-07-12 11:18:03.426628

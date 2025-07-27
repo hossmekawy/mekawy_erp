@@ -45,7 +45,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000',
     'http://192.168.1.100:8000', # Your local network IP
     'http://192.168.1.200:8000', # Your local network IP
-
+    'http://167.86.71.246'
 ]
 
 INSTALLED_APPS = [
@@ -290,5 +290,4 @@ PWA_APP_DIR = 'rtl'
 PWA_APP_LANG = 'ar'
 PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'static', 'js', 'serviceworker.js')
 
-WKHTMLTOPDF_PATH = os.path.join(BASE_DIR, 'bin', 'wkhtmltopdf.exe')
-
+WKHTMLTOPDF_PATH = '/usr/local/bin/wkhtmltopdf'

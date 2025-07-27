@@ -1,0 +1,1 @@
+id,name,code,supplier_type,contact_person,phone,email,address,bank_name,account_number,account_holder_name,supported_payment_methods,credit_limit,payment_terms_days,is_active,current_rating,created_at,updated_at,created_by_id,instapay_identifier,smart_wallet_phone

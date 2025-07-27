@@ -1,0 +1,2 @@
+id,ironing_completed,belt_loops_completed,buttons_completed,leather_details_completed,cleaning_completed,pressing_completed,ticketing_completed,bagging_completed,packaging_completed,quantity_input,quantity_output,defects_in_finishing,total_finishing_cost,start_date,expected_completion_date,actual_completion_date,notes,is_completed,dyeing_process_id,supervisor_id,destination_warehouse_id,external_manufacturer_id,finisher_id,finishing_type
+1,0,0,0,0,0,0,0,0,0,813,0,0,0,2025-07-22 12:57:29,2025-07-25,,,0,2,,4,7,,outsourced
