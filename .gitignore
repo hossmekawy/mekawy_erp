@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+db.sqlite3
+csv_export/
+csv_export.zip
+data.json

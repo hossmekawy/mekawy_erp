@@ -1,1 +1,0 @@
-id,check_type,check_date,items_checked,items_passed,overall_grade,defect_description,corrective_actions,approved,notes,approved_by_id,inspector_id,production_order_id,assembly_process_id,cutting_process_id,dyeing_process_id,finishing_process_id,items_failed

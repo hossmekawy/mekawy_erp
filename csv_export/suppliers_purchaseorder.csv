@@ -1,1 +1,0 @@
-id,po_number,order_date,expected_delivery_date,actual_delivery_date,status,priority,subtotal,tax_amount,discount_amount,total_amount,notes,terms_conditions,created_at,updated_at,approved_at,approved_by_id,created_by_id,supplier_id

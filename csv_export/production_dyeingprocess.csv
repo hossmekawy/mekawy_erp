@@ -1,3 +1,0 @@
-id,color_specification,quantity_sent,quantity_received,losses_count,total_dyeing_cost,sent_date,expected_return_date,actual_return_date,notes,is_completed,assembly_process_id,dyeing_facility_id
-1,ازرق,1156,0,0,0,2025-07-20 07:37:08,2025-07-24,,,0,2,6
-2,ازرق,813,813,0,0,2025-07-20 07:37:08,2025-07-24,2025-07-22 08:46:15.632152,,1,6,6
