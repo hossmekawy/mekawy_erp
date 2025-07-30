@@ -17,7 +17,14 @@ class RoleBasedAccessMiddleware(MiddlewareMixin):
             'dashboard', 'users:profile', 'users:profile_edit',
             'warehouses', 'suppliers', 'production'
         ],
-        'warehouse_manager': ['warehouses:*'],
+                'warehouse_manager': [
+            'dashboard:index',
+            'users:profile',
+            'users:profile_edit',
+            'users:password_change',
+            'users:password_change_done',
+            'warehouses:*'
+        ],
         'warehouse_employee': [
             'warehouses:dashboard',
             'warehouses:stock_list',

@@ -3,7 +3,7 @@ from django.conf import settings
 from django.shortcuts import render, get_object_or_404, redirect
 from django.template.loader import render_to_string
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView, TemplateView, View
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.db.models import Q, F, Sum, Count, ExpressionWrapper
 from django.db import transaction  # Import transaction module
@@ -26,7 +26,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.views.decorators.http import require_http_methods
 import csv
 from datetime import datetime, timedelta
-from .forms import CategoryForm, StockItemUpdateForm, StockTransferForm, WarehouseForm, ProductForm, StockItemForm, UnitForm,UnitConversionForm
+from .forms import CategoryForm, StockItemUpdateForm, StockTransferForm, WarehouseForm, ProductForm, StockItemForm, UnitForm,UnitConversionForm, StockMovementForm
 from django import forms  # <-- Add this import to fix the error
 # views.py
 from django.core.exceptions import AppRegistryNotReady  # Add this import above
@@ -55,12 +55,11 @@ class WarehouseDashboardView(LoginRequiredMixin, TemplateView):
         return context
 
 # Categories
-class CategoryListView(LoginRequiredMixin, PermissionRequiredMixin,ListView):
+class CategoryListView(LoginRequiredMixin,ListView):
     model = Category
     template_name = 'warehouses/category_list.html'
     context_object_name = 'categories'
     paginate_by = 20
-    permission_required = 'warehouses.view_category'
     def get_queryset(self):
         queryset = Category.objects.all()
         search = self.request.GET.get('search')
@@ -79,12 +78,11 @@ class CategoryListView(LoginRequiredMixin, PermissionRequiredMixin,ListView):
             
         return queryset.order_by('name')
 
-class CategoryCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+class CategoryCreateView(LoginRequiredMixin, CreateView):
     model = Category
     form_class = CategoryForm
     template_name = 'warehouses/category_form.html'
     success_url = reverse_lazy('warehouses:category_list')
-    permission_required = 'warehouses.add_category'
     def form_valid(self, form):
         messages.success(self.request, 'تم إضافة التصنيف بنجاح!')
         return super().form_valid(form)
@@ -93,11 +91,10 @@ class CategoryCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
         messages.error(self.request, 'يرجى تصحيح الأخطاء المذكورة.')
         return super().form_invalid(form)
 
-class CategoryDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
+class CategoryDetailView(LoginRequiredMixin, DetailView):
     model = Category
     template_name = 'warehouses/category_detail.html'
     context_object_name = 'category'
-    permission_required = 'warehouses.view_category'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -114,12 +111,11 @@ class CategoryDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView
         context['products_page'] = products_page
         context['products_count'] = product_list.count()
         return context
-class CategoryUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+class CategoryUpdateView(LoginRequiredMixin, UpdateView):
     model = Category
     form_class = CategoryForm
     template_name = 'warehouses/category_form.html'
     success_url = reverse_lazy('warehouses:category_list')
-    permission_required = 'warehouses.change_category'
     def form_valid(self, form):
         messages.success(self.request, 'تم تحديث التصنيف بنجاح!')
         return super().form_valid(form)
@@ -128,13 +124,12 @@ class CategoryUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView
         messages.error(self.request, 'يرجى تصحيح الأخطاء المذكورة.')
         return super().form_invalid(form)
 
-class CategoryDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
+class CategoryDeleteView(LoginRequiredMixin, DeleteView):
     model = Category
     template_name = 'warehouses/category_confirm_delete.html'
     success_url = reverse_lazy('warehouses:category_list')
     required_roles = ['admin']
-    permission_required = 'warehouses.delete_category'
-class CategorySearchView(LoginRequiredMixin, PermissionRequiredMixin,View):
+class CategorySearchView(LoginRequiredMixin,View):
     def get(self, request):
         search = request.GET.get('q', '')
         categories = Category.objects.filter(
@@ -145,12 +140,11 @@ class CategorySearchView(LoginRequiredMixin, PermissionRequiredMixin,View):
         return JsonResponse({'categories': data})
 
 # Products
-class ProductListView(LoginRequiredMixin, PermissionRequiredMixin,ListView):
+class ProductListView(LoginRequiredMixin,ListView):
     model = Product
     template_name = 'warehouses/product_list.html'
     context_object_name = 'products'
     paginate_by = 25
-    permission_required = 'warehouses.view_product'
     
     def get_queryset(self):
         queryset = Product.objects.select_related('category').all()
@@ -177,12 +171,36 @@ class ProductListView(LoginRequiredMixin, PermissionRequiredMixin,ListView):
         context['categories'] = Category.objects.filter(is_active=True)
         context['product_types'] = Product.PRODUCT_TYPES
         return context
+class WarehouseProductStockAPIView(LoginRequiredMixin, View):
+    """
+    API endpoint to fetch products that have a stock item in a specific warehouse.
+    Returns a list of products with their ID, name, and available quantity.
+    """
+    def get(self, request, warehouse_id):
+        try:
+            # We only want products that actually exist as StockItems in this warehouse
+            # and are active.
+            stock_items = StockItem.objects.filter(
+                warehouse_id=warehouse_id,
+                product__is_active=True
+            ).select_related('product').order_by('product__name')
 
-class ProductListPDFView(LoginRequiredMixin, PermissionRequiredMixin, View):
+            products_data = []
+            for item in stock_items:
+                products_data.append({
+                    'id': item.product.id,
+                    'name': f"{item.product.name} ({item.product.code})",
+                    'available_quantity': float(item.available_quantity)
+                })
+
+            return JsonResponse({'products': products_data})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+class ProductListPDFView(LoginRequiredMixin, View):
     """
     Generates a PDF report for the filtered list of products.
     """
-    permission_required = 'warehouses.view_product'
     template_name = 'pdf/warehouses/product_list_pdf.html'
 
     def get(self, request, *args, **kwargs):
@@ -244,22 +262,20 @@ class ProductListPDFView(LoginRequiredMixin, PermissionRequiredMixin, View):
             return redirect('warehouses:product_list')
 
 
-class ProductCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+class ProductCreateView(LoginRequiredMixin, CreateView):
     model = Product
     form_class = ProductForm # Use the new comprehensive form
     template_name = 'warehouses/product_form.html'
     success_url = reverse_lazy('warehouses:product_list')
-    permission_required = 'warehouses.add_product'
 
     def form_valid(self, form):
         messages.success(self.request, "تم إنشاء المنتج بنجاح.")
         return super().form_valid(form)
 
-class ProductDetailView(LoginRequiredMixin,PermissionRequiredMixin, DetailView):
+class ProductDetailView(LoginRequiredMixin, DetailView):
     model = Product
     template_name = 'warehouses/product_detail.html'
     context_object_name = 'product'
-    permission_required = 'warehouses.view_product'
 
 
     
@@ -272,22 +288,20 @@ class ProductDetailView(LoginRequiredMixin,PermissionRequiredMixin, DetailView):
         ).select_related('stock_item__warehouse', 'created_by')[:10]
         return context
 
-class ProductUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+class ProductUpdateView(LoginRequiredMixin, UpdateView):
     model = Product
     form_class = ProductForm # Use the new comprehensive form
     template_name = 'warehouses/product_form.html'
     success_url = reverse_lazy('warehouses:product_list')
-    permission_required = 'warehouses.change_product'
 
     def form_valid(self, form):
         messages.success(self.request, "تم تحديث المنتج بنجاح.")
         return super().form_valid(form)
 
-class ProductDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
+class ProductDeleteView(LoginRequiredMixin, DeleteView):
     model = Product
     template_name = 'warehouses/product_confirm_delete.html'
     success_url = reverse_lazy('warehouses:product_list')
-    permission_required = 'warehouses.delete_product'
 
     def post(self, request, *args, **kwargs):
         """
@@ -343,12 +357,11 @@ class ProductBarcodeView(LoginRequiredMixin, View):
 # Warehouses
 # Update the WarehouseListView in your existing warehouses/views.py file
 
-class WarehouseListView(LoginRequiredMixin,PermissionRequiredMixin, ListView):
+class WarehouseListView(LoginRequiredMixin, ListView):
     model = Warehouse
     template_name = 'warehouses/warehouse_list.html'
     context_object_name = 'warehouses'
     paginate_by = 12 # Adjusted for card layout
-    permission_required = 'warehouses.view_warehouse'
     
     def get_queryset(self):
         queryset = Warehouse.objects.select_related('manager').all()
@@ -377,12 +390,11 @@ class WarehouseListView(LoginRequiredMixin,PermissionRequiredMixin, ListView):
         })
         return context
 
-class WarehouseCreateView(CreateView ,LoginRequiredMixin, PermissionRequiredMixin):
+class WarehouseCreateView(CreateView ,LoginRequiredMixin):
     model = Warehouse
     form_class = WarehouseForm
     template_name = 'warehouses/warehouse_form.html'
     success_url = reverse_lazy('warehouses:warehouse_list')
-    permission_required = 'warehouses.add_warehouse'
 
     def form_valid(self, form):
         messages.success(self.request, 'تم إنشاء المخزن بنجاح.')
@@ -393,11 +405,10 @@ class WarehouseCreateView(CreateView ,LoginRequiredMixin, PermissionRequiredMixi
         context['title'] = 'إنشاء مخزن جديد'
         return context
 
-class WarehouseDetailView(DetailView ,LoginRequiredMixin, PermissionRequiredMixin):
+class WarehouseDetailView(DetailView ,LoginRequiredMixin):
     model = Warehouse
     template_name = 'warehouses/warehouse_detail.html'
     context_object_name = 'warehouse'
-    permission_required = 'warehouses.view_warehouse'
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -418,12 +429,11 @@ class WarehouseDetailView(DetailView ,LoginRequiredMixin, PermissionRequiredMixi
         context['normal_stock_count'] = normal_stock_count
         return context
 
-class WarehouseUpdateView(UpdateView ,LoginRequiredMixin, PermissionRequiredMixin):
+class WarehouseUpdateView(UpdateView ,LoginRequiredMixin):
     model = Warehouse
     form_class = WarehouseForm
     template_name = 'warehouses/warehouse_form.html'
     success_url = reverse_lazy('warehouses:warehouse_list')
-    permission_required = 'warehouses.change_warehouse'
 
     def form_valid(self, form):
         messages.success(self.request, 'تم تحديث المخزن بنجاح.')
@@ -435,11 +445,10 @@ class WarehouseUpdateView(UpdateView ,LoginRequiredMixin, PermissionRequiredMixi
         return context
 
 # --- FIX: Added the missing WarehouseDeleteView ---
-class WarehouseDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
+class WarehouseDeleteView(LoginRequiredMixin, DeleteView):
     model = Warehouse
     template_name = 'warehouses/warehouse_confirm_delete.html'
     success_url = reverse_lazy('warehouses:warehouse_list')
-    permission_required = 'warehouses.delete_warehouse'
 
     def post(self, request, *args, **kwargs):
         # Add a success message before deleting the object
@@ -461,12 +470,11 @@ class WarehouseSearchView(LoginRequiredMixin, View):
 from django.db.models import Sum, F, DecimalField, Value
 from django.db.models.functions import Coalesce, Cast
 
-class StockListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+class StockListView(LoginRequiredMixin, ListView):
     model = StockItem
     template_name = 'warehouses/stock_list.html'
     context_object_name = 'stock_items'
     paginate_by = 25
-    permission_required = 'warehouses.view_stockitem'
     
     def get_queryset(self):
         queryset = StockItem.objects.select_related('product', 'warehouse', 'product__category')
@@ -542,14 +550,13 @@ class StockListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         return context
 
 
-class StockCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
+class StockCreateView(LoginRequiredMixin, View):
     """
     Handles the creation of new stock items. If a stock item for the selected
     product and warehouse already exists, it adds the specified quantity to it.
     This view is now protected against double-submission errors.
     """
     template_name = 'warehouses/stock_form.html'
-    permission_required = 'warehouses.add_stockitem'
 
     def get_form(self):
         """Defines the form used for creating stock."""
@@ -704,7 +711,6 @@ class StockDetailView(LoginRequiredMixin, DetailView):
     model = StockItem
     template_name = 'warehouses/stock_detail.html'
     context_object_name = 'stock_item'
-    permission_required = 'warehouses.view_stockitem'
 
 
     def get_context_data(self, **kwargs):
@@ -713,12 +719,11 @@ class StockDetailView(LoginRequiredMixin, DetailView):
         return context
 
 
-class InventoryCountView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+class InventoryCountView(LoginRequiredMixin, TemplateView):
     """
     A professional view for performing a full inventory count (جرد المخزون).
     """
     template_name = 'warehouses/inventory_count.html'
-    permission_required = 'warehouses.change_stockitem'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -807,13 +812,12 @@ class InventoryCountView(LoginRequiredMixin, PermissionRequiredMixin, TemplateVi
         # Redirect back to the same page to show the results/messages
         return redirect(f"{reverse('warehouses:inventory_count')}?warehouse={warehouse_id}")
 
-class StockUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+class StockUpdateView(LoginRequiredMixin, UpdateView):
     model = StockItem
     # Use the new, specific update form
     form_class = StockItemUpdateForm
     template_name = 'warehouses/stock_form.html'
     success_url = reverse_lazy('warehouses:stock_list')
-    permission_required = 'warehouses.change_stockitem'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -845,7 +849,6 @@ class LowStockView(LoginRequiredMixin, ListView):
     template_name = 'warehouses/low_stock.html'
     context_object_name = 'stock_items'
     paginate_by = 25
-    permission_required = 'warehouses.view_stockitem'
     
     def get_queryset(self):
         return StockItem.objects.filter(
@@ -925,7 +928,6 @@ class OutOfStockView(LoginRequiredMixin, ListView):
     template_name = 'warehouses/out_of_stock.html'
     context_object_name = 'stock_items'
     paginate_by = 25
-    permission_required = 'warehouses.view_stockitem'
     def get_queryset(self):
         return StockItem.objects.filter(
             quantity=0
@@ -936,7 +938,7 @@ class OutOfStockView(LoginRequiredMixin, ListView):
 # Stock Movements
 class StockMovementListView(LoginRequiredMixin, ListView):
     model = StockMovement
-    template_name = 'warehouses/movement_list.html' # Your template name
+    template_name = 'warehouses/movement_list.html'
     context_object_name = 'movements'
     paginate_by = 25
 
@@ -945,22 +947,34 @@ class StockMovementListView(LoginRequiredMixin, ListView):
             'stock_item__product', 'stock_item__warehouse', 'created_by'
         ).order_by('-created_at')
 
-        # --- Filtering Logic ---
-        self.warehouse_filter = self.request.GET.get('warehouse')
-        if self.warehouse_filter:
-            queryset = queryset.filter(stock_item__warehouse_id=self.warehouse_filter)
-
-        self.movement_type_filter = self.request.GET.get('movement_type')
-        if self.movement_type_filter:
-            queryset = queryset.filter(movement_type=self.movement_type_filter)
-
-        self.date_from_filter = self.request.GET.get('date_from')
-        if self.date_from_filter:
-            queryset = queryset.filter(created_at__date__gte=self.date_from_filter)
+        # --- Filtering & Searching Logic ---
         
-        self.date_to_filter = self.request.GET.get('date_to')
-        if self.date_to_filter:
-            queryset = queryset.filter(created_at__date__lte=self.date_to_filter)
+        # General Search
+        search_query = self.request.GET.get('q', '')
+        if search_query:
+            queryset = queryset.filter(
+                Q(stock_item__product__name__icontains=search_query) |
+                Q(stock_item__product__code__icontains=search_query) |
+                Q(reference_number__icontains=search_query) |
+                Q(notes__icontains=search_query)
+            )
+
+        # Specific Filters
+        warehouse_filter = self.request.GET.get('warehouse')
+        if warehouse_filter:
+            queryset = queryset.filter(stock_item__warehouse_id=warehouse_filter)
+
+        movement_type_filter = self.request.GET.get('movement_type')
+        if movement_type_filter:
+            queryset = queryset.filter(movement_type=movement_type_filter)
+
+        date_from_filter = self.request.GET.get('date_from')
+        if date_from_filter:
+            queryset = queryset.filter(created_at__date__gte=date_from_filter)
+        
+        date_to_filter = self.request.GET.get('date_to')
+        if date_to_filter:
+            queryset = queryset.filter(created_at__date__lte=date_to_filter)
             
         return queryset
 
@@ -968,18 +982,19 @@ class StockMovementListView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['warehouses'] = Warehouse.objects.filter(is_active=True)
         
-        # This is the key for cleaner pagination links
+        # Pass all query parameters to the template for pagination
         query_params = self.request.GET.copy()
         if 'page' in query_params:
             del query_params['page']
         context['query_params'] = query_params.urlencode()
         
-        # Pass filter values back to the template
+        # Pass filter values back to the template to keep them in the form
         context['filters'] = {
-            'warehouse': self.warehouse_filter,
-            'movement_type': self.movement_type_filter,
-            'date_from': self.date_from_filter,
-            'date_to': self.date_to_filter,
+            'q': self.request.GET.get('q', ''),
+            'warehouse': self.request.GET.get('warehouse', ''),
+            'movement_type': self.request.GET.get('movement_type', ''),
+            'date_from': self.request.GET.get('date_from', ''),
+            'date_to': self.request.GET.get('date_to', ''),
         }
         return context
 
@@ -1062,34 +1077,59 @@ def print_stock_movements_pdf(request):
     except Exception as e:
         return HttpResponse(f"Error generating PDF: {e}<br>Please ensure wkhtmltopdf is installed and configured correctly in settings.py.", status=500)
     
-class StockMovementCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+class StockMovementCreateView(LoginRequiredMixin, CreateView):
     model = StockMovement
+    form_class = StockMovementForm
     template_name = 'warehouses/movement_form.html'
-    fields = ['stock_item', 'movement_type', 'quantity', 'reference_number', 'notes']
     success_url = reverse_lazy('warehouses:movement_list')
-    permission_required = 'warehouses.add_stockmovement'
-    
+
+    def get_initial(self):
+        """
+        If a product_id is passed in the URL, this pre-fills the
+        product search field.
+        """
+        initial = super().get_initial()
+        product_id = self.request.GET.get('product_id')
+        if product_id:
+            try:
+                product = Product.objects.get(pk=product_id)
+                initial['product'] = product.pk
+                initial['product_search'] = f"{product.name} ({product.code})"
+            except Product.DoesNotExist:
+                pass
+        return initial
+
     def form_valid(self, form):
+        warehouse = form.cleaned_data['warehouse']
+        product = form.cleaned_data['product']
+        
+        # This logic is key: it finds an existing stock item or creates a new one.
+        # This is exactly what's needed to add a product to a warehouse for the first time.
+        stock_item, created = StockItem.objects.get_or_create(
+            warehouse=warehouse,
+            product=product,
+            defaults={'quantity': 0}
+        )
+        
+        # Prevent creating an 'out' movement for a newly created (and thus empty) stock item.
+        if created and form.cleaned_data['movement_type'] == 'out':
+            messages.error(self.request, 'لا يمكن عمل حركة "صادر" لمنتج ليس له رصيد في هذا المخزن.')
+            stock_item.delete() # Clean up the empty item that was created
+            return self.form_invalid(form)
+
+        # Associate the found/created stock_item with the movement instance.
+        form.instance.stock_item = stock_item
         form.instance.created_by = self.request.user
         
-        # --- FIX: Removed manual stock update logic ---
-        # The post_save signal in signals.py now handles all quantity updates.
-        
-        # Check for sufficient quantity for 'out' movements BEFORE saving
-        if form.instance.movement_type == 'out':
-            stock_item = form.instance.stock_item
-            if stock_item.available_quantity < form.instance.quantity:
-                messages.error(self.request, 'الكمية المطلوبة غير متوفرة في المخزون.')
-                return self.form_invalid(form)
-
         messages.success(self.request, 'تم إنشاء حركة المخزون بنجاح.')
         return super().form_valid(form)
 
-class StockMovementDetailView(LoginRequiredMixin,PermissionRequiredMixin, DetailView):
+
+
+class StockMovementDetailView(LoginRequiredMixin, DetailView):
     model = StockMovement
     template_name = 'warehouses/movement_detail.html'
     context_object_name = 'movement'
-    permission_required = 'warehouses.view_stockmovement'
 
 
 
@@ -1142,13 +1182,12 @@ class StockTransferListView(LoginRequiredMixin, ListView):
 
 
 # In your StockTransferCreateView
-class StockTransferCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+class StockTransferCreateView(LoginRequiredMixin, CreateView):
     model = StockTransfer
     # --- FIX: Use the form_class we just updated ---
     form_class = StockTransferForm
     template_name = 'warehouses/transfer_form.html'
     success_url = reverse_lazy('warehouses:transfer_list')
-    permission_required = 'warehouses.add_stocktransfer'
 
     def form_valid(self, form):
         # The validation logic is now in the form, so form_valid is much cleaner.
@@ -1174,8 +1213,7 @@ class StockTransferDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'transfer'
 
 
-class StockTransferApproveView(LoginRequiredMixin, PermissionRequiredMixin, View):
-    permission_required = 'warehouses.change_stocktransfer'    
+class StockTransferApproveView(LoginRequiredMixin, View):
     def post(self, request, pk):
         transfer = get_object_or_404(StockTransfer, pk=pk)
         
@@ -1210,8 +1248,7 @@ class StockTransferApproveView(LoginRequiredMixin, PermissionRequiredMixin, View
         return redirect('warehouses:transfer_detail', pk=pk)
 
 
-class StockTransferCompleteView(LoginRequiredMixin, PermissionRequiredMixin, View):
-    permission_required = 'warehouses.change_stocktransfer'    
+class StockTransferCompleteView(LoginRequiredMixin, View):
     def post(self, request, pk):
         transfer = get_object_or_404(StockTransfer, pk=pk)
         
@@ -1275,13 +1312,12 @@ class StockTransferCompleteView(LoginRequiredMixin, PermissionRequiredMixin, Vie
 
 
 # Additional utility views
-class StockAdjustmentView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+class StockAdjustmentView(LoginRequiredMixin, TemplateView):
     """
     A view for performing stock adjustments for a selected warehouse.
     Handles both displaying the stock items and processing the adjustments.
     """
     template_name = 'warehouses/stock_adjustment.html'
-    permission_required = 'warehouses.change_stockitem'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -2224,32 +2260,29 @@ class UnitListView(LoginRequiredMixin, ListView):
             
         return queryset.order_by('name')
 
-class UnitCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+class UnitCreateView(LoginRequiredMixin, CreateView):
     model = Unit
     form_class = UnitForm
     template_name = 'warehouses/unit_form.html'
     success_url = reverse_lazy('warehouses:unit_list')
-    permission_required = 'warehouses.add_unit'    
     
     def form_valid(self, form):
         messages.success(self.request, 'تم إضافة الوحدة بنجاح!')
         return super().form_valid(form)
 
-class UnitUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+class UnitUpdateView(LoginRequiredMixin, UpdateView):
     model = Unit
     form_class = UnitForm
     template_name = 'warehouses/unit_form.html'
     success_url = reverse_lazy('warehouses:unit_list')
-    permission_required = 'warehouses.change_unit'    
     def form_valid(self, form):
         messages.success(self.request, 'تم تحديث الوحدة بنجاح!')
         return super().form_valid(form)
 
-class UnitDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
+class UnitDeleteView(LoginRequiredMixin, DeleteView):
     model = Unit
     template_name = 'warehouses/unit_confirm_delete.html'
     success_url = reverse_lazy('warehouses:unit_list')
-    permission_required = 'warehouses.delete_unit'
 # Unit Conversions Management
 class UnitConversionListView(LoginRequiredMixin, ListView):
     model = UnitConversion
@@ -2260,31 +2293,28 @@ class UnitConversionListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         return UnitConversion.objects.select_related('from_unit', 'to_unit').order_by('from_unit__name')
 
-class UnitConversionCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+class UnitConversionCreateView(LoginRequiredMixin, CreateView):
     model = UnitConversion
     form_class = UnitConversionForm
     template_name = 'warehouses/unit_conversion_form.html'
     success_url = reverse_lazy('warehouses:unit_conversion_list')
-    permission_required = 'warehouses.add_unitconversion'    
     def form_valid(self, form):
         messages.success(self.request, 'تم إضافة تحويل الوحدة بنجاح!')
         return super().form_valid(form)
 
-class UnitConversionUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+class UnitConversionUpdateView(LoginRequiredMixin, UpdateView):
     model = UnitConversion
     form_class = UnitConversionForm
     template_name = 'warehouses/unit_conversion_form.html'
     success_url = reverse_lazy('warehouses:unit_conversion_list')
-    permission_required = 'warehouses.change_unitconversion'    
     def form_valid(self, form):
         messages.success(self.request, 'تم تحديث تحويل الوحدة بنجاح!')
         return super().form_valid(form)
 
-class UnitConversionDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
+class UnitConversionDeleteView(LoginRequiredMixin, DeleteView):
     model = UnitConversion
     template_name = 'warehouses/unit_conversion_confirm_delete.html'
     success_url = reverse_lazy('warehouses:unit_conversion_list')
-    permission_required = 'warehouses.delete_unitconversion'
     
 # API for unit conversion
 class UnitConversionAPIView(LoginRequiredMixin, View):
@@ -2444,13 +2474,12 @@ class ProductDetailPDFView(LoginRequiredMixin, View):
             messages.error(request, f"حدث خطأ غير متوقع أثناء إنشاء ملف PDF: {e}")
             return redirect('warehouses:product_detail', pk=product.pk)
 
-class ProductImportView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+class ProductImportView(LoginRequiredMixin, TemplateView):
     """
     Handles rendering the product import page and processing the uploaded Excel file.
     This view now supports both creating new products and updating existing ones.
     """
     template_name = 'warehouses/product_import.html'
-    permission_required = 'warehouses.add_product'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -2627,7 +2656,6 @@ class ProductImportView(LoginRequiredMixin, PermissionRequiredMixin, TemplateVie
             return redirect('warehouses:product_import')
 
 @login_required
-@permission_required('warehouses.add_product', raise_exception=True)
 def download_product_import_template(request, template_type):
     """
     Generates and serves a specific Excel file template for importing products
@@ -2705,3 +2733,4 @@ def download_product_import_template(request, template_type):
     response['Content-Disposition'] = f'attachment; filename="template_{template_type}.xlsx"'
     
     return response
+

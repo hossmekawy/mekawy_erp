@@ -46,6 +46,8 @@ urlpatterns = [
     path('products/export/pdf/', views.ProductListPDFView.as_view(), name='product_list_pdf'), # <-- ADD THIS LINE
 
     # Stock
+    path('stock/movement/', views.StockMovementListView.as_view(), name='movement_list'),
+    path('stock/movement/add/', views.StockMovementCreateView.as_view(), name='movement_add'),
     path('stock/', views.StockListView.as_view(), name='stock_list'),
     path('stock/add/', views.StockCreateView.as_view(), name='stock_add'),
     path('stock/<int:pk>/', views.StockDetailView.as_view(), name='stock_detail'),
@@ -81,6 +83,7 @@ urlpatterns = [
     # API endpoints
     path('api/products/search/', views.ProductSearchView.as_view(), name='product_search'),
     path('api/products/generate-code/', views.GenerateProductCodeView.as_view(), name='product_generate_code'),
+    path('api/warehouse/<int:warehouse_id>/products/', views.WarehouseProductStockAPIView.as_view(), name='warehouse_product_stock_api'),
 
     path('api/warehouses/search/', views.WarehouseSearchView.as_view(), name='warehouse_search'),
     path('api/stock/search/', views.StockSearchView.as_view(), name='stock_search'),

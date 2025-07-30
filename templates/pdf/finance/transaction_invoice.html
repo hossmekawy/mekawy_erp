@@ -1,0 +1,62 @@
+{% extends "pdf/base_pdf.html" %}
+{% load humanize %}
+
+{% block pdf_title %}سند حركة مالية - رقم {{ transaction.pk }}{% endblock %}
+
+{% block pdf_header %}
+    <h1>سند حركة مالية</h1>
+    <div class="meta-info">
+        <strong>رقم المرجع:</strong> {{ transaction.pk }} | 
+        <strong>تاريخ الطباعة:</strong> {% now "Y-m-d H:i" %}
+    </div>
+{% endblock %}
+
+{% block pdf_content %}
+    <h2 style="font-size: 18pt; margin-bottom: 20px; text-align: center; color: #555;">تفاصيل الحركة</h2>
+
+    <table>
+        <tr>
+            <td style="width: 30%;"><strong>نوع الحركة:</strong></td>
+            <td><strong>{{ transaction.get_type_display }}</strong></td>
+        </tr>
+        <tr>
+            <td><strong>التاريخ والوقت:</strong></td>
+            <td>{{ transaction.timestamp|date:"Y-m-d, h:i A" }}</td>
+        </tr>
+        <tr>
+            <td><strong>المبلغ:</strong></td>
+            <td style="font-weight: bold; font-size: 1.2em; color: #0056b3;">{{ transaction.amount|intcomma }} جنيه مصري</td>
+        </tr>
+        <tr>
+            <td><strong>من حساب:</strong></td>
+            <td>{{ transaction.account.name }}</td>
+        </tr>
+        {% if transaction.type == 'TRANSFER' %}
+        <tr>
+            <td><strong>إلى حساب:</strong></td>
+            <td>{{ transaction.to_account.name }}</td>
+        </tr>
+        {% endif %}
+        <tr>
+            <td><strong>الوصف / السبب:</strong></td>
+            <td>{{ transaction.description|linebreaksbr }}</td>
+        </tr>
+         <tr>
+            <td><strong>مرجع إضافي:</strong></td>
+            <td>{{ transaction.reference|default:"لا يوجد" }}</td>
+        </tr>
+    </table>
+
+    <div style="margin-top: 40px; padding-top: 20px; border-top: 1px dashed #ccc; display: flex; justify-content: space-between; font-size: 12pt;">
+        <div style="text-align: center;">
+            <p><strong>المستلم:</strong></p>
+            <p>.............................</p>
+            <p>(التوقيع)</p>
+        </div>
+        <div style="text-align: center;">
+            <p><strong>المسؤول المالي:</strong></p>
+            <p>.............................</p>
+            <p>(التوقيع)</p>
+        </div>
+    </div>
+{% endblock %}

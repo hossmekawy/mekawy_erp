@@ -267,17 +267,11 @@
 
 <!-- Toast Container from toast.html -->
 <div class="toast-container position-fixed top-0 end-0 p-3">
-    <!-- Success -->
     <div id="successToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
         <div class="d-flex"><div class="toast-body" id="successMessage"></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>
     </div>
-    <!-- Error -->
     <div id="errorToast" class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
         <div class="d-flex"><div class="toast-body" id="errorMessage"></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>
-    </div>
-    <!-- Info -->
-    <div id="infoToast" class="toast align-items-center text-white bg-info border-0" role="alert" aria-live="assertive" aria-atomic="true">
-        <div class="d-flex"><div class="toast-body" id="infoMessage"></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>
     </div>
 </div>
 
@@ -301,7 +295,6 @@ function showToast(type, message, duration = 5000) {
 }
 function showSuccessToast(message) { showToast('success', message); }
 function showErrorToast(message) { showToast('error', message); }
-function showInfoToast(message) { showToast('info', message); }
 
 $(document).ready(function() {
     // --- Configuration ---
@@ -316,14 +309,6 @@ $(document).ready(function() {
 
     // --- Initial State Setup ---
     function initializeForm() {
-        $('#orderForm .form-control, #orderForm .form-select').each(function() {
-            if (!$(this).hasClass('form-control')) $(this).addClass('form-control');
-        });
-
-        // Use readonly instead of disabled to ensure value is submitted
-        textileStockField.prop('readonly', true).hide();
-        fabricMetersField.prop('readonly', true).hide();
-
         if (productField.val() && quantityField.val()) {
             fetchBOMRequirements();
         } else {
@@ -346,8 +331,31 @@ $(document).ready(function() {
         debounceTimer = setTimeout(fetchBOMRequirements, 500);
     });
     
-    $('#generateOrderBtn').on('click', generateOrderNumber);
-    $('#generateBatchBtn').on('click', generateBatchNumber);
+    // --- UPDATED: Both buttons now call the same AJAX function ---
+    $('#generateOrderBtn, #generateBatchBtn').on('click', function() {
+        const productId = productField.val();
+        if (!productId) {
+            showErrorToast('الرجاء اختيار منتج أولاً لتوليد الأرقام.');
+            return;
+        }
+
+        $.ajax({
+            url: "{% url 'production:ajax_generate_sequential_codes' %}",
+            data: { 'product_id': productId },
+            success: function(response) {
+                if (response.success) {
+                    $('#id_order_number').val(response.order_number).trigger('input');
+                    $('#id_batch_number').val(response.batch_number).trigger('input');
+                    showSuccessToast('تم توليد الأرقام التسلسلية بنجاح.');
+                } else {
+                    showErrorToast(response.error || 'فشل توليد الأرقام.');
+                }
+            },
+            error: function() {
+                showErrorToast('حدث خطأ في الاتصال بالخادم.');
+            }
+        });
+    });
 
     // --- Core Logic ---
     function fetchBOMRequirements() {
@@ -480,49 +488,7 @@ $(document).ready(function() {
         const allCompleted = $('#submission-checklist li.completed').length === 4;
         submitButton.prop('disabled', !allCompleted);
     }
-
-    function generateOrderNumber() {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = (now.getMonth() + 1).toString().padStart(2, '0');
-        const day = now.getDate().toString().padStart(2, '0');
-        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-        const orderNumber = `ORD-${year}${month}${day}-${randomSuffix}`;
-        const field = $('#id_order_number');
-        field.val(orderNumber).trigger('input');
-        showSuccessToast('تم توليد رقم أمر بنجاح.');
-    }
-
-    function generateBatchNumber() {
-        const productText = $('#id_product option:selected').text();
-        const productCodeMatch = productText.match(/\(([^)]+)\)/);
-        const productCode = productCodeMatch ? productCodeMatch[1] : 'PROD';
-        const now = new Date();
-        const year = now.getFullYear().toString().slice(-2);
-        const month = (now.getMonth() + 1).toString().padStart(2, '0');
-        const day = now.getDate().toString().padStart(2, '0');
-        const counter = Math.floor(1 + Math.random() * 99).toString().padStart(2, '0');
-        const batchNumber = `BATCH-${productCode.trim()}-${year}${month}${day}-${counter}`;
-        const field = $('#id_batch_number');
-        field.val(batchNumber).trigger('input');
-        showSuccessToast('تم توليد رقم باتش بنجاح.');
-    }
     
-    (function () {
-        'use strict'
-        var forms = document.querySelectorAll('.needs-validation')
-        Array.prototype.slice.call(forms)
-            .forEach(function (form) {
-                form.addEventListener('submit', function (event) {
-                    if (!form.checkValidity()) {
-                        event.preventDefault()
-                        event.stopPropagation()
-                    }
-                    form.classList.add('was-validated')
-                }, false)
-            })
-    })()
-
     initializeForm();
 });
 </script>

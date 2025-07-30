@@ -1040,8 +1040,10 @@ class SendAdditionalComponentForm(forms.Form):
     A single form for one material being sent to a manufacturer.
     This will be used within a formset.
     """
+    # --- FIX: The queryset is now Product.objects.all() to accept any valid product ID.
+    # The __init__ method has been removed as it was causing the validation error.
     material = forms.ModelChoiceField(
-        queryset=Product.objects.none(), # Populated by JS
+        queryset=Product.objects.all(),
         widget=forms.HiddenInput()
     )
     quantity_to_send = forms.DecimalField(
@@ -1049,19 +1051,14 @@ class SendAdditionalComponentForm(forms.Form):
         required=False, # We'll only process forms where quantity > 0
         widget=forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'الكمية', 'step': '0.01'})
     )
+    # --- FIX: The queryset now includes both 'components' and 'textile' warehouses
+    # to match what the user sees in the dropdown.
     source_warehouse = forms.ModelChoiceField(
-        queryset=Warehouse.objects.filter(warehouse_type='components', is_active=True),
+        queryset=Warehouse.objects.filter(warehouse_type__in=['components', 'textile'], is_active=True),
         required=True,
         widget=forms.Select(attrs={'class': 'form-select form-select-sm'}),
         label="المخزن المصدر"
     )
-
-    def __init__(self, *args, **kwargs):
-        material_id = kwargs.pop('material_id', None)
-        super().__init__(*args, **kwargs)
-        if material_id:
-            self.fields['material'].queryset = Product.objects.filter(id=material_id)
-            self.fields['material'].initial = material_id
 
 
 # We use a base formset factory, not an inline one, because we are creating

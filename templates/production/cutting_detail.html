@@ -10,11 +10,13 @@
 
 {% block production_header_actions %}
 <div class="d-flex justify-content-end align-items-center gap-2">
-    {% if not cutting_process.is_completed and cutting_process.production_order.bom_version %}
-    <a href="{% url 'production:draws:draw_create' %}?bom_id={{ cutting_process.production_order.bom_version.pk }}" class="btn btn-success" target="_blank" title="إضافة رسمة قص للمقاسات الناقصة">
-        <i class="fas fa-plus-square me-2"></i> إضافة رسمة قص
+    {# NEW: Button to start assembly if cutting is done but assembly hasn't started #}
+    {% if cutting_process.is_completed and cutting_process.production_order.status == 'in_assembly' and not cutting_process.production_order.assembly_processes.exists %}
+    <a href="{% url 'production:assembly_create' %}?order_id={{ cutting_process.production_order.pk }}" class="btn btn-success">
+        <i class="fas fa-users-cog me-2"></i> بدء التجميع
     </a>
     {% endif %}
+
     <a href="{% url 'production:cutting_sheet_print_pdf' cutting_process.pk %}" class="btn btn-secondary" target="_blank">
         <i class="fas fa-print me-2"></i> طباعة PDF
     </a>
@@ -158,6 +160,11 @@
                 <div class="detail-item">
                     <span class="label">هدر القماش:</span>
                     <span class="value">{{ cutting_process.fabric_waste|floatformat:2 }} متر</span>
+                </div>
+                <!-- NEW: Real Meterage Calculation -->
+                <div class="detail-item stat-card-lg ps-3 mt-3">
+                    <span class="label">الميتراج الحقيقي:</span>
+                    <span class="value fs-5 text-production-success"><strong>{{ cutting_process.actual_meterage|floatformat:3 }}</strong></span>
                 </div>
             </div>
         </div>

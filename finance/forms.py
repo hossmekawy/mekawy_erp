@@ -1,93 +1,95 @@
 # finance/forms.py
 
 from django import forms
-from django.contrib.contenttypes.models import ContentType
-from .models import Account, AccountCategory, Invoice, Payment, Expense
+from .models import Account, Transaction
+from django.core.exceptions import ValidationError
+from django.db import transaction as db_transaction
+from decimal import Decimal
 
 class AccountForm(forms.ModelForm):
-    """
-    Form for creating and updating Account instances.
-    """
     class Meta:
         model = Account
-        fields = ['name', 'code', 'category', 'is_active']
+        fields = ['name']
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'code': forms.TextInput(attrs={'class': 'form-control'}),
-            'category': forms.Select(attrs={'class': 'form-select'}),
-            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'مثال: الخزينة الرئيسية'}),
         }
 
-class InvoiceForm(forms.ModelForm):
-    """
-    Form for creating and updating Invoices.
-    The 'recipient' fields are handled in the view since it's a GenericForeignKey.
-    """
-    class Meta:
-        model = Invoice
-        fields = [
-            'invoice_number', 'issue_date', 'due_date', 
-            'total_amount', 'status',  'notes'
-        ]
-        widgets = {
-            'invoice_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'issue_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'due_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'total_amount': forms.NumberInput(attrs={'class': 'form-control'}),
-            'status': forms.Select(attrs={'class': 'form-select'}),
-            # 'attachment': forms.ClearableFileInput(attrs={'class': 'form-control'}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-        }
 
-class PaymentForm(forms.ModelForm):
-    """
-    Form for recording a Payment against an Invoice.
-    """
+class TransactionForm(forms.ModelForm):
+    # We make `to_account` not required at the form level and handle it in clean()
+    to_account = forms.ModelChoiceField(
+        queryset=Account.objects.all(),
+        required=False,
+        label="إلى حساب",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
     class Meta:
-        model = Payment
-        fields = ['payment_date', 'amount', 'payment_method', 'reference', 'notes']
+        model = Transaction
+        fields = ['type', 'account', 'to_account', 'amount', 'description', 'reference']
         widgets = {
-            'payment_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'amount': forms.NumberInput(attrs={'class': 'form-control'}),
-            'payment_method': forms.Select(attrs={'class': 'form-select'}),
+            'type': forms.Select(attrs={'class': 'form-select'}),
+            'account': forms.Select(attrs={'class': 'form-select', 'id': 'from_account_select'}),
+            'amount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'reference': forms.TextInput(attrs={'class': 'form-control'}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
         }
-    
-    def __init__(self, *args, **kwargs):
-        # The view will pass the invoice instance to the form
-        self.invoice = kwargs.pop('invoice', None)
-        super().__init__(*args, **kwargs)
-
-    def clean_amount(self):
-        amount = self.cleaned_data.get('amount')
-        if self.invoice and amount > self.invoice.balance_due:
-            raise forms.ValidationError(f"مبلغ الدفعة لا يمكن أن يكون أكبر من الرصيد المستحق ({self.invoice.balance_due}).")
-        return amount
-
-class ExpenseForm(forms.ModelForm):
-    """
-    Form for recording a general Expense.
-    """
-    class Meta:
-        model = Expense
-        fields = [
-            'expense_account', 'source_account', 'description', 'amount', 
-            'expense_date'
-        ]
-        widgets = {
-            'expense_account': forms.Select(attrs={'class': 'form-select'}),
-            'source_account': forms.Select(attrs={'class': 'form-select'}),
-            'description': forms.TextInput(attrs={'class': 'form-control'}),
-            'amount': forms.NumberInput(attrs={'class': 'form-control'}),
-            'expense_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            # 'attachment': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+        labels = {
+            'account': 'من حساب'
         }
+
+    def clean(self):
+        """
+        Custom validation for transactions.
+        """
+        cleaned_data = super().clean()
+        trans_type = cleaned_data.get('type')
+        amount = cleaned_data.get('amount', Decimal('0'))
+        from_account = cleaned_data.get('account')
+        to_account = cleaned_data.get('to_account')
+
+        if amount <= 0:
+            raise ValidationError("المبلغ يجب أن يكون أكبر من صفر.")
+
+        if trans_type in ['WITHDRAWAL', 'TRANSFER']:
+            if not from_account:
+                raise ValidationError("يجب تحديد الحساب للسحب أو التحويل.")
+            if from_account.balance < amount:
+                raise ValidationError(f"الرصيد في '{from_account.name}' غير كافٍ. الرصيد الحالي: {from_account.balance}")
+
+        if trans_type == 'TRANSFER':
+            if not to_account:
+                raise ValidationError("يجب تحديد الحساب المراد التحويل إليه.")
+            if from_account == to_account:
+                raise ValidationError("لا يمكن التحويل إلى نفس الحساب.")
         
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Querysets are already limited in the model definition, but this is good practice
-        self.fields['expense_account'].queryset = Account.objects.filter(category__category_type='expense', is_active=True)
-        self.fields['source_account'].queryset = Account.objects.filter(category__category_type='asset', is_active=True)
+        return cleaned_data
 
-
+    def save(self, commit=True):
+        """
+        Process the transaction and update account balances atomically.
+        """
+        # Create transaction instance but don't save to DB yet
+        instance = super().save(commit=False)
+        
+        from_account = self.cleaned_data.get('account')
+        to_account = self.cleaned_data.get('to_account')
+        amount = self.cleaned_data.get('amount')
+        
+        if instance.type == 'DEPOSIT':
+            from_account.balance += amount
+        
+        elif instance.type == 'WITHDRAWAL':
+            from_account.balance -= amount
+            
+        elif instance.type == 'TRANSFER':
+            from_account.balance -= amount
+            to_account.balance += amount
+            if commit:
+                to_account.save()
+        
+        if commit:
+            from_account.save()
+            instance.save()
+            
+        return instance

@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% load i18n humanize %}
+
+{% block title %}كشف حساب: {{ account.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #print-section, #print-section * {
+            visibility: visible;
+        }
+        #print-section {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .no-print {
+            display: none !important;
+        }
+    }
+</style>
+{% endblock %}
+
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center no-print">
+        <h6 class="m-0 font-weight-bold text-primary">كشف حساب: {{ account.name }}</h6>
+        <div>
+            <button onclick="window.print()" class="btn btn-sm btn-info">
+                <i class="fas fa-print"></i> طباعة
+            </button>
+            <a href="{% url 'finance:account_list' %}" class="btn btn-sm btn-secondary">
+                <i class="fas fa-arrow-left"></i> رجوع
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        <form method="get" class="mb-4 p-3 border rounded bg-light no-print">
+            <div class="row align-items-end">
+                <div class="col-md-4">
+                    <label for="start_date">من تاريخ:</label>
+                    <input type="date" name="start_date" id="start_date" class="form-control" value="{{ start_date|default:'' }}">
+                </div>
+                <div class="col-md-4">
+                    <label for="end_date">إلى تاريخ:</label>
+                    <input type="date" name="end_date" id="end_date" class="form-control" value="{{ end_date|default:'' }}">
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter"></i> تطبيق الفلتر
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <div id="print-section">
+            <h3 class="text-center mb-4">كشف حساب: {{ account.name }}</h3>
+            {% if start_date and end_date %}
+                <p class="text-center">للفترة من {{ start_date }} إلى {{ end_date }}</p>
+            {% endif %}
+
+            <table class="table table-bordered mb-4">
+                <thead class="table-light">
+                    <tr>
+                        <th>الرصيد الافتتاحي</th>
+                        <th>الرصيد الختامي</th>
+                        <th>الرصيد الحالي الفعلي</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>{{ opening_balance|intcomma }} جنيه</strong></td>
+                        <td><strong>{{ closing_balance|intcomma }} جنيه</strong></td>
+                        <td><strong>{{ account.balance|intcomma }} جنيه</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <table class="table table-bordered table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>التاريخ</th>
+                        <th>الوصف / المرجع</th>
+                        <th>مدين (Debit)</th>
+                        <th>دائن (Credit)</th>
+                        <th>الرصيد</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="4" class="text-end fw-bold">الرصيد الافتتاحي (رصيد ما قبل الفترة)</td>
+                        <td class="fw-bold">{{ opening_balance|intcomma }}</td>
+                    </tr>
+                    {% for item in transactions_with_balance %}
+                    <tr>
+                        <td>{{ item.transaction.timestamp|date:"Y-m-d H:i" }}</td>
+                        <td>
+                            <p class="mb-0"><strong>{{ item.transaction.get_type_display }}</strong> - {{ item.transaction.description }}</p>
+                            {% if item.transaction.reference %}
+                            <small class="text-muted">مرجع: {{ item.transaction.reference }}</small>
+                            {% endif %}
+                        </td>
+                        <td class="text-danger">{{ item.debit|intcomma }}</td>
+                        <td class="text-success">{{ item.credit|intcomma }}</td>
+                        <td>{{ item.running_balance|intcomma }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center">لا توجد حركات في هذه الفترة.</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="table-light">
+                        <td colspan="4" class="text-end fw-bold">الرصيد الختامي (رصيد نهاية الفترة)</td>
+                        <td class="fw-bold">{{ closing_balance|intcomma }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

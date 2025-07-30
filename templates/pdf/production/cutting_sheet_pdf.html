@@ -1,116 +1,107 @@
-{% extends 'pdf/base_pdf.html' %}
+{% extends "pdf/base_pdf.html" %}
 
-{% block pdf_title %}ورقة قص - أمر #{{ cutting_process.production_order.order_number }}{% endblock %}
+{% block pdf_title %}ورقة قص - أمر {{ cutting_process.production_order.order_number }}{% endblock %}
 
 {% block pdf_header %}
     <h1>ورقة عملية القص</h1>
     <div class="meta-info">
-        <strong>أمر الإنتاج:</strong> #{{ cutting_process.production_order.order_number }} | 
-        <strong>المنتج:</strong> {{ cutting_process.production_order.product.name }} |
+        <strong>أمر الإنتاج:</strong> {{ cutting_process.production_order.order_number }} |
         <strong>تاريخ الطباعة:</strong> {{ timestamp|date:"Y-m-d" }}
     </div>
 {% endblock %}
 
 {% block pdf_content %}
-    <h2>معلومات العملية</h2>
-    <table class="info-table">
+    <h2 class="section-title">المعلومات الأساسية</h2>
+    <table>
         <tr>
-            <td style="width: 20%;"><strong>تاريخ القص:</strong></td>
-            <td style="width: 30%;">{{ cutting_process.cutting_date|date:"Y-m-d H:i" }}</td>
-            <td style="width: 20%;"><strong>القاص:</strong></td>
-            <td style="width: 30%;">{{ cutting_process.cutter.get_full_name|default:cutting_process.cutter.username }}</td>
+            <td><strong>كود القصة:</strong></td>
+            <td><strong>{{ cutting_process.production_order.order_number }}</strong></td>
+            <td><strong>اسم القصة:</strong></td>
+            <td><strong>{{ cutting_process.production_order.product.name }}</strong></td>
         </tr>
         <tr>
-            <td><strong>إجمالي القماش المستخدم:</strong></td>
-            <td>{{ cutting_process.total_fabric_used|floatformat:2 }} متر</td>
-            <td><strong>إجمالي المنتجات:</strong></td>
-            <td>{{ cutting_process.total_pieces_cut }}</td>
+            <td><strong>القاص:</strong></td>
+            <td>{{ cutting_process.cutter.get_full_name|default:"-" }}</td>
+            <td><strong>تاريخ القص:</strong></td>
+            <td>{{ cutting_process.cutting_date|date:"Y-m-d H:i" }}</td>
         </tr>
+        <tr>
+            <td><strong>الحالة:</strong></td>
+            <td>{% if cutting_process.is_completed %}مكتمل{% else %}قيد التنفيذ{% endif %}</td>
+            <td><strong>الكمية المطلوبة:</strong></td>
+            <td>{{ cutting_process.production_order.quantity_ordered }}</td>
+        </tr>
+    </table>
+
+    <h2 class="section-title">تفاصيل الرسمة والحسابات</h2>
+    <table>
         <tr>
             <td><strong>مقاسات الرسمة (Marker):</strong></td>
             <td colspan="3"><code>{{ cutting_process.marker_details.sizes|join:", " }}</code></td>
         </tr>
-         <tr>
-            <td><strong>الهدر المحسوب:</strong></td>
-            <td colspan="3" style="color: red; font-weight: bold;">{{ cutting_process.fabric_waste|floatformat:2 }} متر</td>
+        <tr>
+            <td><strong>عرض الفرشة:</strong></td>
+            <td>{{ cutting_process.single_layer_width|default:"--"|floatformat:2 }} م</td>
+            <td><strong>عدد القطع في الطبقة:</strong></td>
+            <td>{{ cutting_process.single_layer_pieces|default:"--" }}</td>
+        </tr>
+        <tr>
+            <td><strong>طول الفرشة المستخدم:</strong></td>
+            <td>{{ cutting_process.single_layer_fabric_length|default:"--"|floatformat:2 }} م</td>
+            <td><strong>ميتراج القطعة المحسوب:</strong></td>
+            <td><strong>{{ cutting_process.single_layer_meterage|default:"--"|floatformat:3 }}</strong></td>
+        </tr>
+    </table>
+    
+    <h2 class="section-title">الإجماليات</h2>
+    <table>
+        <tr>
+            <td><strong>إجمالي القماش المستخدم:</strong></td>
+            <td>{{ cutting_process.total_fabric_used|floatformat:2 }} متر</td>
+            <td><strong>إجمالي القصه:</strong></td>
+            <td>{{ cutting_stats.total_garments }}</td>
+        </tr>
+        <tr>
+            <td><strong>هدر القماش:</strong></td>
+            <td>{{ cutting_process.fabric_waste|floatformat:2 }} متر</td>
+            <td><strong>إجمالي القطع المفردة:</strong></td>
+            <td>{{ cutting_stats.total_individual_pieces }}</td>
+        </tr>
+        <tr>
+            <td colspan="2" style="background-color: #f2f2f2;"><strong>الميتراج الحقيقي (متر/قطعة):</strong></td>
+            <td colspan="2" style="background-color: #f2f2f2; font-weight: bold; font-size: 1.1em;">{{ cutting_process.actual_meterage|floatformat:3 }}</td>
         </tr>
     </table>
 
-    <hr>
-    
-    <h2>حسابات الطبقة الواحدة</h2>
+    <h2 class="section-title">ملاحظات على القص</h2>
+    <div class="notes-section">
+        <p>{{ cutting_process.notes|default:"لا توجد ملاحظات."|linebreaksbr }}</p>
+    </div>
+
+    <h2 class="section-title">جداول القص (الفرشات)</h2>
     <table>
         <thead>
             <tr>
-                <th>عرض الفرشة (متر)</th>
-                <th>عدد القطع في الطبقة</th>
-                <th>طول الفرشة المستخدم (متر)</th>
-                <th>ميتراج القطعة المحسوب</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>{{ cutting_process.single_layer_width|default:"--"|floatformat:2 }}</td>
-                <td>{{ cutting_process.single_layer_pieces|default:"--" }}</td>
-                <td>{{ cutting_process.single_layer_fabric_length|default:"--"|floatformat:2 }}</td>
-                <td><strong>{{ cutting_process.single_layer_meterage|default:"--"|floatformat:3 }}</strong></td>
-            </tr>
-        </tbody>
-    </table>
-
-    <hr>
-
-    <h2>جداول القص (الفرشات)</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>طول الثوب (م)</th>
+                <th>#</th>
+                <th>طول الثوب (متر)</th>
                 <th>عدد الطبقات</th>
-                <th>المنتجات لكل طبقة</th>
-                <th>إجمالي المنتجات</th>
+                <th>الإجمالي</th>
                 <th>ملاحظات</th>
             </tr>
         </thead>
         <tbody>
             {% for table in cutting_tables %}
             <tr>
+                <td>{{ forloop.counter }}</td>
                 <td>{{ table.fabric_length|floatformat:2 }}</td>
                 <td>{{ table.layers_count }}</td>
-                <td>{{ table.pieces_per_layer }}</td>
                 <td><strong>{{ table.total_pieces }}</strong></td>
                 <td>{{ table.notes|default:"-" }}</td>
             </tr>
             {% empty %}
-            <tr>
-                <td colspan="5" style="text-align: center;">لا توجد جداول قص.</td>
-            </tr>
+            <tr><td colspan="5" class="text-center">لا توجد فرشات.</td></tr>
             {% endfor %}
         </tbody>
     </table>
 
-    <hr>
-
-    <h2>جرد القطع المقصوصة</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>اسم القطعة (المكون)</th>
-                <th>المقاس</th>
-                <th>الكمية المطلوبة</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for piece in cut_pieces %}
-            <tr>
-                <td>{{ piece.piece_type }}</td>
-                <td>{{ piece.size }}</td>
-                <td><strong>{{ piece.quantity }}</strong></td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="3" style="text-align: center;">لم يتم توليد أي قطع.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
 {% endblock %}

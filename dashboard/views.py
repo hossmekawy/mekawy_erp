@@ -9,15 +9,16 @@ from suppliers.models import Supplier, PurchaseOrder
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import TemplateView
 from django.db import models
+from django.views.decorators.cache import cache_page
 
 @login_required
+@cache_page(60 * 15) # Cache the view for 15 minutes
 def index(request):
     """Dashboard main page with statistics"""
     
     # Get current date and calculate date ranges
     today = timezone.now().date()
     last_30_days = today - timedelta(days=30)
-    last_7_days = today - timedelta(days=7)
     
     # User Statistics
     total_users = User.objects.count()
@@ -33,18 +34,18 @@ def index(request):
     total_products = Product.objects.count()
     active_products = Product.objects.filter(is_active=True).count()
     
-    # Get low stock products
+    # Get low stock products --- OPTIMIZED QUERY ---
     try:
-        low_stock_products = StockItem.objects.filter(
+        low_stock_products = StockItem.objects.select_related('product').filter(
             quantity__lte=F('product__min_stock_level')
         ).count()
-    except:
+    except Exception:
         low_stock_products = 0
     
     # Get best products by stock quantity
     try:
         best_products = StockItem.objects.select_related('product').order_by('-quantity')[:5]
-    except:
+    except Exception:
         best_products = []
     
     # Recent stock movements
@@ -52,7 +53,7 @@ def index(request):
         recent_movements = StockMovement.objects.select_related(
             'stock_item__product', 'created_by'
         ).order_by('-created_at')[:10]
-    except:
+    except Exception:
         recent_movements = []
     
     # Supplier Statistics

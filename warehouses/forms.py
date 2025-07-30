@@ -317,19 +317,77 @@ class ProductForm(forms.ModelForm):
         
         return cleaned_data
 
-
-
 class StockMovementForm(forms.ModelForm):
+    """
+    Form for creating a stock movement with a simplified workflow.
+    The user can select any product and then any warehouse.
+    """
+    # This field is for display and user search.
+    product_search = forms.CharField(
+        label="ابحث عن المنتج (بالاسم أو الكود)",
+        required=False, 
+        widget=forms.TextInput(attrs={
+            'class': 'form-control form-control-lg',
+            'id': 'id_product_search',
+            'placeholder': 'ابدأ الكتابة للبحث عن منتج...'
+        })
+    )
+    
+    # The actual product ID is stored in this hidden field.
+    product = forms.ModelChoiceField(
+        queryset=Product.objects.all(),
+        widget=forms.HiddenInput(),
+        required=True,
+        label=""
+    )
+
+    # The warehouse dropdown now lists ALL active warehouses.
+    warehouse = forms.ModelChoiceField(
+        queryset=Warehouse.objects.filter(is_active=True),
+        label="اختر المخزن",
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_warehouse'})
+    )
+
     class Meta:
         model = StockMovement
-        fields = ['stock_item', 'movement_type', 'quantity', 'reference_number', 'notes']
+        fields = ['product_search', 'product', 'warehouse', 'movement_type', 'quantity', 'reference_number', 'notes']
         widgets = {
-            'stock_item': forms.Select(attrs={'class': 'form-select'}),
             'movement_type': forms.Select(attrs={'class': 'form-select'}),
-            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'reference_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'رقم المرجع'}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'ملاحظات'}),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0.01'}),
+            'reference_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'رقم المرجع (فاتورة، إذن صرف، ...)'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'أي تفاصيل إضافية عن الحركة'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # If editing an existing movement, pre-fill the fields.
+        if self.instance and self.instance.pk and self.instance.stock_item:
+            stock_item = self.instance.stock_item
+            self.initial['product_search'] = f"{stock_item.product.name} ({stock_item.product.code})"
+            self.initial['product'] = stock_item.product.pk
+            self.initial['warehouse'] = stock_item.warehouse.pk
+
+    def clean(self):
+        cleaned_data = super().clean()
+        movement_type = cleaned_data.get('movement_type')
+        quantity = cleaned_data.get('quantity')
+        warehouse = cleaned_data.get('warehouse')
+        product = cleaned_data.get('product')
+
+        if not (warehouse and product and quantity and movement_type):
+            return cleaned_data
+
+        # For 'out' movements, ensure there is enough stock.
+        if movement_type == 'out':
+            try:
+                stock_item = StockItem.objects.get(warehouse=warehouse, product=product)
+                if stock_item.available_quantity < quantity:
+                    self.add_error('quantity', f'الكمية المطلوبة ({quantity}) أكبر من الكمية المتاحة ({stock_item.available_quantity}).')
+            except StockItem.DoesNotExist:
+                self.add_error('product', 'لا يمكن عمل حركة "صادر" لمنتج ليس له رصيد في هذا المخزن.')
+        
+        return cleaned_data
 
 # In your StockTransferForm
 class StockTransferForm(forms.ModelForm):

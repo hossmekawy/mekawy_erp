@@ -116,139 +116,132 @@
             }
         }
     },
-    "المالية": {
-        "title": "المالية",
-        "icon": "fas fa-coins",
-        "roles": ["admin", "manager"],
-        "submenu": {
-            "لوحة التحكم المالية": {
-                "url_name": "finance:dashboard",
-                "icon": "fas fa-chart-pie",
-                "roles": ["admin", "manager"]
-            },
-            "دليل الحسابات": {
-                "url_name": "finance:chart_of_accounts",
-                "icon": "fas fa-sitemap",
-                "roles": ["admin", "manager"]
-            },
-            "دفتر اليومية العام": {
-                "url_name": "finance:journal",
-                "icon": "fas fa-book",
-                "roles": ["admin", "manager"]
-            },
-            "الفواتير": {
-                "url_name": "finance:invoice_list",
-                "icon": "fas fa-file-invoice-dollar",
-                "roles": ["admin", "manager"]
-            },
-            "المدفوعات": {
-                "url_name": "finance:payment_list",
-                "icon": "fas fa-money-bill-wave",
-                "roles": ["admin", "manager"]
-            },
-            "التقارير المالية": {
-                "title": "التقارير المالية",
-                "icon": "fas fa-file-signature",
-                "roles": ["admin", "manager"],
-                "submenu": {
-                    "قائمة الدخل": {
-                        "url_name": "finance:income_statement",
-                        "icon": "fas fa-file-invoice",
-                        "roles": ["admin", "manager"]
-                    },
-                    "الميزانية العمومية": {
-                        "url_name": "finance:balance_sheet",
-                        "icon": "fas fa-balance-scale",
-                        "roles": ["admin", "manager"]
-                    }
-                }
-            }
+   "المالية": {
+    "title": "المالية",
+    "icon": "fas fa-coins",
+    "roles": ["admin", "manager"],
+    "submenu": {
+        "الحسابات_المالية": {
+            "url_name": "finance:account_list",
+            "icon": "fas fa-wallet",
+            "roles": ["admin", "manager"]
+        },
+        "سجل_الحركات": {
+            "url_name": "finance:transaction_list",
+            "icon": "fas fa-history",
+            "roles": ["admin", "manager"]
+        },
+        "إضافة_حركة_جديدة": {
+            "url_name": "finance:transaction_create",
+            "icon": "fas fa-plus-circle",
+            "roles": ["admin", "manager"]
         }
-    },
-    "المخازن": {
+    }
+},
+        "المخازن": {
         "title": "المخازن",
         "icon": "fas fa-warehouse",
-        "roles": ["admin", "manager", "employee", "*"],
+        "roles": ["admin", "manager", "employee", "warehouse_manager"],
         "submenu": {
+            "لوحة التحكم": {
+                "url_name": "warehouses:dashboard",
+                "icon": "fas fa-tachometer-alt",
+                "roles": ["admin", "manager", "warehouse_manager"]
+            },
             "قائمة المخازن": {
                 "url_name": "warehouses:warehouse_list",
                 "icon": "fas fa-list",
-                "roles": ["*"]
+                "roles": ["admin", "manager", "warehouse_manager"]
             },
             "إضافة مخزن": {
                 "url_name": "warehouses:warehouse_add",
                 "icon": "fas fa-plus",
-                "roles": ["admin", "manager", "employee"]
+                "roles": ["admin", "manager", "warehouse_manager"]
             },
             "قائمة التصنيفات": {
                 "url_name": "warehouses:category_list",
                 "icon": "fas fa-tags",
-                "roles": ["admin", "manager", "employee"]
+                "roles": ["admin", "manager", "warehouse_manager"]
             },
             "إضافة تصنيف": {
                 "url_name": "warehouses:category_add",
                 "icon": "fas fa-plus",
-                "roles": ["admin", "manager", "employee"]
+                "roles": ["admin", "manager", "warehouse_manager"]
             },
             "قائمة المنتجات": {
                 "url_name": "warehouses:product_list",
                 "icon": "fas fa-boxes",
-                "roles": ["*"]
+                "roles": ["admin", "manager", "warehouse_manager", "employee"]
             },
             "إضافة منتج": {
                 "url_name": "warehouses:product_add",
                 "icon": "fas fa-plus",
-                "roles": ["admin", "manager", "employee"]
+                "roles": ["admin", "manager", "warehouse_manager", "employee"]
             },
             "إدارة المخزون": {
                 "url_name": "warehouses:stock_list",
                 "icon": "fas fa-clipboard-list",
-                "roles": ["*"]
+                "roles": ["admin", "manager", "warehouse_manager", "employee"]
+            },
+             "إضافة للمخزون": {
+                "url_name": "warehouses:stock_add",
+                "icon": "fas fa-plus",
+                "roles": ["admin", "manager", "warehouse_manager", "employee"]
             },
             "قائمة الوحدات": {
                 "url_name": "warehouses:unit_list",
                 "icon": "fas fa-balance-scale",
-                "roles": ["admin", "manager", "employee"]
+                "roles": ["admin", "manager", "warehouse_manager"]
             },
             "إضافة وحدة": {
                 "url_name": "warehouses:unit_add",
                 "icon": "fas fa-plus",
-                "roles": ["admin", "manager", "employee"]
+                "roles": ["admin", "manager", "warehouse_manager"]
             },
             "تحويلات الوحدات": {
                 "url_name": "warehouses:unit_conversion_list",
                 "icon": "fas fa-exchange-alt",
-                "roles": ["admin", "manager", "employee"]
+                "roles": ["admin", "manager", "warehouse_manager"]
             },
             "إضافة تحويل": {
                 "url_name": "warehouses:unit_conversion_add",
                 "icon": "fas fa-plus",
-                "roles": ["admin", "manager", "employee"]
+                "roles": ["admin", "manager", "warehouse_manager"]
             },
             "حركات المخزون": {
                 "url_name": "warehouses:movement_list",
                 "icon": "fas fa-exchange-alt",
-                "roles": ["admin", "manager", "employee"]
+                "roles": ["admin", "manager", "warehouse_manager", "employee"]
             },
             "التحويلات": {
                 "url_name": "warehouses:transfer_list",
                 "icon": "fas fa-truck",
-                "roles": ["admin", "manager", "employee"]
+                "roles": ["admin", "manager", "warehouse_manager", "employee"]
+            },
+             "إضافة تحويل": {
+                "url_name": "warehouses:transfer_add",
+                "icon": "fas fa-plus",
+                "roles": ["admin", "manager", "warehouse_manager", "employee"]
             },
             "مخزون منخفض": {
                 "url_name": "warehouses:low_stock",
                 "icon": "fas fa-exclamation-triangle",
-                "roles": ["admin", "manager", "employee"]
+                "roles": ["admin", "manager", "warehouse_manager"]
             },
             "تنبيهات المخزون": {
                 "url_name": "warehouses:stock_alerts",
                 "icon": "fas fa-bell",
-                "roles": ["admin", "manager", "employee"]
+                "roles": ["admin", "manager", "warehouse_manager"]
             },
             "جرد المخزون": {
                 "url_name": "warehouses:inventory_count",
-                "icon": "fas fa-clipboard-list",
-                "roles": ["admin", "manager", "employee"]
+                "icon": "fas fa-clipboard-check",
+                "roles": ["admin", "manager", "warehouse_manager"]
+            },
+            "تسوية المخزون": {
+                "url_name": "warehouses:stock_adjustment",
+                "icon": "fas fa-sliders-h",
+                "roles": ["admin", "manager", "warehouse_manager"]
             }
         }
     },

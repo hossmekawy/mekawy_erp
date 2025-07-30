@@ -1,59 +1,66 @@
 {% extends 'warehouses/base.html' %}
 {% load static %}
 
-{% block title %}حركات المخزون{% endblock %}
+{% block title %}سجل حركات المخزون{% endblock %}
 
 {% block warehouse_content %}
 <div class="container-fluid">
+    <!-- Page Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0">سجل حركات المخزون</h2>
         <div class="d-flex gap-2">
-            {% if perms.warehouses.add_stockmovement %}
+            
                 <a href="{% url 'warehouses:movement_add' %}" class="btn btn-primary">
                     <i class="fas fa-plus me-2"></i> إضافة حركة جديدة
                 </a>
-            {% endif %}
+            
             <button id="printPdfBtn" class="btn btn-outline-secondary" title="طباعة التقرير الحالي">
                 <i class="fas fa-print me-2"></i> طباعة PDF
             </button>
         </div>
     </div>
 
+    <!-- Filters and Search Card -->
     <div class="card shadow-sm mb-4">
         <div class="card-body">
             <form method="get" class="row g-3 align-items-end">
-                <div class="col-md-3">
+                <div class="col-lg-4 col-md-12">
+                    <label for="searchQuery" class="form-label">بحث شامل</label>
+                    <input type="text" name="q" id="searchQuery" class="form-control" placeholder="ابحث بالمنتج, الكود, المرجع..." value="{{ filters.q }}">
+                </div>
+                <div class="col-lg-2 col-md-6">
                     <label for="warehouseFilter" class="form-label">المخزن</label>
                     <select name="warehouse" id="warehouseFilter" class="form-select">
-                        <option value="">جميع المخازن</option>
+                        <option value="">الكل</option>
                         {% for warehouse in warehouses %}
-                            <option value="{{ warehouse.id }}" {% if request.GET.warehouse == warehouse.id|stringformat:"s" %}selected{% endif %}>
+                            <option value="{{ warehouse.id }}" {% if filters.warehouse == warehouse.id|stringformat:"s" %}selected{% endif %}>
                                 {{ warehouse.name }}
                             </option>
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-lg-2 col-md-6">
                     <label for="movementTypeFilter" class="form-label">نوع الحركة</label>
                     <select name="movement_type" id="movementTypeFilter" class="form-select">
-                        <option value="">جميع الأنواع</option>
-                        <option value="in" {% if request.GET.movement_type == 'in' %}selected{% endif %}>وارد</option>
-                        <option value="out" {% if request.GET.movement_type == 'out' %}selected{% endif %}>صادر</option>
-                        <option value="transfer" {% if request.GET.movement_type == 'transfer' %}selected{% endif %}>تحويل</option>
-                        <option value="adjustment" {% if request.GET.movement_type == 'adjustment' %}selected{% endif %}>تسوية</option>
-                        <option value="return" {% if request.GET.movement_type == 'return' %}selected{% endif %}>مرتجع</option>
+                        <option value="">الكل</option>
+                        <option value="in" {% if filters.movement_type == 'in' %}selected{% endif %}>وارد</option>
+                        <option value="out" {% if filters.movement_type == 'out' %}selected{% endif %}>صادر</option>
+                        <option value="transfer" {% if filters.movement_type == 'transfer' %}selected{% endif %}>تحويل</option>
+                        <option value="adjustment" {% if filters.movement_type == 'adjustment' %}selected{% endif %}>تسوية</option>
+                        <option value="return" {% if filters.movement_type == 'return' %}selected{% endif %}>مرتجع</option>
                     </select>
                 </div>
-                <div class="col-md-2">
+                <div class="col-lg-2 col-md-6">
                     <label for="dateFromFilter" class="form-label">من تاريخ</label>
-                    <input type="date" name="date_from" id="dateFromFilter" class="form-control" value="{{ request.GET.date_from }}">
+                    <input type="date" name="date_from" id="dateFromFilter" class="form-control" value="{{ filters.date_from }}">
                 </div>
-                <div class="col-md-2">
+                <div class="col-lg-2 col-md-6">
                     <label for="dateToFilter" class="form-label">إلى تاريخ</label>
-                    <input type="date" name="date_to" id="dateToFilter" class="form-control" value="{{ request.GET.date_to }}">
+                    <input type="date" name="date_to" id="dateToFilter" class="form-control" value="{{ filters.date_to }}">
                 </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">
+                <div class="col-12 d-flex justify-content-end gap-2 mt-3">
+                     <a href="{% url 'warehouses:movement_list' %}" class="btn btn-outline-secondary">إعادة تعيين</a>
+                    <button type="submit" class="btn btn-primary">
                         <i class="fas fa-filter me-2"></i>تصفية
                     </button>
                 </div>
@@ -61,43 +68,47 @@
         </div>
     </div>
 
+    <!-- Movements Table Card -->
     <div class="card shadow-sm">
-        <div class="card-body">
+        <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle">
+                <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th>المنتج</th>
+                            <th class="px-3">المنتج</th>
                             <th>المخزن</th>
                             <th>نوع الحركة</th>
-                            <th>الكمية</th>
+                            <th class="text-center">الكمية</th>
                             <th>رقم المرجع</th>
                             <th>بواسطة</th>
                             <th>التاريخ والوقت</th>
-                            <th class="text-center">تفاصيل</th>
+                            <th class="text-center">إجراءات</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for movement in movements %}
                         <tr>
-                            <td>
-                                <a href="{{ movement.stock_item.product.get_absolute_url }}" class="text-decoration-none text-dark fw-bold" title="عرض تفاصيل المنتج">
+                            <td class="px-3">
+                                <a href="{% url 'warehouses:product_detail' movement.stock_item.product.pk %}" class="text-decoration-none text-dark fw-bold" title="عرض تفاصيل المنتج">
                                     {{ movement.stock_item.product.name }}
+                                    <small class="text-muted d-block">{{ movement.stock_item.product.code }}</small>
                                 </a>
                             </td>
                             <td>
-                                <a href="{{ movement.stock_item.warehouse.get_absolute_url }}" class="text-decoration-none text-dark" title="عرض تفاصيل المخزن">
+                                <a href="{% url 'warehouses:warehouse_detail' movement.stock_item.warehouse.pk %}" class="text-decoration-none text-dark" title="عرض تفاصيل المخزن">
                                     {{ movement.stock_item.warehouse.name }}
                                 </a>
                             </td>
                             <td>
-                                <span class="badge fs-6 {% if movement.movement_type == 'in' %}text-bg-success{% elif movement.movement_type == 'out' %}text-bg-danger{% elif movement.movement_type == 'transfer' %}text-bg-info{% elif movement.movement_type == 'adjustment' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">
+                                <span class="badge fs-6 {% if movement.movement_type == 'in' or movement.movement_type == 'return' %}bg-success-subtle text-success-emphasis border border-success-subtle{% elif movement.movement_type == 'out' %}bg-danger-subtle text-danger-emphasis border border-danger-subtle{% elif movement.movement_type == 'transfer' %}bg-info-subtle text-info-emphasis border border-info-subtle{% else %}bg-warning-subtle text-warning-emphasis border border-warning-subtle{% endif %}">
                                     {{ movement.get_movement_type_display }}
                                 </span>
                             </td>
-                            <td class="fw-bold">{{ movement.quantity|floatformat:"-2" }}</td>
+                            <td class="text-center fw-bold fs-5 {% if movement.movement_type == 'in' or movement.movement_type == 'return' %}text-success{% else %}text-danger{% endif %}">
+                                {{ movement.quantity|floatformat:"-2" }}
+                            </td>
                             <td>{{ movement.reference_number|default:"-" }}</td>
-                            <td>{{ movement.created_by.get_full_name|default:movement.created_by.username }}</td>
+                            <td>{{ movement.created_by.get_full_name|default:movement.created_by.username|default:"-" }}</td>
                             <td>{{ movement.created_at|date:"Y-m-d h:i A" }}</td>
                             <td class="text-center">
                                 <button class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#movementModal{{ movement.id }}" title="عرض التفاصيل">
@@ -106,6 +117,7 @@
                             </td>
                         </tr>
                         
+                        <!-- Details Modal -->
                         <div class="modal fade" id="movementModal{{ movement.id }}" tabindex="-1" aria-labelledby="movementModalLabel{{ movement.id }}" aria-hidden="true">
                             <div class="modal-dialog modal-dialog-centered">
                                 <div class="modal-content">
@@ -114,15 +126,16 @@
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
                                     <div class="modal-body">
-                                        <p><strong>المنتج:</strong> {{ movement.stock_item.product.name }}</p>
+                                        <p><strong>المنتج:</strong> {{ movement.stock_item.product.name }} ({{ movement.stock_item.product.code }})</p>
                                         <p><strong>المخزن:</strong> {{ movement.stock_item.warehouse.name }}</p>
                                         <p><strong>نوع الحركة:</strong> {{ movement.get_movement_type_display }}</p>
                                         <p><strong>الكمية:</strong> {{ movement.quantity|floatformat:"-2" }}</p>
                                         <p><strong>رقم المرجع:</strong> {{ movement.reference_number|default:"-" }}</p>
                                         <p><strong>التاريخ:</strong> {{ movement.created_at|date:"Y-m-d h:i A" }}</p>
+                                        <p><strong>المستخدم:</strong> {{ movement.created_by.get_full_name|default:movement.created_by.username|default:"-" }}</p>
                                         <hr>
                                         <h6>ملاحظات</h6>
-                                        <p class="text-muted">{{ movement.notes|default:"لا توجد ملاحظات." }}</p>
+                                        <p class="text-muted">{{ movement.notes|default:"لا توجد ملاحظات."|linebreaksbr }}</p>
                                     </div>
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
@@ -134,6 +147,7 @@
                         <tr>
                             <td colspan="8" class="text-center py-5">
                                 <h4>لا توجد حركات مخزون تطابق معايير البحث.</h4>
+                                <p class="text-muted">حاول تغيير الفلاتر أو إعادة التعيين.</p>
                             </td>
                         </tr>
                         {% endfor %}
@@ -142,8 +156,8 @@
             </div>
 
             {% if is_paginated %}
-            <nav aria-label="Page navigation">
-                <ul class="pagination justify-content-center">
+            <nav aria-label="Page navigation" class="p-3">
+                <ul class="pagination justify-content-center mb-0">
                     {% if page_obj.has_previous %}
                         <li class="page-item">
                             <a class="page-link" href="?page={{ page_obj.previous_page_number }}&{{ query_params }}">السابق</a>
@@ -180,6 +194,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (printBtn) {
         printBtn.addEventListener('click', function() {
             // Get current filter values from the form
+            const searchQuery = document.getElementById('searchQuery').value;
             const warehouse = document.getElementById('warehouseFilter').value;
             const movementType = document.getElementById('movementTypeFilter').value;
             const dateFrom = document.getElementById('dateFromFilter').value;
@@ -187,6 +202,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Build the URL with the filter parameters
             const printUrl = new URL("{% url 'warehouses:movement_print' %}", window.location.origin);
+            if (searchQuery) printUrl.searchParams.append('q', searchQuery);
             if (warehouse) printUrl.searchParams.append('warehouse', warehouse);
             if (movementType) printUrl.searchParams.append('movement_type', movementType);
             if (dateFrom) printUrl.searchParams.append('date_from', dateFrom);

@@ -2,27 +2,61 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block title %}
-    {% if object %}تعديل حركة المخزون{% else %}إضافة حركة مخزون{% endif %}
-{% endblock %}
+{% block title %}إضافة حركة مخزون جديدة{% endblock %}
 
 {% block warehouse_content %}
 <div class="container mt-4">
-    <div class="row">
-        <div class="col-lg-8 mx-auto">
+    <div class="row justify-content-center">
+        <div class="col-lg-9 col-md-10">
             <div class="card shadow-sm">
                 <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">{% if object %}تعديل حركة المخزون{% else %}إضافة حركة مخزون جديدة{% endif %}</h4>
+                    <h4 class="mb-0">إضافة حركة مخزون جديدة</h4>
                 </div>
-                <div class="card-body">
-                    <form method="post" novalidate id="movementForm">
+                <div class="card-body p-4">
+                    <form method="post" novalidate id="movementForm" autocomplete="off">
                         {% csrf_token %}
                         
-                        {{ form|crispy }}
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}
+                                    <p class="mb-0">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        <!-- Manually render fields for new workflow -->
+                        <div class="mb-3 position-relative">
+                            {{ form.product_search|as_crispy_field }}
+                            <div id="product-search-results" class="list-group position-absolute w-100" style="z-index: 1000; display: none;"></div>
+                            <div id="product-loader" class="d-none spinner-border spinner-border-sm text-primary position-absolute" style="top: 45px; left: 15px;"></div>
+                        </div>
                         
-                        <div class="d-flex justify-content-between mt-4">
+                        {# This renders the hidden product ID input #}
+                        {{ form.product|as_crispy_field }}
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.warehouse|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.movement_type|as_crispy_field }}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.quantity|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.reference_number|as_crispy_field }}
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            {{ form.notes|as_crispy_field }}
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
                             <button type="submit" class="btn btn-primary px-4">
-                                <i class="fas fa-save me-2"></i> حفظ
+                                <i class="fas fa-save me-2"></i> حفظ الحركة
                             </button>
                             <a href="{% url 'warehouses:movement_list' %}" class="btn btn-secondary">
                                 <i class="fas fa-times me-2"></i> إلغاء
@@ -34,56 +68,100 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('movementForm');
-    if (!form) return;
+    // --- DOM Elements ---
+    const productSearchInput = document.getElementById('id_product_search');
+    const productHiddenInput = document.getElementById('id_product');
+    const productSearchResults = document.getElementById('product-search-results');
+    const productLoader = document.getElementById('product-loader');
+    const warehouseSelect = document.getElementById('id_warehouse');
 
-    // --- Get form elements ---
-    // Note: Crispy Forms generates predictable IDs, typically 'id_field_name'
-    const stockItemSelect = document.getElementById('id_stock_item');
-    const movementTypeSelect = document.getElementById('id_movement_type');
-    const quantityInput = document.getElementById('id_quantity');
+    // --- API URL from Django ---
+    const productSearchApiUrl = "{% url 'warehouses:product_search' %}";
 
-    // --- Function to validate stock for 'out' movements ---
-    const validateStockQuantity = () => {
-        // Only run validation for 'out' movements
-        if (movementTypeSelect.value !== 'out') {
-            quantityInput.setCustomValidity(''); // Clear previous custom errors
-            return;
+    let searchTimeout;
+
+    // --- 1. Search for products as user types ---
+    productSearchInput.addEventListener('keyup', function() {
+        clearTimeout(searchTimeout);
+        const query = this.value;
+
+        // When the user clears the search, disable the warehouse select
+        if (query.length === 0) {
+            productHiddenInput.value = '';
+            warehouseSelect.disabled = true;
         }
         
-        const selectedOption = stockItemSelect.options[stockItemSelect.selectedIndex];
-        if (!selectedOption) {
-            quantityInput.setCustomValidity('');
+        if (query.length < 2) {
+            productSearchResults.style.display = 'none';
             return;
         }
 
-        // Get available quantity from the 'data-available' attribute on the selected option
-        const availableQuantity = parseFloat(selectedOption.dataset.available);
-        const requestedQuantity = parseFloat(quantityInput.value);
+        productLoader.classList.remove('d-none');
 
-        // Check if data is valid for comparison
-        if (!isNaN(availableQuantity) && !isNaN(requestedQuantity)) {
-            if (requestedQuantity > availableQuantity) {
-                // Set a custom error message that the browser will display on submit
-                quantityInput.setCustomValidity(`الكمية المطلوبة أكبر من الرصيد المتاح (${availableQuantity})`);
-            } else {
-                // If quantity is valid, clear the custom error message
-                quantityInput.setCustomValidity('');
+        searchTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch(`${productSearchApiUrl}?q=${query}`);
+                const data = await response.json();
+                
+                productSearchResults.innerHTML = '';
+                productSearchResults.style.display = 'block';
+
+                if (data.products && data.products.length > 0) {
+                    data.products.forEach(product => {
+                        const item = document.createElement('a');
+                        item.href = '#';
+                        item.classList.add('list-group-item', 'list-group-item-action');
+                        item.textContent = `${product.name} (${product.code})`;
+                        item.dataset.productId = product.id;
+                        item.dataset.productName = `${product.name} (${product.code})`;
+                        
+                        item.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            selectProduct(this.dataset.productId, this.dataset.productName);
+                        });
+                        
+                        productSearchResults.appendChild(item);
+                    });
+                } else {
+                    productSearchResults.innerHTML = '<span class="list-group-item">لا توجد نتائج</span>';
+                }
+            } catch (error) {
+                console.error('Product search failed:', error);
+                productSearchResults.innerHTML = '<span class="list-group-item text-danger">خطأ في البحث</span>';
+            } finally {
+                productLoader.classList.add('d-none');
             }
+        }, 300);
+    });
+
+    // --- 2. Handle product selection from search results ---
+    function selectProduct(productId, productName) {
+        productSearchInput.value = productName;
+        productHiddenInput.value = productId;
+        productSearchResults.style.display = 'none';
+        
+        // Enable the warehouse dropdown now that a product is selected
+        warehouseSelect.disabled = false;
+    }
+    
+    // --- Utility: Hide search results when clicking elsewhere ---
+    document.addEventListener('click', function(e) {
+        if (!productSearchInput.contains(e.target)) {
+            productSearchResults.style.display = 'none';
         }
-    };
+    });
 
-    // --- Attach event listeners ---
-    // We listen for changes on all three relevant fields
-    stockItemSelect?.addEventListener('change', validateStockQuantity);
-    movementTypeSelect?.addEventListener('change', validateStockQuantity);
-    quantityInput?.addEventListener('input', validateStockQuantity);
+    // --- Initial Page State ---
+    // If a product is NOT pre-selected, disable the warehouse select.
+    if (!productHiddenInput.value) {
+        warehouseSelect.disabled = true;
+    }
 
-    // Initial validation check in case the form is pre-filled (e.g., on edit)
-    validateStockQuantity();
 });
 </script>
 {% endblock %}

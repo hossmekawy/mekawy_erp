@@ -190,24 +190,50 @@ class ProductionOrder(models.Model):
     def __str__(self):
         return f"أمر إنتاج {self.order_number} - {self.product.name}"    
     def save(self, *args, **kwargs):
-        # Generate order_number if not set, format: ORDproductnameYYYYMMDD###
-        if not self.order_number:
-            today = timezone.now().date()
-            counter = ProductionOrder.objects.filter(
-                product=self.product,
-                created_at__date=today
-            ).count() + 1
-            self.order_number = f"ORD{self.product.name}{today.strftime('%Y%m%d')}{counter:03d}"
-        # Generate batch_number if not set (keep old logic or adjust as needed)
-        if not self.batch_number:
-            today = timezone.now().date()
-            counter = ProductionOrder.objects.filter(
-                product=self.product,
-                created_at__date=today
-            ).count() + 1
-            self.batch_number = f"BATCH{self.product.name}{today.strftime('%y%m%d')}{counter:03d}"
+        # This logic runs only when a new order is being created
+        if not self.pk:
+            # --- CORRECTED: Sequential Order Number Generation ---
+            if not self.order_number:
+                today_str = timezone.now().strftime('%Y%m%d')
+                last_order = ProductionOrder.objects.order_by('id').last()
+                next_seq = 1
+                if last_order and last_order.order_number and '-' in last_order.order_number:
+                    try:
+                        # Find the last sequential number from the string
+                        last_seq_part = last_order.order_number.split('-')[-1]
+                        next_seq = int(last_seq_part) + 1
+                    except (ValueError, IndexError):
+                        # Fallback if the format is unexpected
+                        next_seq = (last_order.id or 0) + 1
+                self.order_number = f"ORD-{today_str}-{next_seq}"
+
+            # --- CORRECTED: Sequential Batch Number Generation ---
+            if not self.batch_number:
+                today_short_str = timezone.now().strftime('%y%m%d')
+                product_code_prefix = self.product.code[:3].upper() if self.product.code else 'PROD'
+                
+                last_batch_order = ProductionOrder.objects.filter(
+                    product__product_type=self.product.product_type,
+                    batch_number__startswith=f'BATCH-{product_code_prefix}-'
+                ).order_by('id').last()
+
+                next_batch_seq = 1
+                if last_batch_order and last_batch_order.batch_number:
+                    try:
+                        parts = last_batch_order.batch_number.split('-')
+                        if len(parts) > 2:
+                            last_seq = int(parts[2])
+                            next_batch_seq = last_seq + 1
+                    except (ValueError, IndexError):
+                        next_batch_seq = ProductionOrder.objects.filter(product__product_type=self.product.product_type).count() + 1
+                
+                # Use the same next_id from the order number for the final part
+                last_order_for_id = ProductionOrder.objects.order_by('id').last()
+                order_id_part = (last_order_for_id.id + 1) if last_order_for_id else 1
+                self.batch_number = f"BATCH-{product_code_prefix}-{next_batch_seq:04d}-{today_short_str}-{order_id_part}"
+
         super().save(*args, **kwargs)
-    
+
     @property
     def total_fabric_required(self):
         """إجمالي القماش المطلوب"""
@@ -281,6 +307,16 @@ class CuttingProcess(models.Model):
         if piece_length <= 0:
             return 0
         return int(fabric_length / piece_length)
+    
+    @property
+    def actual_meterage(self):
+        """Calculates the actual meterage based on total fabric used and total garments cut."""
+        if self.total_fabric_used and self.total_pieces_cut:
+            try:
+                return self.total_fabric_used / self.total_pieces_cut
+            except (TypeError, ZeroDivisionError):
+                return Decimal('0.0')
+        return Decimal('0.0')
 
 class CuttingTable(models.Model):
     """جدول القص"""

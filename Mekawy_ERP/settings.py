@@ -137,6 +137,15 @@ DATABASES = {
         'PORT': config('DATABASE_PORT', default='5432'), # Add this line
     }
 }
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "unique-mekawy-erp-cache",
+        "TIMEOUT": 60 * 15,  # Cache timeout in seconds (15 minutes)
+    }
+}
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 

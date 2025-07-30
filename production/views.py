@@ -4,6 +4,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.db.models.functions import Coalesce
 from django.contrib.auth import get_user_model
+
 from django.views.generic import (
     ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
 )
@@ -29,9 +30,7 @@ import json
 from django.views import View
 from collections import Counter
 from django.db.models.functions import TruncMonth
-from finance.models import Invoice, Account, AccountCategory
 
-from finance.utils import create_double_entry_transaction
 
 from .models import (
     ProductionOrder, CuttingProcess, AssemblyProcess, DyeingProcess, 
@@ -43,7 +42,7 @@ from .forms import (
     CutPieceFormSet, CuttingTableForm, ProductionOrderForm, BillOfMaterialsForm, BOMItemFormSet, CuttingProcessForm, 
     AssemblyProcessForm, DyeingProcessForm, FinishingProcessForm, FinishingReceiveForm,
     AssemblyReceiveForm, DyeingReceiveForm, ExternalManufacturerForm, ExitPermitForm,
-    ReceiptConfirmationForm, QualityControlCheckForm, ProductionCostAnalysisUpdateForm,
+    ReceiptConfirmationForm, QualityControlCheckForm, ProductionCostAnalysisUpdateForm,SendAdditionalComponentFormSet,
     AssemblySendForm, DyeingSendForm, FinishingSendForm ,CuttingTableFormSet,CustomAssemblyComponentFormSet,ManufacturerProductPriceFormSet ,ExternalManufacturerForm, CustomFinishingComponentFormSet  
 )
 from warehouses.models import Product, StockItem, StockMovement, ProductBatch, Category , Warehouse
@@ -277,30 +276,29 @@ class ProductionOrderDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         order = self.get_object()
         
-        # العمليات المرتبطة
-        context['cutting_process'] = getattr(order, 'cutting_process', None)
-        context['assembly_processes'] = order.assembly_processes.all()
+        # --- Fetch all related processes with prefetching for performance ---
+        context['cutting_process'] = CuttingProcess.objects.select_related('cutter').filter(production_order=order).first()
+        
+        # Prefetch nested relationships for efficiency
+        context['assembly_processes'] = order.assembly_processes.select_related(
+            'external_manufacturer', 'assembler'
+        ).prefetch_related(
+            'dyeing_processes__dyeing_facility',
+            'dyeing_processes__finishing_process__external_manufacturer',
+            'dyeing_processes__finishing_process__finisher',
+            'dyeing_processes__finishing_process__supervisor',
+            'dyeing_processes__finishing_process__destination_warehouse'
+        ).all()
+        
+        # Other related data
         context['quality_checks'] = order.quality_checks.all()
         context['exit_permits'] = order.exit_permits.all()
         context['cost_analysis'] = getattr(order, 'cost_analysis', None)
         
-        # تقدم العمليات
-        context['process_progress'] = {
-            'cutting': getattr(order, 'cutting_process', None) and order.cutting_process.is_completed,
-            'assembly': order.assembly_processes.filter(is_completed=True).exists(),
-            'dyeing': any(ap.dyeing_processes.filter(is_completed=True).exists() for ap in order.assembly_processes.all()),
-            'finishing': any( # Corrected logic for finishing process
-                getattr(dp, 'finishing_process', None) and dp.finishing_process.is_completed
-                for ap in order.assembly_processes.all() 
-                for dp in ap.dyeing_processes.all()
-            ),
-        }
-        
-        # Check if Bill of Materials (BOM) exists for the product
+        # Check if a Bill of Materials exists for the product
         context['bom_exists'] = BillOfMaterials.objects.filter(product=order.product).exists()
         
         return context
-
 # Add this to the existing ProductionOrderCreateView and ProductionOrderUpdateView
 
 class ProductionOrderCreateView(LoginRequiredMixin, CreateView):
@@ -1250,8 +1248,6 @@ def get_stock_for_material_in_warehouse_ajax(request):
         return JsonResponse({'error': str(e)}, status=500)
     
 from django.contrib.contenttypes.models import ContentType
-from finance.models import Invoice, Account, AccountCategory
-from finance.utils import create_double_entry_transaction
 from datetime import timedelta
 # ... other existing imports
 
@@ -1960,6 +1956,7 @@ def ajax_get_finishing_bom_components_for_dyeing(request):
         logging.error(f"Error in ajax_get_finishing_bom_components_for_dyeing: {e}")
         return JsonResponse({'error': str(e)}, status=500)
     
+
 @login_required
 @require_POST
 def receive_finishing_process(request, pk):
@@ -1977,7 +1974,8 @@ def receive_finishing_process(request, pk):
             process = form.save(commit=False)
             process.is_completed = True
             process.actual_completion_date = timezone.now()
-            process.calculate_total_cost()
+            
+            process.calculate_total_cost() 
             process.save()
 
             # 2. Handle financial logic for outsourced work
@@ -2007,23 +2005,22 @@ def receive_finishing_process(request, pk):
                     messages.error(request, _("Cannot complete process: A destination warehouse for finished goods was not selected."))
                     raise ValueError("Destination warehouse is missing.")
 
-                # Find or create the stock item for the finished product in the destination warehouse.
-                stock_item, _ = StockItem.objects.get_or_create(
+                # --- THIS IS THE FIX ---
+                # Changed the throwaway variable from '_' to 'created' to avoid conflict.
+                stock_item, created = StockItem.objects.get_or_create(
                     product=finished_product,
                     warehouse=destination_warehouse,
                     defaults={'quantity': 0}
                 )
 
-                # Create a batch record for traceability.
                 ProductBatch.objects.create(
-                    stock_item=stock_item,
+                    stock=stock_item,
                     batch_number=production_order.batch_number,
                     quantity=quantity_produced,
                     production_finishing_source=finishing_process,
                     cost_per_piece=production_order.cost_analysis.cost_per_piece if hasattr(production_order, 'cost_analysis') else 0
                 )
 
-                # Create an 'in' movement to officially add the stock.
                 StockMovement.objects.create(
                     stock_item=stock_item,
                     movement_type='in',
@@ -4668,10 +4665,13 @@ def get_order_details_ajax(request):
         import logging
         logging.error(f"Error in get_order_details_ajax: {str(e)}")
         return JsonResponse({'success': False, 'error': 'An unexpected server error occurred.'}, status=500)
+
+# In production/views.py
+
 @login_required
 def print_cutting_sheet_pdf(request, pk):
     """
-    Exports a single Cutting Process sheet to a PDF file.
+    Exports a single Cutting Process sheet to a PDF file with all possible data.
     """
     process = get_object_or_404(CuttingProcess.objects.select_related(
         'production_order__product', 'cutter'
@@ -4683,6 +4683,11 @@ def print_cutting_sheet_pdf(request, pk):
         'cutting_process': process,
         'cutting_tables': process.cutting_tables.all(),
         'cut_pieces': process.cut_pieces.order_by('piece_type', 'size'),
+        'cutting_stats': {
+            'total_tables': process.cutting_tables.count(),
+            'total_garments': process.total_pieces_cut,
+            'total_individual_pieces': process.cut_pieces.aggregate(total=Sum('quantity'))['total'] or 0,
+        },
         'timestamp': timezone.now()
     }
     
@@ -4702,19 +4707,17 @@ def print_cutting_sheet_pdf(request, pk):
     }
 
     try:
-        # Make sure WKHTMLTOPDF_PATH is configured in your settings.py
         pdf_config = pdfkit.configuration(wkhtmltopdf=settings.WKHTMLTOPDF_PATH)
         pdf = pdfkit.from_string(html, False, configuration=pdf_config, options=options)
         
         response = HttpResponse(pdf, content_type='application/pdf')
         filename = f"CuttingSheet_{process.production_order.order_number}_{timezone.now().strftime('%Y%m%d')}.pdf"
-        response['Content-Disposition'] = f'inline; filename="{filename}"' # 'inline' opens it in the browser
+        response['Content-Disposition'] = f'inline; filename="{filename}"'
         
         return response
     except Exception as e:
         messages.error(request, f"خطأ في إنشاء ملف PDF: {e}")
         return redirect('production:cutting_detail', pk=pk)
-    
     
 @login_required
 def ajax_get_dyeing_process_details(request):
@@ -5024,3 +5027,66 @@ def export_orders(request):
         ])
 
     return response
+
+# Add this import at the top of your views.py if it's not there
+# Add this import at the top of your views.py if it's not there
+@login_required
+def generate_sequential_codes_ajax(request):
+    """
+    AJAX view to generate the next sequential order and batch numbers based on the LAST existing number.
+    """
+    product_id = request.GET.get('product_id')
+    if not product_id:
+        return JsonResponse({'success': False, 'error': 'Product ID is required.'}, status=400)
+
+    try:
+        product = Product.objects.get(pk=product_id)
+        
+        # --- CORRECTED: Order Number Logic ---
+        today_str = timezone.now().strftime('%Y%m%d')
+        last_order = ProductionOrder.objects.order_by('id').last()
+        next_order_seq = 1
+        if last_order and last_order.order_number and '-' in last_order.order_number:
+            try:
+                last_seq_part = last_order.order_number.split('-')[-1]
+                next_order_seq = int(last_seq_part) + 1
+            except (ValueError, IndexError):
+                next_order_seq = (last_order.id or 0) + 1
+        order_number = f"ORD-{today_str}-{next_order_seq}"
+
+        # --- CORRECTED: Batch Number Logic ---
+        today_short_str = timezone.now().strftime('%y%m%d')
+        product_code_prefix = product.code[:3].upper() if product.code else 'PROD'
+        
+        last_batch_order = ProductionOrder.objects.filter(
+            product__product_type=product.product_type,
+            batch_number__startswith=f'BATCH-{product_code_prefix}-'
+        ).order_by('id').last()
+
+        next_batch_seq = 1
+        if last_batch_order and last_batch_order.batch_number:
+            try:
+                parts = last_batch_order.batch_number.split('-')
+                if len(parts) > 2:
+                    last_seq = int(parts[2])
+                    next_batch_seq = last_seq + 1
+            except (ValueError, IndexError):
+                next_batch_seq = ProductionOrder.objects.filter(product__product_type=product.product_type).count() + 1
+        
+        # Use the same next_id from the order number for the final part
+        order_id_part = (last_order.id + 1) if last_order else 1
+        batch_number = f"BATCH-{product_code_prefix}-{next_batch_seq:04d}-{today_short_str}-{order_id_part}"
+
+        return JsonResponse({
+            'success': True,
+            'order_number': order_number,
+            'batch_number': batch_number
+        })
+
+    except Product.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Product not found.'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    
+    
