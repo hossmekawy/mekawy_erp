@@ -101,7 +101,7 @@
                     <!-- Financial Balance Metric -->
                     <div class="col-lg-6 col-md-6 mb-3">
                         <div class="metric-box">
-                            {% with manufacturer.financial_account as account %}
+                            {% with manufacturer.finance_account as account %}
                                 {% if account %}
                                     <div class="metric-value {% if account.balance > 0 %}text-danger{% elif account.balance < 0 %}text-success{% else %}text-dark{% endif %}">{{ account.balance|floatformat:2|intcomma }}</div>
                                     <div class="metric-label">الرصيد المالي (جنيه)</div>
@@ -118,21 +118,21 @@
                     <!-- Completed Jobs Value -->
                     <div class="col-lg-6 col-md-6 mb-3">
                         <div class="metric-box">
-                            <div class="metric-value text-success">{{ manufacturer.total_value_of_completed_jobs|intcomma }}</div>
+                            <div class="metric-value text-success">{{ total_value_of_completed_jobs|intcomma }}</div>
                             <div class="metric-label">قيمة الأعمال المكتملة (جنيه)</div>
                         </div>
                     </div>
                     <!-- Active Jobs Value -->
                     <div class="col-lg-6 col-md-6 mb-3">
                         <div class="metric-box">
-                             <div class="metric-value text-warning">{{ manufacturer.total_value_of_active_jobs|intcomma }}</div>
+                             <div class="metric-value text-warning">{{ total_value_of_active_jobs|intcomma }}</div>
                             <div class="metric-label">قيمة الأعمال النشطة (جنيه)</div>
                         </div>
                     </div>
                     <!-- Total Pieces Completed -->
                     <div class="col-lg-6 col-md-6 mb-3">
                         <div class="metric-box">
-                            <div class="metric-value text-info">{{ manufacturer.total_pieces_completed|intcomma }}</div>
+                            <div class="metric-value text-info">{{ total_pieces_completed|intcomma }}</div>
                             <div class="metric-label">إجمالي القطع المنجزة</div>
                         </div>
                     </div>
@@ -274,7 +274,7 @@
 
     <div class="tab-pane fade" id="financials-pane" role="tabpanel">
         <div class="p-4">
-            {% with manufacturer.financial_account as account %}
+            {% with manufacturer.finance_account as account %}
                 {% if account %}
                     <h4 class="mb-3">الملخص المالي</h4>
                     <p><strong>الرصيد الحالي للحساب:</strong> 
@@ -287,13 +287,20 @@
                     </p>
                     <p class="text-muted">هذا هو الرصيد النهائي لجميع الفواتير والدفعات المسجلة لهذا المصنع.</p>
                     <hr>
-                    <a href="{% url 'finance:manufacturer-statement' manufacturer.pk %}" class="btn btn-info">
+                    <a href="{% url 'finance:manufacturer_statement_detail' manufacturer.pk %}" class="btn btn-info">
                         <i class="fas fa-file-alt me-2"></i> عرض كشف الحساب التفصيلي
                     </a>
                 {% else %}
-                    <div class="alert alert-warning">
+                    <div class="alert alert-warning text-center">
                         <i class="fas fa-exclamation-triangle me-2"></i>
-                        لا يوجد حساب مالي مرتبط بهذا المصنع حتى الآن. سيتم إنشاؤه تلقائياً عند إضافة المصنع.
+                        <strong>لا يوجد حساب مالي مرتبط بهذا المصنع.</strong>
+                        <p class="mt-2">انقر على الزر أدناه لإنشاء حساب مالي تلقائياً لهذا المصنع.</p>
+                        <form action="{% url 'production:manufacturers:manufacturer_create_account' manufacturer.pk %}" method="post" class="mt-3">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-plus-circle me-2"></i>إنشاء حساب مالي الآن
+                            </button>
+                        </form>
                     </div>
                 {% endif %}
             {% endwith %}
@@ -301,7 +308,7 @@
     </div>
 </div>
 
-<!-- Modal for sending additional materials -->
+<!-- Modal for sending additional materials (remains the same) -->
 <div class="modal fade" id="sendMaterialsModal" tabindex="-1" aria-labelledby="sendMaterialsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">

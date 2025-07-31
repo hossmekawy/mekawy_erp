@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}كشوفات حسابات المصانع{% endblock title %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">كشوفات حسابات المصانع</h1>
+    </div>
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">قائمة المصانع الخارجية</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>اسم المصنع</th>
+                            <th>الرصيد الحالي</th>
+                            <th>إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for manufacturer in manufacturers %}
+                        <tr>
+                            <td>{{ manufacturer.name }}</td>
+                            <td>
+                                {% if manufacturer.finance_account %}
+                                    {{ manufacturer.finance_account.balance|floatformat:2 }} EGP
+                                    {% if manufacturer.finance_account.balance > 0 %}
+                                        <span class="badge bg-danger text-white">مستحق له</span>
+                                    {% elif manufacturer.finance_account.balance < 0 %}
+                                        <span class="badge bg-success text-white">مستحق عليه</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary text-white">خالص</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">لا يوجد حساب مالي</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if manufacturer.finance_account %}
+                                    <a href="{% url 'finance:manufacturer_statement_detail' pk=manufacturer.pk %}" class="btn btn-info btn-sm">
+                                        <i class="fas fa-file-invoice-dollar"></i> كشف حساب
+                                    </a>
+                                    <a href="{% url 'finance:manufacturer_payment_create' pk=manufacturer.pk %}" class="btn btn-success btn-sm">
+                                        <i class="fas fa-money-bill-wave"></i> تسجيل دفعة
+                                    </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center">لا توجد مصانع خارجية مسجلة.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

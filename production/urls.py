@@ -23,6 +23,8 @@ manufacturer_patterns = [
     path('<int:pk>/', views.ExternalManufacturerDetailView.as_view(), name='manufacturer_detail'),
     path('<int:pk>/update/', views.ExternalManufacturerUpdateView.as_view(), name='manufacturer_update'),
     path('<int:pk>/delete/', views.ExternalManufacturerDeleteView.as_view(), name='manufacturer_delete'),
+    path('<int:pk>/create-account/', views.create_manufacturer_account_view, name='manufacturer_create_account'),
+
 ]
 
 exit_permit_patterns = [

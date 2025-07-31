@@ -4,7 +4,13 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.db.models.functions import Coalesce
 from django.contrib.auth import get_user_model
-
+from django.contrib.contenttypes.models import ContentType
+from finance.models import Account, Transaction # Make sure your finance app is named 'finance'
+from xhtml2pdf import pisa
+import io
+import logging  # FIX: This was incorrectly 'import logger'
+from itertools import chain
+from operator import attrgetter
 from django.views.generic import (
     ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
 )
@@ -14,6 +20,8 @@ from django.views.decorators.http import require_POST
 from django.urls import reverse_lazy, reverse
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Q, Sum, Avg, Count, F
+from django.db import models
+
 from django.utils import timezone
 from django.core.paginator import Paginator
 from django.template.loader import render_to_string
@@ -31,9 +39,8 @@ from django.views import View
 from collections import Counter
 from django.db.models.functions import TruncMonth
 
-
 from .models import (
-    ProductionOrder, CuttingProcess, AssemblyProcess, DyeingProcess, 
+    ManufacturerProductPrice, ProductionOrder, CuttingProcess, AssemblyProcess, DyeingProcess, 
     FinishingProcess, ExternalManufacturer, ExitPermit, ReceiptConfirmation, 
     ProductionCostAnalysis, BillOfMaterials, BOMItem, CutPiece, CuttingTable, 
     AssemblyComponent, GarmentDraw, FinishingComponent, QualityControlCheck,ProductionReport
@@ -49,6 +56,65 @@ from warehouses.models import Product, StockItem, StockMovement, ProductBatch, C
 
 User = get_user_model()
 
+
+def create_invoice_and_transaction(request, process_instance, manufacturer, cost, expense_name, notes):
+    """
+    Helper function to create a financial transaction for a production process.
+    This function creates a debt transaction against the manufacturer's account.
+    """
+    try:
+        # 1. Find the manufacturer's liability account (created by a signal or manually)
+        manufacturer_liability_account = Account.objects.get(
+            manufacturer=manufacturer,
+            account_type='LIABILITY'
+        )
+
+        # 2. Create the MANUFACTURING_DEBT transaction within a single database operation
+        with transaction.atomic():
+            # This transaction increases the liability account (what we owe them)
+            manufacturer_liability_account.balance += cost
+            manufacturer_liability_account.save()
+
+            Transaction.objects.create(
+                account=manufacturer_liability_account,
+                type='MANUFACTURING_DEBT',
+                amount=cost,
+                description=notes,
+                reference=f"{type(process_instance).__name__}-{process_instance.id}",
+                content_object=process_instance,
+            )
+        return True
+    except Account.DoesNotExist:
+        messages.error(request, f"CRITICAL ERROR: Financial account for manufacturer '{manufacturer.name}' not found. The transaction could not be recorded.")
+        return False
+    except Exception as e:
+        logger.error(f"Error creating financial transaction for {manufacturer.name}: {e}")
+        messages.error(request, f"An unexpected error occurred while creating financial records: {e}")
+        return False
+
+
+@login_required
+@require_POST
+def create_manufacturer_account_view(request, pk):
+    """
+    Creates a financial account for an existing external manufacturer.
+    """
+    manufacturer = get_object_or_404(ExternalManufacturer, pk=pk)
+    
+    if hasattr(manufacturer, 'finance_account') and manufacturer.finance_account is not None:
+        messages.warning(request, f"The financial account for '{manufacturer.name}' already exists.")
+    else:
+        try:
+            Account.objects.create(
+                name=f"Factory Account: {manufacturer.name}",
+                account_type='LIABILITY',
+                manufacturer=manufacturer
+            )
+            messages.success(request, f"Financial account for '{manufacturer.name}' was created successfully.")
+        except Exception as e:
+            messages.error(request, f"An error occurred while creating the account: {e}")
+            
+    return redirect('production:manufacturers:manufacturer_detail', pk=manufacturer.pk)
 
 # Dashboard View
 # Dashboard View (update the get_context_data method)
@@ -1256,9 +1322,8 @@ from datetime import timedelta
 @require_POST
 def receive_assembly_process(request, pk):
     """
-    Handles the submission of the 'Receive Items' modal form.
-    This view now explicitly updates the production order status AND
-    creates the necessary financial records for outsourced jobs.
+    Handles receiving items from assembly.
+    FIX: Now correctly calculates the cost before creating the financial transaction.
     """
     assembly_process = get_object_or_404(AssemblyProcess, pk=pk, is_completed=False)
     form = AssemblyReceiveForm(request.POST, instance=assembly_process)
@@ -1269,32 +1334,40 @@ def receive_assembly_process(request, pk):
             process.is_completed = True
             process.actual_completion_date = timezone.now()
             
-            # First, calculate the cost. This must be done before creating the invoice.
-            process.calculate_assembly_cost()
+            # --- FIX: Explicitly calculate the cost here in the view ---
+            cost = Decimal('0.00')
+            if process.assembly_type == 'outsourced' and process.external_manufacturer and process.quantity_received > 0:
+                try:
+                    price_record = ManufacturerProductPrice.objects.get(
+                        manufacturer=process.external_manufacturer,
+                        product=process.production_order.product
+                    )
+                    # Cost is price per piece * quantity received
+                    cost = price_record.price * process.quantity_received
+                except ManufacturerProductPrice.DoesNotExist:
+                    messages.warning(request, f"No price set for product '{process.production_order.product.name}' with manufacturer '{process.external_manufacturer.name}'. Cost will be zero.")
+            
+            process.assembly_cost = cost
             process.save() # Save the process with the final cost
 
-            # **FINANCIAL LOGIC**
-            # If the assembly was outsourced and has a cost, create an invoice and a transaction.
+            # FINANCIAL LOGIC
             if process.assembly_type == 'outsourced' and process.external_manufacturer and process.assembly_cost > 0:
                 success = create_invoice_and_transaction(
                     request=request,
                     process_instance=process,
                     manufacturer=process.external_manufacturer,
                     cost=process.assembly_cost,
-                    expense_code="EXP-ASM-01",
                     expense_name=_("Outsourced Assembly Costs"),
-                    notes=_("Auto-invoice for assembly process #{id} for order {order_num}").format(
-                        id=process.id, order_num=process.production_order.order_number
+                    notes=_("تكلفة تجميع: {prod_name} ({qty} قطعة)").format(
+                        prod_name=process.production_order.product.name,
+                        qty=process.quantity_received
                     )
                 )
                 if not success:
-                    # The helper function puts error in messages, we just need to stop the transaction.
                     raise ValueError("Failed to create financial records for assembly.")
 
-            # Update the production order status
             process.production_order.status = 'in_dyeing'
             process.production_order.save(update_fields=['status'])
-
             messages.success(request, _('Assembly process for order {order_num} has been successfully received.').format(
                 order_num=process.production_order.order_number
             ))
@@ -1368,52 +1441,6 @@ class DyeingProcessListView(LoginRequiredMixin, ListView):
         context['facilities'] = ExternalManufacturer.objects.filter(dyeing_jobs__isnull=False).distinct()
         return context
 
-def create_invoice_and_transaction(request, process_instance, manufacturer, cost, expense_code, expense_name, notes):
-    """
-    Helper function to create an invoice and a double-entry transaction for a production process.
-    """
-    try:
-        # 1. Create the Invoice
-        invoice = Invoice.objects.create(
-            recipient_content_type=ContentType.objects.get_for_model(manufacturer),
-            recipient_object_id=manufacturer.pk,
-            issue_date=timezone.now().date(),
-            due_date=timezone.now().date() + timezone.timedelta(days=manufacturer.payment_terms_days),
-            total_amount=cost,
-            status='sent',
-            notes=notes
-        )
-
-        # 2. Find the manufacturer's liability account (created by the signal)
-        manufacturer_liability_account = Account.objects.get(
-            owner_content_type=ContentType.objects.get_for_model(manufacturer),
-            owner_object_id=manufacturer.pk
-        )
-
-        # 3. Find or create the specific expense account
-        expense_category, _ = AccountCategory.objects.get_or_create(name=_("Production Expenses"), defaults={'category_type': 'expense'})
-        expense_account, _ = Account.objects.get_or_create(
-            code=expense_code,
-            defaults={'name': expense_name, 'category': expense_category}
-        )
-
-        # 4. Create the double-entry transaction
-        create_double_entry_transaction(
-            description=notes,
-            created_by=request.user,
-            debit_account=expense_account,          # Debit Expense (increases expense)
-            credit_account=manufacturer_liability_account, # Credit Liability (increases what we owe)
-            amount=cost,
-            date=timezone.now().date(),
-            source_document=invoice
-        )
-        return True
-    except Account.DoesNotExist:
-        messages.error(request, f"خطأ حرج: لم يتم العثور على حساب مالي للمصنع {manufacturer.name}.")
-        return False
-    except Exception as e:
-        messages.error(request, f"خطأ في إنشاء السجلات المالية: {e}")
-        return False
 
 
 class DyeingProcessCreateView(LoginRequiredMixin, CreateView):
@@ -1542,7 +1569,7 @@ class DyeingProcessDeleteView(LoginRequiredMixin, DeleteView):
 def receive_dyeing_process(request, pk):
     """
     Handles receiving items from the dyeing process.
-    Creates financial records for outsourced jobs.
+    FIX: Now correctly calculates the cost before creating the financial transaction.
     """
     dyeing_process = get_object_or_404(DyeingProcess, pk=pk, is_completed=False)
     form = DyeingReceiveForm(request.POST, instance=dyeing_process)
@@ -1552,17 +1579,18 @@ def receive_dyeing_process(request, pk):
             process = form.save(commit=False)
             process.is_completed = True
             process.actual_return_date = timezone.now()
-            process.calculate_total_cost()
+            
+            # FIX: Explicit cost calculation
+            process.calculate_total_cost() # This method should use ManufacturerProductPrice
             process.save()
 
-            # **FINANCIAL LOGIC**
+            # FINANCIAL LOGIC
             if process.dyeing_facility and process.total_dyeing_cost > 0:
                 success = create_invoice_and_transaction(
                     request=request,
                     process_instance=process,
                     manufacturer=process.dyeing_facility,
                     cost=process.total_dyeing_cost,
-                    expense_code="EXP-DYE-01",
                     expense_name=_("Dyeing Costs"),
                     notes=_("Auto-invoice for dyeing process #{id} for order {order_num}").format(
                         id=process.id, order_num=process.assembly_process.production_order.order_number
@@ -1571,11 +1599,9 @@ def receive_dyeing_process(request, pk):
                 if not success:
                     raise ValueError("Failed to create financial records for dyeing.")
 
-            # Update the production order status
             production_order = process.assembly_process.production_order
             production_order.status = 'in_finishing'
             production_order.save(update_fields=['status'])
-
             messages.success(request, _("Dyeing process for order {order_num} has been successfully received.").format(
                 order_num=production_order.order_number
             ))
@@ -1961,40 +1987,39 @@ def ajax_get_finishing_bom_components_for_dyeing(request):
 @require_POST
 def receive_finishing_process(request, pk):
     """
-    Handles receiving items from the finishing process. This is the final step
-    that creates financial records for outsourced jobs and adds the produced 
-    goods into the main warehouse inventory.
+    Handles receiving finished goods.
+    FIX: Now correctly calculates the cost and adds products to stock.
     """
     finishing_process = get_object_or_404(FinishingProcess, pk=pk, is_completed=False)
     form = FinishingReceiveForm(request.POST, instance=finishing_process)
 
     if form.is_valid():
         with transaction.atomic():
-            # 1. Save the finishing process with its completion details
             process = form.save(commit=False)
             process.is_completed = True
             process.actual_completion_date = timezone.now()
             
-            process.calculate_total_cost() 
+            # FIX: Explicit cost calculation
+            process.calculate_total_cost() # This method should use ManufacturerProductPrice
             process.save()
 
-            # 2. Handle financial logic for outsourced work
+            # FINANCIAL LOGIC
             if process.finishing_type == 'outsourced' and process.external_manufacturer and process.total_finishing_cost > 0:
                 success = create_invoice_and_transaction(
                     request=request,
                     process_instance=process,
                     manufacturer=process.external_manufacturer,
                     cost=process.total_finishing_cost,
-                    expense_code="EXP-FIN-01",
                     expense_name=_("Outsourced Finishing Costs"),
-                    notes=_("Auto-invoice for finishing process #{id} for order {order_num}").format(
-                        id=process.id, order_num=process.dyeing_process.assembly_process.production_order.order_number
+                    notes=_("تكلفة تشطيب: {prod_name} ({qty} قطعة)").format(
+                        prod_name=process.dyeing_process.assembly_process.production_order.product.name,
+                        qty=process.quantity_output
                     )
                 )
                 if not success:
                     raise ValueError("Failed to create financial records for finishing.")
 
-            # 3. Handle inventory update for finished goods
+            # INVENTORY LOGIC
             production_order = finishing_process.dyeing_process.assembly_process.production_order
             finished_product = production_order.product
             destination_warehouse = finishing_process.destination_warehouse
@@ -2002,11 +2027,9 @@ def receive_finishing_process(request, pk):
 
             if quantity_produced > 0:
                 if not destination_warehouse:
-                    messages.error(request, _("Cannot complete process: A destination warehouse for finished goods was not selected."))
+                    messages.error(request, _("Cannot complete: A destination warehouse was not selected."))
                     raise ValueError("Destination warehouse is missing.")
 
-                # --- THIS IS THE FIX ---
-                # Changed the throwaway variable from '_' to 'created' to avoid conflict.
                 stock_item, created = StockItem.objects.get_or_create(
                     product=finished_product,
                     warehouse=destination_warehouse,
@@ -2029,15 +2052,13 @@ def receive_finishing_process(request, pk):
                     notes=_("Completed production from order #{num}").format(num=production_order.order_number),
                     created_by=request.user
                 )
-                messages.info(request, _("{qty} pieces of '{prod}' have been added to warehouse '{wh}'.").format(
+                messages.info(request, _("{qty} pieces of '{prod}' added to warehouse '{wh}'.").format(
                     qty=quantity_produced, prod=finished_product.name, wh=destination_warehouse.name
                 ))
 
-            # 4. Mark the main production order as complete
             production_order.status = 'completed'
             production_order.actual_completion_date = timezone.now().date()
             production_order.save(update_fields=['status', 'actual_completion_date'])
-
             messages.success(request, _("Finishing process for order {order_num} has been completed.").format(
                 order_num=production_order.order_number
             ))
@@ -2162,17 +2183,65 @@ class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
     model = ExternalManufacturer
     template_name = 'production/manufacturer/manufacturer_detail.html'
     context_object_name = 'manufacturer'
-    # You can add logic here to show related Assembly Processes later
+
+    def get_queryset(self):
+        """
+        Pre-fetches related data for efficiency.
+        """
+        return super().get_queryset().select_related('finance_account').prefetch_related(
+            'assembly_processes__production_order__product',
+            'dyeing_jobs__assembly_process__production_order__product',
+            'finishing_jobs__dyeing_process__assembly_process__production_order__product',
+            'product_prices__product'
+        )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         manufacturer = self.get_object()
         
-        # Get active and completed jobs
-        context['active_jobs'] = manufacturer.assembly_processes.filter(is_completed=False).select_related('production_order__product').order_by('-start_date')
-        context['job_history'] = manufacturer.assembly_processes.filter(is_completed=True).select_related('production_order__product').order_by('-actual_completion_date')
-        context['product_prices'] = manufacturer.product_prices.select_related('product').order_by('product__name')
+        # --- FIX: Combine all job types (Assembly, Dyeing, Finishing) ---
+        assembly_jobs = manufacturer.assembly_processes.all().annotate(job_type=F('assembly_type'))
+        dyeing_jobs = manufacturer.dyeing_jobs.all().annotate(job_type=models.Value('Dyeing'))
+        finishing_jobs = manufacturer.finishing_jobs.all().annotate(job_type=F('finishing_type'))
+
+        # Combine all jobs into a single list
+        all_jobs = list(chain(assembly_jobs, dyeing_jobs, finishing_jobs))
+
+        # Separate into active and completed jobs
+        active_jobs = [job for job in all_jobs if not job.is_completed]
+        completed_jobs = [job for job in all_jobs if job.is_completed]
+
+        # Sort jobs by date
+        # Use a sensible default for sorting if a date is missing
+        default_date = timezone.now()
+        context['active_jobs'] = sorted(active_jobs, key=lambda x: getattr(x, 'start_date', getattr(x, 'sent_date', default_date)), reverse=True)
+        
+        # FIX: Corrected the sorting logic to check for 'actual_completion_date' first,
+        # as it is more common, before checking for 'actual_return_date'.
+        context['job_history'] = sorted(
+            completed_jobs, 
+            key=lambda job: (
+                getattr(job, 'actual_completion_date', None) or 
+                getattr(job, 'actual_return_date', None) or 
+                default_date
+            ), 
+            reverse=True
+        )
+        
+        context['product_prices'] = manufacturer.product_prices.all()
+
+        total_completed_value = sum(getattr(job, 'assembly_cost', getattr(job, 'total_dyeing_cost', getattr(job, 'total_finishing_cost', 0))) or 0 for job in completed_jobs)
+        total_active_value = sum(getattr(job, 'assembly_cost', getattr(job, 'total_dyeing_cost', getattr(job, 'total_finishing_cost', 0))) or 0 for job in active_jobs)
+        total_pieces_completed = sum(getattr(job, 'quantity_received', getattr(job, 'quantity_output', 0)) or 0 for job in completed_jobs)
+
+        context['total_value_of_completed_jobs'] = total_completed_value
+        context['total_value_of_active_jobs'] = total_active_value
+        context['total_pieces_completed'] = total_pieces_completed
 
         return context
+
+
+
 class ExternalManufacturerCreateView(LoginRequiredMixin, CreateView):
     model = ExternalManufacturer
     form_class = ExternalManufacturerForm

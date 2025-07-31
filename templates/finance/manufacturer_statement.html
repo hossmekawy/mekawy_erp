@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}كشف حساب المصنع: {{ manufacturer.name }}{% endblock title %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-2 text-gray-800">كشف حساب المصنع: {{ manufacturer.name }}</h1>
+    <p class="mb-4">
+        الرصيد الحالي: <strong class="{% if account.balance > 0 %}text-danger{% elif account.balance < 0 %}text-success{% endif %}">{{ account.balance|floatformat:2 }} EGP</strong>
+    </p>
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">تصفية حسب التاريخ</h6>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-center">
+                <div class="col-md-5">
+                    <label for="start_date" class="form-label">من تاريخ</label>
+                    <input type="date" name="start_date" id="start_date" value="{{ start_date|default:'' }}" class="form-control">
+                </div>
+                <div class="col-md-5">
+                    <label for="end_date" class="form-label">إلى تاريخ</label>
+                    <input type="date" name="end_date" id="end_date" value="{{ end_date|default:'' }}" class="form-control">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">بحث</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">الحركات المالية</h6>
+            <a href="{% url 'finance:manufacturer_payment_create' pk=manufacturer.pk %}" class="btn btn-success btn-sm">
+                <i class="fas fa-plus"></i> تسجيل دفعة جديدة
+            </a>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>التاريخ</th>
+                            <th>الوصف / البيان</th>
+                            <th>المرجع</th>
+                            <th>مدين (له)</th>
+                            <th>دائن (عليه)</th>
+                            <th>الرصيد</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if start_date %}
+                        <tr>
+                            <td colspan="5" class="text-end fw-bold">رصيد افتتاحي</td>
+                            <td class="fw-bold">{{ opening_balance|floatformat:2 }}</td>
+                        </tr>
+                        {% endif %}
+                        {% for item in transactions_with_balance %}
+                        <tr>
+                            <td>{{ item.transaction.timestamp|date:"Y-m-d H:i" }}</td>
+                            <td>{{ item.transaction.description }}</td>
+                            <td>{{ item.transaction.reference|default:"--" }}</td>
+                            <td>{{ item.debit|floatformat:2 }}</td>
+                            <td>{{ item.credit|floatformat:2 }}</td>
+                            <td>{{ item.running_balance|floatformat:2 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center">لا توجد حركات مالية لهذه الفترة.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="table-light">
+                            <th colspan="5" class="text-end">الرصيد الختامي</th>
+                            <th>{{ closing_balance|floatformat:2 }}</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

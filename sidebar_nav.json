@@ -116,28 +116,36 @@
             }
         }
     },
-   "المالية": {
-    "title": "المالية",
-    "icon": "fas fa-coins",
-    "roles": ["admin", "manager"],
-    "submenu": {
-        "الحسابات_المالية": {
-            "url_name": "finance:account_list",
-            "icon": "fas fa-wallet",
-            "roles": ["admin", "manager"]
-        },
-        "سجل_الحركات": {
-            "url_name": "finance:transaction_list",
-            "icon": "fas fa-history",
-            "roles": ["admin", "manager"]
-        },
-        "إضافة_حركة_جديدة": {
-            "url_name": "finance:transaction_create",
-            "icon": "fas fa-plus-circle",
-            "roles": ["admin", "manager"]
+
+    "المالية": {
+        "title": "المالية",
+        "icon": "fas fa-coins",
+        "roles": ["admin", "manager"],
+        "submenu": {
+            "الحسابات_المالية": {
+                "url_name": "finance:account_list",
+                "icon": "fas fa-wallet",
+                "roles": ["admin", "manager"]
+            },
+            "سجل_الحركات": {
+                "url_name": "finance:transaction_list",
+                "icon": "fas fa-history",
+                "roles": ["admin", "manager"]
+            },
+            "إضافة_حركة_جديدة": {
+                "url_name": "finance:transaction_create",
+                "icon": "fas fa-plus-circle",
+                "roles": ["admin", "manager"]
+            },
+            "كشوفات_حسابات_المصانع": {
+                "url_name": "finance:manufacturer_statement_list",
+                "icon": "fas fa-industry",
+                "roles": ["admin", "manager"]
+            }
         }
-    }
-},
+    },
+
+
         "المخازن": {
         "title": "المخازن",
         "icon": "fas fa-warehouse",
