@@ -1,5 +1,5 @@
 {% extends 'production/production_base.html' %}
-{% load static i18n humanize widget_tweaks %}
+{% load static i18n humanize widget_tweaks production_extras %}
 
 {% block production_title %}
     تفاصيل المصنع - {{ manufacturer.name }}
@@ -150,12 +150,12 @@
 <ul class="nav nav-tabs nav-tabs-underlined mb-0" id="manufacturerTabs" role="tablist">
     <li class="nav-item" role="presentation">
         <button class="nav-link active" id="active-jobs-tab" data-bs-toggle="tab" data-bs-target="#active-jobs-pane" type="button" role="tab">
-            <i class="fas fa-tasks me-2"></i>المهام النشطة <span class="badge bg-primary rounded-pill ms-1">{{ active_jobs.count }}</span>
+            <i class="fas fa-tasks me-2"></i>المهام النشطة <span class="badge bg-primary rounded-pill ms-1">{{ active_jobs|length }}</span>
         </button>
     </li>
     <li class="nav-item" role="presentation">
         <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab">
-            <i class="fas fa-history me-2"></i>سجل المهام <span class="badge bg-secondary rounded-pill ms-1">{{ job_history.count }}</span>
+            <i class="fas fa-history me-2"></i>سجل المهام <span class="badge bg-secondary rounded-pill ms-1">{{ job_history|length }}</span>
         </button>
     </li>
     <li class="nav-item" role="presentation">
@@ -173,24 +173,28 @@
 <div class="tab-content bg-white border border-top-0" id="manufacturerTabsContent">
     <div class="tab-pane fade show active" id="active-jobs-pane" role="tabpanel">
         <div class="list-group list-group-flush">
-            {% for job in active_jobs %}
+            {# --- THIS IS THE UPDATED SECTION --- #}
+            {% for job_data in active_jobs %}
                 <div class="list-group-item p-3">
                     <div class="d-flex w-100 justify-content-between">
-                        <a href="{% url 'production:assembly_detail' job.pk %}" class="text-decoration-none">
-                            <h6 class="mb-1 text-primary">أمر إنتاج: {{ job.production_order.order_number }}</h6>
+                        <a href="{{ job_data.detail_url }}" class="text-decoration-none">
+                            <h6 class="mb-1 text-primary">أمر إنتاج: {{ job_data.order.order_number }}</h6>
                         </a>
-                        <small class="text-muted">أرسل: {{ job.start_date|date:"d M Y" }}</small>
+                        <small class="text-muted">أرسل: {{ job_data.start_date|date:"d M Y" }}</small>
                     </div>
                     <p class="mb-2 text-muted">
-                        <strong>المنتج:</strong> {{ job.production_order.product.name }} | 
-                        <strong>الكمية:</strong> {{ job.quantity_sent }} قطعة
+                        <strong>المنتج:</strong> {{ job_data.order.product.name }} | 
+                        <strong>الكمية:</strong> {{ job_data.job_object.quantity_sent }} قطعة |
+                        <strong>النوع:</strong> {{ job_data.job_type }}
                     </p>
+                    {% if job_data.job_object|class_name == 'AssemblyProcess' %}
                     <button type="button" class="btn btn-sm btn-outline-primary send-materials-btn" 
                             data-bs-toggle="modal" data-bs-target="#sendMaterialsModal"
-                            data-assembly-id="{{ job.pk }}"
-                            data-assembly-name="{{ job.production_order.order_number }}">
+                            data-assembly-id="{{ job_data.job_object.pk }}"
+                            data-assembly-name="{{ job_data.order.order_number }}">
                         <i class="fas fa-box-open me-2"></i>إرسال/سحب مواد
                     </button>
+                    {% endif %}
                 </div>
             {% empty %}
                 <div class="list-group-item text-center text-muted p-5">
@@ -216,12 +220,15 @@
                 <tbody>
                     {% for job in job_history %}
                         <tr>
-                            <td><strong>{{ job.production_order.order_number }}</strong></td>
-                            <td>{{ job.production_order.product.name }}</td>
-                            <td class="text-center text-success fw-bold">{{ job.assembly_cost|intcomma }} جنيه</td>
-                            <td class="text-center">{{ job.actual_completion_date|date:"d M Y" }}</td>
+                            <td>
+                                <strong>{{ job.order_number }}</strong>
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">{{ job.job_type }}</span>
+                            </td>
+                            <td>{{ job.product_name }}</td>
+                            <td class="text-center text-success fw-bold">{{ job.cost|intcomma }} جنيه</td>
+                            <td class="text-center">{{ job.completion_date|date:"d M Y" }}</td>
                             <td class="text-end">
-                                <a href="{% url 'production:assembly_detail' job.pk %}" class="btn btn-sm btn-outline-secondary">
+                                <a href="{{ job.detail_url }}" class="btn btn-sm btn-outline-secondary">
                                     <i class="fas fa-eye"></i>
                                 </a>
                             </td>

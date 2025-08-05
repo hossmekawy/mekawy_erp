@@ -1,0 +1,37 @@
+{% extends 'pdf/base_pdf.html' %}
+{% load i18n %}
+
+{% block pdf_title %}{{ title }}{% endblock %}
+
+{% block document_main_title %}{{ title }}{% endblock %}
+
+{% block pdf_content %}
+    <p>هذا التقرير يعرض قائمة بأوامر الإنتاج المكتملة بناءً على الفلاتر المحددة.</p>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>{% trans "رقم الأمر" %}</th>
+                <th>{% trans "اسم المنتج" %}</th>
+                <th>{% trans "الكمية" %}</th>
+                <th>{% trans "تاريخ الإكمال" %}</th>
+                <th>{% trans "تم إنشاؤه بواسطة" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr>
+                <td>{{ order.order_number }}</td>
+                <td>{{ order.product.name }}</td>
+                <td>{{ order.quantity_ordered }}</td>
+                <td>{{ order.actual_completion_date|date:"Y-m-d" }}</td>
+                <td>{{ order.created_by.username|default:"N/A" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 20px;">{% trans "لا توجد بيانات لعرضها." %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

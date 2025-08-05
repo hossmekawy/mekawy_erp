@@ -82,6 +82,57 @@
                                         <span class="production-status {{ order.status }}">
                                             {{ order.get_status_display }}
                                         </span>
+                                        
+                                        {# UPDATE: Display detailed status based on the current stage #}
+                                        {% if order.status == 'in_cutting' and order.cutting_process %}
+                                            <small class="d-block text-muted">
+                                                <i class="fas fa-user me-1"></i>
+                                                {{ order.cutting_process.cutter.get_full_name|default:'غير محدد' }}
+                                            </small>
+                                        {% elif order.status == 'in_assembly' %}
+                                            {% for process in order.assembly_processes.all %}
+                                                {% if not process.is_completed %}
+                                                    <small class="d-block text-muted">
+                                                        {% if process.assembly_type == 'in_house' %}
+                                                            <i class="fas fa-user-cog me-1"></i>
+                                                            {{ process.assembler.get_full_name|default:'داخلي' }}
+                                                        {% else %}
+                                                            <i class="fas fa-industry me-1"></i>
+                                                            {{ process.external_manufacturer.name|default:'خارجي' }}
+                                                        {% endif %}
+                                                    </small>
+                                                {% endif %}
+                                            {% endfor %}
+                                        {% elif order.status == 'in_dyeing' %}
+                                            {% for a_process in order.assembly_processes.all %}
+                                                {% for d_process in a_process.dyeing_processes.all %}
+                                                    {% if not d_process.is_completed %}
+                                                        <small class="d-block text-muted">
+                                                            <i class="fas fa-industry me-1"></i>
+                                                            {{ d_process.dyeing_facility.name|default:'غير محدد' }}
+                                                        </small>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            {% endfor %}
+                                        {% elif order.status == 'in_finishing' %}
+                                            {% for a_process in order.assembly_processes.all %}
+                                                {% for d_process in a_process.dyeing_processes.all %}
+                                                    {% if d_process.finishing_process and not d_process.finishing_process.is_completed %}
+                                                        {% with f_process=d_process.finishing_process %}
+                                                            <small class="d-block text-muted">
+                                                                {% if f_process.finishing_type == 'in_house' %}
+                                                                    <i class="fas fa-user-cog me-1"></i>
+                                                                    {{ f_process.finisher.get_full_name|default:f_process.supervisor.get_full_name|default:'داخلي' }}
+                                                                {% else %}
+                                                                    <i class="fas fa-industry me-1"></i>
+                                                                    {{ f_process.external_manufacturer.name|default:'خارجي' }}
+                                                                {% endif %}
+                                                            </small>
+                                                        {% endwith %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                            {% endfor %}
+                                        {% endif %}
                                     </td>
                                     <td>
                                         <span class="badge bg-{{ order.priority|status_color }}">{{ order.get_priority_display }}</span>

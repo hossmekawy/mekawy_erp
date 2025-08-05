@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>بوليصة شحن - {{ order.order_number }}</title>
+    <style>
+        @font-face {
+            font-family: 'Tajawal';
+            src: url('https://fonts.gstatic.com/s/tajawal/v9/Iura6YBj_oCad4k1nzSBC45I.woff2') format('woff2');
+            font-weight: normal;
+            font-style: normal;
+        }
+        body {
+            font-family: 'Tajawal', sans-serif;
+            direction: rtl;
+            text-align: right;
+            width: 148mm;
+            height: 210mm;
+            margin: 0;
+            padding: 10mm;
+            box-sizing: border-box;
+            font-size: 12pt;
+            -webkit-print-color-adjust: exact; /* Important for wkhtmltopdf */
+            color-adjust: exact;
+        }
+        @page {
+            size: A5;
+            margin: 10mm;
+        }
+        .container {
+            border: 2px solid black;
+            padding: 5mm;
+            height: 180mm; /* Full height minus padding */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .header, .footer {
+            text-align: center;
+            padding-bottom: 10px;
+            border-bottom: 2px solid black;
+        }
+        .footer {
+            border-top: 2px solid black;
+            border-bottom: none;
+            padding-top: 10px;
+            margin-top: 10px;
+            font-size: 9pt;
+        }
+        .content {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-grow: 1;
+            padding-top: 10px;
+        }
+        .details {
+            flex-grow: 1;
+        }
+        .qr-code {
+            padding-left: 10mm;
+            text-align: center;
+        }
+        .qr-code img {
+            width: 40mm;
+            height: 40mm;
+            border: 1px solid black;
+        }
+        h1 {
+            margin: 0;
+            font-size: 20pt;
+        }
+        h2 {
+            font-size: 16pt;
+            margin-top: 20px;
+            margin-bottom: 5px;
+        }
+        p {
+            margin: 5px 0;
+        }
+        strong {
+            font-weight: bold;
+        }
+        .detail-item {
+            margin-bottom: 15px;
+        }
+        .label {
+            font-weight: bold;
+            display: inline-block;
+            width: 120px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>بوليصة الشحن</h1>
+        </div>
+        <div class="content">
+            <div class="details">
+                <div class="detail-item">
+                    <span class="label">كود أمر الإنتاج:</span>
+                    <strong>{{ order.order_number }}</strong>
+                </div>
+                <div class="detail-item">
+                    <span class="label">تاريخ بدء الإنتاج:</span>
+                    <strong>{{ order.start_date|date:"Y-m-d" }}</strong>
+                </div>
+                <hr>
+                <div class="detail-item">
+                    <span class="label">اسم المنتج:</span>
+                    <strong>{{ order.product.name }}</strong>
+                </div>
+                <div class="detail-item">
+                    <span class="label">الكمية:</span>
+                    <strong>{{ order.quantity_ordered }} قطعة</strong>
+                </div>
+                <div class="detail-item">
+                    <span class="label">المقاسات:</span>
+                    <strong>{{ sizes_str|default:"غير محددة" }}</strong>
+                </div>
+            </div>
+            <div class="qr-code">
+                <img src="data:image/png;base64,{{ qr_code_base64 }}" alt="QR Code">
+                <p>امسح الكود للتفاصيل</p>
+            </div>
+        </div>
+        <div class="footer">
+            <span>تمت الطباعة في: {% now "Y-m-d H:i" %}</span>
+        </div>
+    </div>
+</body>
+</html>

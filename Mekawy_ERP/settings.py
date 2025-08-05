@@ -89,7 +89,9 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',  # Add HTMX middleware
-    # 'users.middleware.RoleBasedAccessMiddleware',
+    'users.middleware.NoCacheForAuthenticatedMiddleware', 
+
+    'users.middleware.RoleBasedAccessMiddleware',
     
 ]
 

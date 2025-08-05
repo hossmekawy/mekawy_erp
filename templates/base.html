@@ -340,6 +340,15 @@
             var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
                 return new bootstrap.Tooltip(tooltipTriggerEl);
             });
+            $(document).ajaxError(function(event, jqxhr, settings, thrownError) {
+                // Check if the error status is 401 (Unauthorized)
+                if (jqxhr.status == 401) {
+                    // Alert the user that their session has expired.
+                    alert('تم انتهاء جلستك، سيتم توجيهك إلى صفحة تسجيل الدخول.');
+                    // Redirect to the login page.
+                    window.location.href = "{% url 'users:login' %}";
+                }
+            });
         });
     </script>
 

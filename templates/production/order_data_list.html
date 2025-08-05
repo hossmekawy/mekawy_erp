@@ -1,0 +1,90 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+
+{% block production_title %}بيانات أوامر الإنتاج للطباعة{% endblock %}
+
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item"><a href="{% url 'production:dashboard' %}">لوحة التحكم</a></li>
+    <li class="breadcrumb-item active" aria-current="page">بيانات أوامر الإنتاج</li>
+{% endblock %}
+
+{% block production_page_title %}بيانات أوامر الإنتاج{% endblock %}
+{% block production_page_subtitle %}قائمة بجميع أوامر الإنتاج لطباعة بوليصة الشحن.{% endblock %}
+
+{% block production_header_actions %}
+    <!-- Search Form -->
+    <form method="get" class="d-flex align-items-center">
+        <div class="input-group">
+            <input type="text" name="search" class="form-control" placeholder="ابحث برقم الأمر، الباتش، أو المنتج..." value="{{ search_query }}">
+            <button class="btn btn-production-outline" type="submit"><i class="fas fa-search"></i></button>
+        </div>
+    </form>
+{% endblock %}
+
+{% block production_content %}
+<div class="production-card">
+    <div class="production-card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>رقم الأمر</th>
+                        <th>المنتج</th>
+                        <th>الكمية</th>
+                        <th>تاريخ البدء</th>
+                        <th>الحالة</th>
+                        <th class="text-center">إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'production:order_detail' order.pk %}" class="fw-bold">{{ order.order_number }}</a>
+                            <small class="d-block text-muted">{{ order.batch_number }}</small>
+                        </td>
+                        <td>{{ order.product.name }}</td>
+                        <td>{{ order.quantity_ordered }}</td>
+                        <td>{{ order.start_date|date:"Y-m-d" }}</td>
+                        <td><span class="badge bg-secondary">{{ order.get_status_display }}</span></td>
+                        <td class="text-center">
+                            <a href="{% url 'production:print_shipping_label' order.pk %}" class="btn btn-sm btn-dark" target="_blank" title="طباعة بوليصة الشحن">
+                                <i class="fas fa-print me-1"></i> طباعة بوليصة الشحن (A5)
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5">
+                            <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+                            <h5 class="mb-0">لا توجد أوامر إنتاج تطابق بحثك.</h5>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if is_paginated %}
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center mt-4">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item"><a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}">&laquo; الأولى</a></li>
+                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}">السابقة</a></li>
+                    {% endif %}
+
+                    <li class="page-item active" aria-current="page">
+                        <span class="page-link">صفحة {{ page_obj.number }} من {{ page_obj.paginator.num_pages }}</span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}">التالية</a></li>
+                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}">الأخيرة &raquo;</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

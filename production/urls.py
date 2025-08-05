@@ -73,6 +73,7 @@ urlpatterns = [
     path('ajax/size-groups/<int:size_group_id>/get/', category_size_blueprint.get_size_group_ajax, name='get_size_group_ajax'),
     path('export/size-groups/', category_size_blueprint.export_size_groups, name='export_size_groups'),
     path('export/categories/', category_size_blueprint.export_categories, name='export_categories'),
+    path('reports/export/', views.ExportProductionReportView.as_view(), name='export_production_report'),
 
     # Production Orders
     path('orders/', views.ProductionOrderListView.as_view(), name='order_list'),
@@ -134,7 +135,9 @@ urlpatterns = [
     path('cost-analysis/<int:pk>/update/', views.CostAnalysisUpdateView.as_view(), name='cost_analysis_update'),
     path('cost-analysis/select-order/', views.CostAnalysisSelectOrderView.as_view(), name='cost_analysis_select_order'), 
     path('cost-analysis/<int:pk>/export/', include((cost_analysis_exports_blueprint.urlpatterns, 'cost_analysis_exports'))),
-
+       # --- NEW: Order Data and Shipping Label URLs ---
+    path('order-data/', views.OrderDataListView.as_view(), name='order_data_list'),
+    path('order-data/<int:pk>/print-shipping-label/', views.print_shipping_label_pdf, name='print_shipping_label'),
     # --- CORRECTED AJAX URLS ---
     path('ajax/get-stock-item-details/', views.get_stock_item_details_ajax, name='get_stock_item_details_ajax'),
     path('ajax/get-size-group-for-product/', views.get_size_group_for_product_ajax, name='get_size_group_for_product_ajax'),
@@ -154,4 +157,8 @@ urlpatterns = [
     # =============================================================================
     path('ajax/get-bom-components-for-order/', views.ajax_get_bom_components_for_order, name='ajax_get_bom_components_for_order'),
     path('ajax/get-stock-for-material-in-warehouse/', views.get_stock_for_material_in_warehouse_ajax, name='ajax_get_stock_for_material_in_warehouse'),
+]
+
+public_urlpatterns = [
+    path('track/<str:order_number>/', views.public_order_detail_view, name='public_order_detail'),
 ]

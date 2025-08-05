@@ -25,9 +25,67 @@
         </button>
         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="quickActionsDropdown">
             <li><a class="dropdown-item" href="{% url 'production:order_create' %}"><i class="fas fa-plus-circle text-primary me-2"></i>أمر إنتاج جديد</a></li>
-            {% comment %} <li><a class="dropdown-item" href="{% url 'production:textile_stock_create' %}"><i class="fas fa-layer-group text-info me-2"></i>إضافة مخزون قماش</a></li> {% endcomment %}
             <li><hr class="dropdown-divider"></li>
-            {% comment %} <li><a class="dropdown-item" href="{% url 'production:daily_report' %}"><i class="fas fa-chart-line text-success me-2"></i>عرض التقارير</a></li> {% endcomment %}
+        </ul>
+    </div>
+
+    <!-- UPDATED: Export Reports Dropdown -->
+    <div class="dropdown">
+        <button class="btn btn-success dropdown-toggle" type="button" id="exportReportsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="fas fa-download ms-1"></i>
+            تصدير تقرير
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="exportReportsDropdown">
+            <li><h6 class="dropdown-header">تقارير إنتاج البناطيل</h6></li>
+            
+            <!-- Last Month -->
+            <li>
+                <a class="dropdown-item" href="{% url 'production:export_production_report' %}?report_type=trousers_last_month&format=pdf" target="_blank">
+                    آخر شهر (PDF) <i class="fas fa-file-pdf text-danger"></i>
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item" href="{% url 'production:export_production_report' %}?report_type=trousers_last_month&format=excel">
+                    آخر شهر (Excel) <i class="fas fa-file-excel text-success"></i>
+                </a>
+            </li>
+
+            <!-- Last 3 Months -->
+            <li>
+                <a class="dropdown-item" href="{% url 'production:export_production_report' %}?report_type=trousers_last_3_months&format=pdf" target="_blank">
+                    آخر 3 شهور (PDF) <i class="fas fa-file-pdf text-danger"></i>
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item" href="{% url 'production:export_production_report' %}?report_type=trousers_last_3_months&format=excel">
+                    آخر 3 شهور (Excel) <i class="fas fa-file-excel text-success"></i>
+                </a>
+            </li>
+
+            <!-- Last Year -->
+             <li>
+                <a class="dropdown-item" href="{% url 'production:export_production_report' %}?report_type=trousers_last_year&format=pdf" target="_blank">
+                    آخر سنة (PDF) <i class="fas fa-file-pdf text-danger"></i>
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item" href="{% url 'production:export_production_report' %}?report_type=trousers_last_year&format=excel">
+                    آخر سنة (Excel) <i class="fas fa-file-excel text-success"></i>
+                </a>
+            </li>
+
+            <li><hr class="dropdown-divider"></li>
+            <li><h6 class="dropdown-header">تقارير عامة</h6></li>
+            <li>
+                <a class="dropdown-item" href="{% url 'production:export_production_report' %}?report_type=all_completed&format=pdf" target="_blank">
+                    كل الأوامر المكتملة (PDF) <i class="fas fa-file-pdf text-danger"></i>
+                </a>
+            </li>
+             <li>
+                <a class="dropdown-item" href="{% url 'production:export_production_report' %}?report_type=all_completed&format=excel">
+                    كل الأوامر المكتملة (Excel) <i class="fas fa-file-excel text-success"></i>
+                </a>
+            </li>
         </ul>
     </div>
 </div>
@@ -184,6 +242,61 @@
                             </div>
                             <div class="col-auto"><i class="fas fa-hourglass-half fa-2x text-gray-400"></i></div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NEW: Trousers Production Stats -->
+        <div class="row">
+            <div class="col-12">
+                <h5 class="mb-3 mt-4 text-primary"><i class="fas fa-ruler-horizontal me-2"></i>إحصائيات إنتاج البناطيل</h5>
+            </div>
+            <div class="col-xl-2 col-md-4 mb-4">
+                <div class="card stat-card border-left-info shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <div class="text-xs fw-bold text-info text-uppercase mb-1">آخر يوم</div>
+                        <div class="h5 mb-0 fw-bold text-gray-800">{{ trousers_produced.last_day }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4 mb-4">
+                <div class="card stat-card border-left-info shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <div class="text-xs fw-bold text-info text-uppercase mb-1">آخر أسبوع</div>
+                        <div class="h5 mb-0 fw-bold text-gray-800">{{ trousers_produced.last_week }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4 mb-4">
+                <div class="card stat-card border-left-info shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <div class="text-xs fw-bold text-info text-uppercase mb-1">آخر شهر</div>
+                        <div class="h5 mb-0 fw-bold text-gray-800">{{ trousers_produced.last_month }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4 mb-4">
+                <div class="card stat-card border-left-info shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <div class="text-xs fw-bold text-info text-uppercase mb-1">آخر 3 شهور</div>
+                        <div class="h5 mb-0 fw-bold text-gray-800">{{ trousers_produced.last_3_months }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4 mb-4">
+                <div class="card stat-card border-left-info shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <div class="text-xs fw-bold text-info text-uppercase mb-1">آخر 6 شهور</div>
+                        <div class="h5 mb-0 fw-bold text-gray-800">{{ trousers_produced.last_6_months }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4 mb-4">
+                <div class="card stat-card border-left-info shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <div class="text-xs fw-bold text-info text-uppercase mb-1">آخر سنة</div>
+                        <div class="h5 mb-0 fw-bold text-gray-800">{{ trousers_produced.last_year }}</div>
                     </div>
                 </div>
             </div>

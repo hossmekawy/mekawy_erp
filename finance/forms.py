@@ -9,7 +9,6 @@ from decimal import Decimal
 class AccountForm(forms.ModelForm):
     class Meta:
         model = Account
-        # --- FIX: Allow editing account type ---
         fields = ['name', 'account_type']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'مثال: الخزينة الرئيسية'}),
@@ -40,20 +39,23 @@ class TransactionForm(forms.ModelForm):
         }
 
     def clean(self):
+        """
+        Performs a 'soft' validation without database locking for quick user feedback.
+        The real, secure check happens in the save() method.
+        """
         cleaned_data = super().clean()
         trans_type = cleaned_data.get('type')
-        amount = cleaned_data.get('amount', Decimal('0'))
+        amount = cleaned_data.get('amount')
         from_account = cleaned_data.get('account')
         to_account = cleaned_data.get('to_account')
 
         if not amount or amount <= 0:
             raise ValidationError("المبلغ يجب أن يكون أكبر من صفر.")
 
-        if trans_type in ['WITHDRAWAL', 'TRANSFER', 'MANUFACTURER_PAYMENT']:
-            if not from_account:
-                raise ValidationError("يجب تحديد الحساب للسحب أو التحويل.")
+        if from_account and amount and trans_type in ['WITHDRAWAL', 'TRANSFER']:
             if from_account.balance < amount:
-                raise ValidationError(f"الرصيد في '{from_account.name}' غير كافٍ. الرصيد الحالي: {from_account.balance}")
+                # This is a non-locking, preliminary check for better UX.
+                raise ValidationError(f"الرصيد الحالي في '{from_account.name}' ({from_account.balance}) قد يكون غير كافٍ.")
 
         if trans_type == 'TRANSFER':
             if not to_account:
@@ -64,46 +66,54 @@ class TransactionForm(forms.ModelForm):
         return cleaned_data
 
     def save(self, commit=True):
+        """
+        Handles the entire process atomically: locking, final validation, and saving.
+        This is the single source of truth for creating a transaction and updating balances.
+        """
         instance = super().save(commit=False)
         
-        from_account = self.cleaned_data.get('account')
-        to_account = self.cleaned_data.get('to_account')
-        amount = self.cleaned_data.get('amount')
-        
-        # This logic needs to be updated for the new types
-        with db_transaction.atomic():
-            if instance.type == 'DEPOSIT':
-                acc = instance.account
-                acc.balance += amount
-                acc.save()
-            
-            elif instance.type == 'WITHDRAWAL':
-                acc = instance.account
-                acc.balance -= amount
-                acc.save()
+        # We wrap the entire logic in a single atomic transaction.
+        try:
+            with db_transaction.atomic():
+                # Use select_for_update to lock the rows and get the definitive current state.
+                from_account = Account.objects.select_for_update().get(pk=instance.account.pk)
+                to_account = None
+                if instance.type == 'TRANSFER':
+                    if not instance.to_account:
+                        raise ValidationError("يجب تحديد الحساب المراد التحويل إليه.")
+                    to_account = Account.objects.select_for_update().get(pk=instance.to_account.pk)
+
+                # Perform the definitive, locked balance check.
+                if instance.type in ['WITHDRAWAL', 'TRANSFER']:
+                    if from_account.balance < instance.amount:
+                        # This error will be correctly displayed on the form to the user.
+                        raise ValidationError(f"الرصيد الفعلي في '{from_account.name}' غير كافٍ لإتمام العملية.")
+
+                # Update balances based on transaction type
+                if instance.type == 'DEPOSIT':
+                    from_account.balance += instance.amount
+                elif instance.type == 'WITHDRAWAL':
+                    from_account.balance -= instance.amount
+                elif instance.type == 'TRANSFER':
+                    from_account.balance -= instance.amount
+                    to_account.balance += instance.amount
                 
-            elif instance.type == 'TRANSFER':
-                from_acc = instance.account
-                to_acc = instance.to_account
-                from_acc.balance -= amount
-                to_acc.balance += amount
-                from_acc.save()
-                to_acc.save()
-            
-            # The MANUFACTURING_DEBT is handled by the signal, not forms.
-            # The ManufacturerPaymentForm will handle its own logic.
-            
-            if commit:
-                instance.save()
+                # Save the updated accounts
+                from_account.save()
+                if to_account:
+                    to_account.save()
+                
+                # Save the transaction instance itself
+                if commit:
+                    instance.save()
+
+        except Account.DoesNotExist:
+            raise ValidationError("أحد الحسابات لم يعد موجوداً. يرجى تحديث الصفحة والمحاولة مرة أخرى.")
             
         return instance
 
-# --- NEW: Form for making payments to manufacturers ---
+
 class ManufacturerPaymentForm(forms.Form):
-    """
-    Form to simplify making a payment to a manufacturer.
-    This creates a 'MANUFACTURER_PAYMENT' transaction.
-    """
     amount = forms.DecimalField(
         label="مبلغ الدفعة",
         min_value=Decimal('0.01'),
@@ -111,7 +121,7 @@ class ManufacturerPaymentForm(forms.Form):
     )
     payment_account = forms.ModelChoiceField(
         label="الدفع من حساب",
-        queryset=Account.objects.filter(account_type='ASSET'), # Pay from Treasury/Bank
+        queryset=Account.objects.filter(account_type='ASSET'),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     description = forms.CharField(
@@ -125,33 +135,59 @@ class ManufacturerPaymentForm(forms.Form):
         self.manufacturer = kwargs.pop('manufacturer')
         super().__init__(*args, **kwargs)
         self.manufacturer_account = self.manufacturer.finance_account
+        if not self.manufacturer_account:
+            raise ValueError("Critical: Manufacturer does not have a linked finance account.")
 
-    def clean_amount(self):
-        amount = self.cleaned_data.get('amount')
-        payment_account = self.cleaned_data.get('payment_account')
-        if payment_account and amount > payment_account.balance:
-            raise ValidationError(f"الرصيد في '{payment_account.name}' غير كافٍ. الرصيد الحالي: {payment_account.balance}")
-        return amount
+    def clean(self):
+        """
+        Performs a 'soft' validation without locking for quick user feedback.
+        """
+        cleaned_data = super().clean()
+        payment_account = cleaned_data.get('payment_account')
+        amount = cleaned_data.get('amount')
+
+        if payment_account and amount:
+            if payment_account.balance < amount:
+                raise ValidationError(f"الرصيد الحالي في '{payment_account.name}' ({payment_account.balance}) قد يكون غير كافٍ.")
+        
+        return cleaned_data
 
     def save(self):
+        """
+        Handles the manufacturer payment atomically.
+        """
+        payment_account_data = self.cleaned_data['payment_account']
+        manufacturer_account_data = self.manufacturer.finance_account
         amount = self.cleaned_data['amount']
-        payment_account = self.cleaned_data['payment_account']
-        
-        with db_transaction.atomic():
-            # 1. Decrease the balance of the payment account (e.g., Treasury)
-            payment_account.balance -= amount
-            payment_account.save()
 
-            # 2. Decrease the balance of the manufacturer's liability account
-            self.manufacturer_account.balance -= amount
-            self.manufacturer_account.save()
+        try:
+            with db_transaction.atomic():
+                # 1. Lock the rows to prevent race conditions
+                payment_account = Account.objects.select_for_update().get(pk=payment_account_data.pk)
+                manufacturer_account = Account.objects.select_for_update().get(pk=manufacturer_account_data.pk)
 
-            # 3. Create the transaction record
-            transaction = Transaction.objects.create(
-                account=self.manufacturer_account,
-                type='MANUFACTURER_PAYMENT',
-                amount=amount,
-                description=self.cleaned_data.get('description') or f"دفعة إلى المصنع: {self.manufacturer.name}",
-                reference=self.cleaned_data.get('reference')
-            )
+                # 2. Perform the definitive balance check inside the lock
+                if payment_account.balance < amount:
+                    raise ValidationError(f"الرصيد الفعلي في '{payment_account.name}' غير كافٍ.")
+
+                # 3. Update balances
+                payment_account.balance -= amount  # Decrease asset
+                manufacturer_account.balance -= amount  # Decrease liability (what you owe)
+
+                # 4. Save the updated accounts
+                payment_account.save()
+                manufacturer_account.save()
+
+                # 5. Create the transaction record
+                transaction = Transaction.objects.create(
+                    account=payment_account,
+                    to_account=manufacturer_account,
+                    type='MANUFACTURER_PAYMENT',
+                    amount=amount,
+                    description=self.cleaned_data.get('description') or f"دفعة إلى المصنع: {self.manufacturer.name}",
+                    reference=self.cleaned_data.get('reference')
+                )
+        except Account.DoesNotExist:
+            raise ValidationError("أحد الحسابات لم يعد موجوداً. يرجى تحديث الصفحة والمحاولة مرة أخرى.")
+
         return transaction

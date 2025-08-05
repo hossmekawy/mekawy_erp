@@ -278,6 +278,7 @@ class AccountDeleteView(SuccessMessageMixin, DeleteView):
         messages.success(self.request, self.success_message)
         return super().post(request, *args, **kwargs)
 
+
 class AccountStatementView(View):
     """Generates and displays a detailed account statement with a running balance."""
     template_name = 'finance/account_statement.html'
@@ -315,15 +316,29 @@ class AccountStatementView(View):
         transactions_with_balance = []
         running_balance = opening_balance
         
+        # =====================================================================
+        # ===== FIX STARTS HERE ===============================================
+        # =====================================================================
+        
+        # Replace the old loop logic with this clear and correct structure.
         for trans in transactions:
             debit = Decimal('0.00')
             credit = Decimal('0.00')
 
-            if trans.account == account and trans.type in ['WITHDRAWAL', 'TRANSFER', 'MANUFACTURER_PAYMENT']:
-                running_balance -= trans.amount
-                debit = trans.amount
-            elif (trans.to_account == account and trans.type == 'TRANSFER') or \
-                 (trans.account == account and trans.type in ['DEPOSIT', 'MANUFACTURING_DEBT']):
+            # Case 1: The current account is the primary/source account
+            if trans.account == account:
+                if trans.type in ['WITHDRAWAL', 'TRANSFER', 'MANUFACTURER_PAYMENT']:
+                    # These are debits (money going out)
+                    running_balance -= trans.amount
+                    debit = trans.amount
+                elif trans.type in ['DEPOSIT', 'MANUFACTURING_DEBT']:
+                    # These are credits (money coming in or liability increasing)
+                    running_balance += trans.amount
+                    credit = trans.amount
+            
+            # Case 2: The current account is the destination of a transfer
+            elif trans.to_account == account:
+                # This is always a credit (money coming in)
                 running_balance += trans.amount
                 credit = trans.amount
 
@@ -333,6 +348,10 @@ class AccountStatementView(View):
                 'credit': credit,
                 'running_balance': running_balance
             })
+
+        # ===================================================================
+        # ===== FIX ENDS HERE ===============================================
+        # ===================================================================
 
         context = {
             'account': account,
@@ -368,6 +387,7 @@ class TransactionListView(ListView):
         context['per_page'] = self.request.GET.get('per_page', self.paginate_by)
         return context
 
+# THIS IS CORRECT - IT SAVES ONLY ONCE
 class TransactionCreateView(SuccessMessageMixin, CreateView):
     """View to create a new financial transaction."""
     model = Transaction
@@ -376,11 +396,8 @@ class TransactionCreateView(SuccessMessageMixin, CreateView):
     success_url = reverse_lazy('finance:transaction_list')
     success_message = "تم تسجيل الحركة المالية بنجاح!"
 
-    @db_transaction.atomic
-    def form_valid(self, form):
-        form.save()
-        return super().form_valid(form)
-    
+    # By removing the custom form_valid method, the parent CreateView
+    # will handle saving the form correctly, exactly one time.
 class TransactionDetailView(DetailView):
     """Displays the details of a single transaction."""
     model = Transaction

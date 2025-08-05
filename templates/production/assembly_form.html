@@ -245,7 +245,7 @@
                                    {% render_field form.quantity_sent class+="form-control" placeholder="0" %}
                                </div>
                                {% for error in form.quantity_sent.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
-                               <div class="form-text">هذه هي كمية القطع الرئيسية الجاهزة للتجميع.</div>
+                               <div class="form-text">هذه هي كمية القطع الرئيسية الجاهزة للتجميع (تأتي من مرحلة القص).</div>
                            </div>
                            <div class="col-md-6 mb-4">
                                <label for="{{ form.expected_completion_date.id_for_label }}" class="form-label">{{ form.expected_completion_date.label }}</label>
@@ -302,6 +302,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const manualComponentSearch = $('#manual-component-search');
     const cancelBtn = document.getElementById('cancel-btn');
     const globalWarningDiv = document.getElementById('global-components-warning');
+    // MODIFICATION START: Get the quantity_sent input field
+    const quantitySentInput = document.getElementById('{{ form.quantity_sent.id_for_label }}');
+    // MODIFICATION END
 
     const sessionStorageKey = `assemblyFormState_{{ request.user.id }}`;
 
@@ -606,13 +609,45 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // --- Event Listeners ---
-    orderSelect.on('change', (e) => {
-        loadBomBtn.disabled = !e.target.value;
+    // MODIFICATION START: Updated the change event listener for orderSelect
+    orderSelect.on('change', async (e) => {
+        const orderId = e.target.value;
+
+        // Reset fields when selection changes
+        loadBomBtn.disabled = !orderId;
         componentsTbody.innerHTML = '';
         totalFormsInput.value = 0;
+        if(quantitySentInput) quantitySentInput.value = ''; // Reset quantity sent
         updateTablePlaceholder();
-        saveState();
+        
+        if (!orderId) {
+            saveState();
+            return;
+        }
+
+        // Fetch order details to update quantity
+        try {
+            const url = `{% url 'production:get_order_details_ajax' %}?order_id=${orderId}`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Network response was not ok.');
+            
+            const data = await response.json();
+            if (data.success) {
+                if (quantitySentInput) {
+                    quantitySentInput.value = data.quantity_ordered;
+                }
+            } else {
+                console.error('Failed to get order details:', data.error);
+                 if (typeof showErrorToast === 'function') showErrorToast(data.error || 'فشل في جلب تفاصيل الأمر.');
+            }
+        } catch (error) {
+            console.error('Error fetching order details:', error);
+            if (typeof showErrorToast === 'function') showErrorToast('خطأ في الاتصال لجلب تفاصيل الأمر.');
+        }
+
+        saveState(); // Save state after all updates
     });
+    // MODIFICATION END
 
     loadBomBtn.addEventListener('click', loadBomComponents);
 

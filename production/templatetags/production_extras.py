@@ -3,7 +3,10 @@ from decimal import Decimal
 
 register = template.Library()
 
-
+@register.filter
+def class_name(value):
+    """Returns the name of the object's class."""
+    return value.__class__.__name__
 
 @register.filter(name='div')
 def div(value, arg):

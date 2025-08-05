@@ -8,6 +8,12 @@ from django.contrib.contenttypes.models import ContentType
 from finance.models import Account, Transaction # Make sure your finance app is named 'finance'
 from xhtml2pdf import pisa
 import io
+from datetime import datetime, timedelta
+import logging
+import pdfkit
+import openpyxl
+from openpyxl.styles import Font, Alignment
+from openpyxl.utils import get_column_letter
 import logging  # FIX: This was incorrectly 'import logger'
 from itertools import chain
 from operator import attrgetter
@@ -54,7 +60,13 @@ from .forms import (
 )
 from warehouses.models import Product, StockItem, StockMovement, ProductBatch, Category , Warehouse
 
+
+import qrcode
+import base64
+from io import BytesIO
+
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 def create_invoice_and_transaction(request, process_instance, manufacturer, cost, expense_name, notes):
@@ -119,6 +131,10 @@ def create_manufacturer_account_view(request, pk):
 # Dashboard View
 # Dashboard View (update the get_context_data method)
 class ProductionDashboardView(LoginRequiredMixin, TemplateView):
+    """
+    Handles the display of the main production dashboard, including various statistics
+    and charts related to production orders and processes.
+    """
     template_name = 'production/dashboard.html'
     
     def get_context_data(self, **kwargs):
@@ -135,7 +151,7 @@ class ProductionDashboardView(LoginRequiredMixin, TemplateView):
             context['date_to'] = timezone.now().date()
             context['date_from'] = context['date_to'] - timedelta(days=29)
 
-        # General stats
+        # General order stats within the selected date range
         orders_in_range = ProductionOrder.objects.filter(created_at__date__range=[context['date_from'], context['date_to']])
         context['total_orders'] = orders_in_range.count()
         context['active_orders'] = ProductionOrder.objects.filter(
@@ -144,24 +160,22 @@ class ProductionDashboardView(LoginRequiredMixin, TemplateView):
         context['completed_orders'] = ProductionOrder.objects.filter(status='completed').count()
         context['pending_orders'] = ProductionOrder.objects.filter(status='draft').count()
         
-        # Recent orders
+        # Recent orders for the table display
         context['recent_orders'] = ProductionOrder.objects.select_related(
             'product', 'created_by'
         ).order_by('-created_at')[:10]
         
-        # Active processes
+        # Active processes count
         context['active_cutting'] = CuttingProcess.objects.filter(is_completed=False).count()
         context['active_assembly'] = AssemblyProcess.objects.filter(is_completed=False).count()
         context['active_dyeing'] = DyeingProcess.objects.filter(is_completed=False).count()
         context['active_finishing'] = FinishingProcess.objects.filter(is_completed=False).count()
         
-        # Low textile stock
+        # Alerts
         context['low_textile_stock'] = StockItem.objects.filter(
             product__product_type='fabric',
             quantity__lt=F('product__min_stock_level')
         ).count()
-        
-        # Pending permits and QC
         context['pending_exit_permits'] = ExitPermit.objects.filter(status='pending').count()
         context['pending_quality_checks'] = QualityControlCheck.objects.filter(approved=False).count()
         
@@ -182,8 +196,32 @@ class ProductionDashboardView(LoginRequiredMixin, TemplateView):
         # Monthly trend data for charts
         context['monthly_trend_data'] = self.get_monthly_trend_data()
         
+        # --- Trousers Production Stats ---
+        today = timezone.now().date()
+        # This query assumes trousers are identified by the product name.
+        # Adjust if you use categories or another method.
+        base_trousers_query = ProductionOrder.objects.filter(
+            status='completed',
+            product__name__icontains='بنطلون' 
+        )
+
+        def get_production_sum(query, start_date):
+            """Helper function to aggregate production quantity from a start date."""
+            return query.filter(actual_completion_date__gte=start_date).aggregate(
+                total=Coalesce(Sum('quantity_ordered'), 0)
+            )['total']
+
+        context['trousers_produced'] = {
+            'last_day': get_production_sum(base_trousers_query, today - timedelta(days=1)),
+            'last_week': get_production_sum(base_trousers_query, today - timedelta(weeks=1)),
+            'last_month': get_production_sum(base_trousers_query, today - timedelta(days=30)),
+            'last_3_months': get_production_sum(base_trousers_query, today - timedelta(days=90)),
+            'last_6_months': get_production_sum(base_trousers_query, today - timedelta(days=180)),
+            'last_year': get_production_sum(base_trousers_query, today - timedelta(days=365)),
+        }
+        
         return context
-    
+
     def get_monthly_trend_data(self):
         """Get monthly trend data for the last 6 months"""
         end_date = timezone.now().date()
@@ -236,6 +274,118 @@ class ProductionDashboardView(LoginRequiredMixin, TemplateView):
             'orders_completed': orders_completed_data,
         }
 
+
+class ExportProductionReportView(LoginRequiredMixin, View):
+    
+    def get_queryset(self, report_type):
+        today = timezone.now().date()
+        queryset = ProductionOrder.objects.filter(status='completed').select_related('product', 'created_by')
+        title = "تقرير الإنتاج العام"
+        time_filters = {
+            'day': timedelta(days=1), 'week': timedelta(weeks=1), 'month': timedelta(days=30),
+            '3_months': timedelta(days=90), '6_months': timedelta(days=180), 'year': timedelta(days=365),
+        }
+        if 'trousers' in report_type:
+            queryset = queryset.filter(product__name__icontains='بنطلون')
+            title = "تقرير إنتاج البناطيل"
+            for key, delta in time_filters.items():
+                if f'last_{key}' in report_type:
+                    queryset = queryset.filter(actual_completion_date__gte=(today - delta))
+                    title += f" - آخر {key.replace('_', ' ')}"
+                    break
+        return queryset, title
+
+    def render_to_pdf(self, template_path, context):
+        """Renders a given Django template to a PDF response using wkhtmltopdf."""
+        html_string = render_to_string(template_path, context)
+        try:
+            pdf_options = {
+                'encoding': "UTF-8",
+                'page-size': 'A5',
+                'margin-top': '0.75in',
+                'margin-right': '0.75in',
+                'margin-bottom': '0.75in',
+                'margin-left': '0.75in',
+            }
+            
+            # FIX: Check if the setting exists. If it does, create a config object.
+            if hasattr(settings, 'WKHTMLTOPDF_PATH') and settings.WKHTMLTOPDF_PATH:
+                config = pdfkit.configuration(wkhtmltopdf=settings.WKHTMLTOPDF_PATH)
+                pdf = pdfkit.from_string(html_string, False, configuration=config, options=pdf_options)
+            else:
+                # If the setting doesn't exist, let pdfkit try to find the executable in the system PATH.
+                pdf = pdfkit.from_string(html_string, False, options=pdf_options)
+
+            response = HttpResponse(pdf, content_type='application/pdf')
+            return response
+        except OSError as e:
+            # This error is often raised if wkhtmltopdf is not found at all.
+            logger.error(f"PDF generation failed: {e}. Is wkhtmltopdf installed and in your PATH?")
+            error_message = (
+                "Error generating PDF: Could not find wkhtmltopdf executable. "
+                "Please ensure it is installed and accessible in your system's PATH, "
+                "or define the WKHTMLTOPDF_PATH in your Django settings.py file."
+            )
+            return HttpResponse(error_message, status=500)
+        except Exception as e:
+            # Catch any other unexpected errors.
+            logger.error(f"PDF generation failed with an unexpected error: {e}")
+            return HttpResponse(f"An unexpected error occurred during PDF generation: {e}", status=500)
+
+    def render_to_excel(self, queryset, title):
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.title = "Production Report"
+        sheet.sheet_view.rightToLeft = True
+        header_font = Font(bold=True, size=14, name='Arial')
+        title_font = Font(bold=True, size=18, name='Arial')
+        cell_font = Font(size=12, name='Arial')
+        center_align = Alignment(horizontal='center', vertical='center')
+        sheet.merge_cells('A1:E1')
+        title_cell = sheet['A1']
+        title_cell.value = title
+        title_cell.font = title_font
+        title_cell.alignment = center_align
+        headers = ['رقم الأمر', 'اسم المنتج', 'الكمية', 'تاريخ الإكمال', 'تم إنشاؤه بواسطة']
+        for col_num, header_title in enumerate(headers, 1):
+            cell = sheet.cell(row=3, column=col_num)
+            cell.value = header_title
+            cell.font = header_font
+            cell.alignment = center_align
+            sheet.column_dimensions[get_column_letter(col_num)].width = 25
+        for row_num, order in enumerate(queryset, 4):
+            sheet.cell(row=row_num, column=1, value=order.order_number).font = cell_font
+            sheet.cell(row=row_num, column=2, value=order.product.name).font = cell_font
+            sheet.cell(row=row_num, column=3, value=order.quantity_ordered).font = cell_font
+            sheet.cell(row=row_num, column=4, value=order.actual_completion_date.strftime('%Y-%m-%d')).font = cell_font
+            sheet.cell(row=row_num, column=5, value=order.created_by.username if order.created_by else 'N/A').font = cell_font
+        workbook.save(response)
+        return response
+
+    def get(self, request, *args, **kwargs):
+        report_type = request.GET.get('report_type', 'all_completed')
+        export_format = request.GET.get('format', 'pdf')
+        queryset, title = self.get_queryset(report_type)
+        today = timezone.now().date()
+
+        file_extension = 'xlsx' if export_format == 'excel' else export_format
+        filename = f"production_report_{report_type}_{today}.{file_extension}"
+
+        if export_format == 'pdf':
+            context = {'orders': queryset, 'title': title}
+            response = self.render_to_pdf('pdf/production/production_report_pdf.html', context)
+            response['Content-Disposition'] = f'inline; filename="{filename}"'
+            return response
+        elif export_format == 'excel':
+            response = self.render_to_excel(queryset, title)
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+        else:
+            messages.error(request, "تنسيق التصدير غير صالح.")
+            return redirect('production:dashboard')
+
+
 # Production Order Views
 class ProductionOrderListView(LoginRequiredMixin, ListView):
     model = ProductionOrder
@@ -244,11 +394,19 @@ class ProductionOrderListView(LoginRequiredMixin, ListView):
     paginate_by = 20
     
     def get_queryset(self):
+        # Combines the original select_related with the new prefetch_related for efficiency
         queryset = ProductionOrder.objects.select_related(
-            'product', 'product__category', 'textile_stock__product', 'created_by'
+            'product', 'product__category', 'textile_stock__product', 
+            'created_by', 'cutting_process__cutter'
+        ).prefetch_related(
+            'assembly_processes__assembler', 
+            'assembly_processes__external_manufacturer',
+            'assembly_processes__dyeing_processes__dyeing_facility',
+            'assembly_processes__dyeing_processes__finishing_process__finisher',
+            'assembly_processes__dyeing_processes__finishing_process__external_manufacturer'
         ).order_by('-created_at')
         
-        # البحث والتصفية
+        # --- All of your original filtering logic is preserved ---
         search = self.request.GET.get('search')
         if search:
             queryset = queryset.filter(
@@ -265,7 +423,6 @@ class ProductionOrderListView(LoginRequiredMixin, ListView):
         if priority_filter:
             queryset = queryset.filter(priority=priority_filter)
         
-        # Advanced filters
         date_from = self.request.GET.get('date_from')
         if date_from:
             queryset = queryset.filter(created_at__date__gte=date_from)
@@ -293,9 +450,8 @@ class ProductionOrderListView(LoginRequiredMixin, ListView):
         return queryset
     
     def get_context_data(self, **kwargs):
+        # --- Your original context data logic is preserved ---
         context = super().get_context_data(**kwargs)
-    
-        # Filter configuration for search_filters component
         context['filter_config'] = [
             {
                 'name': 'status',
@@ -316,18 +472,12 @@ class ProductionOrderListView(LoginRequiredMixin, ListView):
                 ]
             }
         ]
-        
-        # Search configuration
         context['search_enabled'] = True
         context['search_placeholder'] = 'البحث برقم الأمر، رقم الباتش، أو اسم المنتج...'
         context['total_count'] = self.get_queryset().count()
-        
-        # Current filter values
         context['search'] = self.request.GET.get('search', '')
         context['status_filter'] = self.request.GET.get('status', '')
         context['priority_filter'] = self.request.GET.get('priority', '')
-        
-        # Context for advanced filter dropdowns
         context['users'] = User.objects.filter(is_active=True)
         context['product_categories'] = Category.objects.all()
         return context
@@ -2180,15 +2330,21 @@ class ExternalManufacturerListView(LoginRequiredMixin, ListView):
         return queryset.order_by('name')
 
 class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
+    """
+    Displays the details for a single external manufacturer, including their
+    job history, financial status, and performance metrics.
+    """
     model = ExternalManufacturer
     template_name = 'production/manufacturer/manufacturer_detail.html'
     context_object_name = 'manufacturer'
 
     def get_queryset(self):
         """
-        Pre-fetches related data for efficiency.
+        Pre-fetches related data for efficiency to avoid numerous database queries
+        in the template and context data processing.
         """
         return super().get_queryset().select_related('finance_account').prefetch_related(
+            # Prefetching deep relationships to get all necessary data in fewer queries
             'assembly_processes__production_order__product',
             'dyeing_jobs__assembly_process__production_order__product',
             'finishing_jobs__dyeing_process__assembly_process__production_order__product',
@@ -2196,47 +2352,85 @@ class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
         )
 
     def get_context_data(self, **kwargs):
+        """
+        Gathers and processes all data needed for the manufacturer detail page.
+        This method now standardizes both active jobs and job history.
+        """
         context = super().get_context_data(**kwargs)
         manufacturer = self.get_object()
         
-        # --- FIX: Combine all job types (Assembly, Dyeing, Finishing) ---
-        assembly_jobs = manufacturer.assembly_processes.all().annotate(job_type=F('assembly_type'))
-        dyeing_jobs = manufacturer.dyeing_jobs.all().annotate(job_type=models.Value('Dyeing'))
-        finishing_jobs = manufacturer.finishing_jobs.all().annotate(job_type=F('finishing_type'))
-
-        # Combine all jobs into a single list
+        # --- Combine all job types into a single list ---
+        assembly_jobs = manufacturer.assembly_processes.all()
+        dyeing_jobs = manufacturer.dyeing_jobs.all()
+        finishing_jobs = manufacturer.finishing_jobs.all()
         all_jobs = list(chain(assembly_jobs, dyeing_jobs, finishing_jobs))
 
-        # Separate into active and completed jobs
-        active_jobs = [job for job in all_jobs if not job.is_completed]
-        completed_jobs = [job for job in all_jobs if job.is_completed]
-
-        # Sort jobs by date
-        # Use a sensible default for sorting if a date is missing
+        active_jobs_raw = [job for job in all_jobs if not job.is_completed]
+        completed_jobs_raw = [job for job in all_jobs if job.is_completed]
         default_date = timezone.now()
-        context['active_jobs'] = sorted(active_jobs, key=lambda x: getattr(x, 'start_date', getattr(x, 'sent_date', default_date)), reverse=True)
+
+        # --- FIX: Standardize the Active Jobs list ---
+        active_jobs_list = []
+        for job in active_jobs_raw:
+            production_order = None
+            job_type_display = "غير محدد"
+            start_date = None
+            detail_url = "#"
+
+            if isinstance(job, AssemblyProcess):
+                production_order = job.production_order
+                job_type_display = "تجميع"
+                start_date = job.start_date
+                detail_url = reverse('production:assembly_detail', kwargs={'pk': job.pk})
+            elif isinstance(job, DyeingProcess):
+                production_order = job.assembly_process.production_order
+                job_type_display = "صباغة"
+                start_date = job.sent_date
+                detail_url = reverse('production:dyeing_detail', kwargs={'pk': job.pk})
+            elif isinstance(job, FinishingProcess):
+                production_order = job.dyeing_process.assembly_process.production_order
+                job_type_display = "تشطيب"
+                start_date = job.start_date
+                detail_url = reverse('production:finishing_detail', kwargs={'pk': job.pk})
+
+            if production_order:
+                active_jobs_list.append({
+                    'job_object': job, # Pass original object for filters like 'class_name'
+                    'order': production_order,
+                    'job_type': job_type_display,
+                    'start_date': start_date,
+                    'detail_url': detail_url,
+                })
+        context['active_jobs'] = sorted(active_jobs_list, key=lambda x: x['start_date'] or default_date, reverse=True)
+
+        # --- Standardize the Job History list ---
+        job_history_list = []
+        for job in completed_jobs_raw:
+            cost, completion_date, detail_url, production_order, job_type_display = 0, None, "#", None, "غير محدد"
+            if isinstance(job, AssemblyProcess):
+                cost, completion_date, production_order, job_type_display, detail_url = job.assembly_cost, job.actual_completion_date, job.production_order, "تجميع", reverse('production:assembly_detail', kwargs={'pk': job.pk})
+            elif isinstance(job, DyeingProcess):
+                cost, completion_date, production_order, job_type_display, detail_url = job.total_dyeing_cost, job.actual_return_date, job.assembly_process.production_order, "صباغة", reverse('production:dyeing_detail', kwargs={'pk': job.pk})
+            elif isinstance(job, FinishingProcess):
+                cost, completion_date, production_order, job_type_display, detail_url = job.total_finishing_cost, job.actual_completion_date, job.dyeing_process.assembly_process.production_order, "تشطيب", reverse('production:finishing_detail', kwargs={'pk': job.pk})
+
+            if production_order:
+                job_history_list.append({'order_number': production_order.order_number, 'product_name': production_order.product.name, 'cost': cost or 0, 'completion_date': completion_date, 'job_type': job_type_display, 'detail_url': detail_url})
         
-        # FIX: Corrected the sorting logic to check for 'actual_completion_date' first,
-        # as it is more common, before checking for 'actual_return_date'.
-        context['job_history'] = sorted(
-            completed_jobs, 
-            key=lambda job: (
-                getattr(job, 'actual_completion_date', None) or 
-                getattr(job, 'actual_return_date', None) or 
-                default_date
-            ), 
-            reverse=True
-        )
+        context['job_history'] = sorted(job_history_list, key=lambda x: x['completion_date'] or default_date, reverse=True)
         
+        # --- Calculate summary metrics ---
         context['product_prices'] = manufacturer.product_prices.all()
-
-        total_completed_value = sum(getattr(job, 'assembly_cost', getattr(job, 'total_dyeing_cost', getattr(job, 'total_finishing_cost', 0))) or 0 for job in completed_jobs)
-        total_active_value = sum(getattr(job, 'assembly_cost', getattr(job, 'total_dyeing_cost', getattr(job, 'total_finishing_cost', 0))) or 0 for job in active_jobs)
-        total_pieces_completed = sum(getattr(job, 'quantity_received', getattr(job, 'quantity_output', 0)) or 0 for job in completed_jobs)
-
-        context['total_value_of_completed_jobs'] = total_completed_value
-        context['total_value_of_active_jobs'] = total_active_value
-        context['total_pieces_completed'] = total_pieces_completed
+        context['total_value_of_completed_jobs'] = sum(item['cost'] for item in job_history_list)
+        context['total_pieces_completed'] = sum(getattr(job, 'quantity_received', getattr(job, 'quantity_output', 0)) or 0 for job in completed_jobs_raw)
+        
+        # This is an estimate as active jobs may not have a final cost yet.
+        context['total_value_of_active_jobs'] = sum(
+            getattr(job, 'assembly_cost', 0) or 0 + 
+            getattr(job, 'total_dyeing_cost', 0) or 0 + 
+            getattr(job, 'total_finishing_cost', 0) or 0 
+            for job in active_jobs_raw
+        )
 
         return context
 
@@ -5158,4 +5352,138 @@ def generate_sequential_codes_ajax(request):
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
     
+class OrderDataListView(LoginRequiredMixin, ListView):
+    """
+    View to display a list of all production orders for printing shipping labels.
+    """
+    model = ProductionOrder
+    template_name = 'production/order_data_list.html'
+    context_object_name = 'orders'
+    paginate_by = 25
+
+    def get_queryset(self):
+        queryset = ProductionOrder.objects.select_related(
+            'product', 'created_by'
+        ).order_by('-start_date', '-created_at')
+        
+        # Add search functionality
+        search_query = self.request.GET.get('search')
+        if search_query:
+            queryset = queryset.filter(
+                Q(order_number__icontains=search_query) |
+                Q(batch_number__icontains=search_query) |
+                Q(product__name__icontains=search_query)
+            )
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = "بيانات أوامر الإنتاج للطباعة"
+        context['search_query'] = self.request.GET.get('search', '')
+        return context
+
+
+@login_required
+def print_shipping_label_pdf(request, pk):
+    """
+    Generates an A5 PDF shipping label for a Production Order, including a QR code.
+    """
+    order = get_object_or_404(
+        ProductionOrder.objects.select_related('product', 'bom_version__size_group'), 
+        pk=pk
+    )
+
+    # 1. Generate the public URL for the QR code
+    # --- FIX: Removed the 'production:' namespace prefix ---
+    public_url = request.build_absolute_uri(
+        reverse('public_order_detail', kwargs={'order_number': order.order_number})
+    )
+
+    # 2. Create QR code in memory
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(public_url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
     
+    # 3. Convert image to base64 string to embed in HTML
+    buffered = BytesIO()
+    img.save(buffered, format="PNG")
+    qr_code_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+    # 4. Get sizes from the linked BOM
+    sizes_list = []
+    if order.bom_version and order.bom_version.size_group:
+        sizes_list = order.bom_version.size_group.sizes
+    
+    context = {
+        'order': order,
+        'qr_code_base64': qr_code_base64,
+        'sizes_str': ", ".join(sizes_list),
+    }
+
+    # 5. Render the HTML template
+    html_string = render_to_string('pdf/production/shipping_label_a5.html', context)
+
+    # 6. Configure PDF options for A5, black and white
+    options = {
+        'page-size': 'A5',
+        'margin-top': '0.5in',
+        'margin-right': '0.5in',
+        'margin-bottom': '0.5in',
+        'margin-left': '0.5in',
+        'encoding': "UTF-8",
+        'grayscale': '', # This option makes the PDF black and white
+        '--load-error-handling': 'ignore',
+    }
+
+    try:
+        # Ensure WKHTMLTOPDF_PATH is configured in settings.py
+        pdf_config = pdfkit.configuration(wkhtmltopdf=settings.WKHTMLTOPDF_PATH)
+        pdf = pdfkit.from_string(html_string, False, configuration=pdf_config, options=options)
+        
+        response = HttpResponse(pdf, content_type='application/pdf')
+        filename = f"ShippingLabel_{order.order_number}.pdf"
+        response['Content-Disposition'] = f'inline; filename="{filename}"'
+        return response
+    except Exception as e:
+        logging.error(f"PDF generation error for order {pk}: {e}")
+        messages.error(request, f"خطأ في إنشاء ملف PDF: {e}")
+        return redirect('production:order_data_list')
+
+
+def public_order_detail_view(request, order_number):
+    """
+    Public, no-login-required view to display order details.
+    Accessed by scanning the QR code.
+    """
+    try:
+        order = get_object_or_404(
+            ProductionOrder.objects.select_related(
+                'product', 'bom_version__size_group'
+            ).prefetch_related(
+                'cutting_process',
+                'assembly_processes',
+                'assembly_processes__dyeing_processes',
+                'assembly_processes__dyeing_processes__finishing_process'
+            ),
+            order_number=order_number
+        )
+
+        # Get sizes from the linked BOM
+        sizes_list = []
+        if order.bom_version and order.bom_version.size_group:
+            sizes_list = order.bom_version.size_group.sizes
+
+        context = {
+            'order': order,
+            'sizes_str': ", ".join(sizes_list),
+        }
+        return render(request, 'production/public_order_detail.html', context)
+    except ProductionOrder.DoesNotExist:
+        return HttpResponse("Order not found.", status=404)
+  

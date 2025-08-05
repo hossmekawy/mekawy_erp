@@ -402,10 +402,15 @@
                 "url_name": "production:quality_report",
                 "icon": "fas fa-award",
                 "roles": ["admin", "manager", "employee"]
-            }
+            } , 
+            "طباعة بوليصات القصات": {
+                "url_name": "production:order_data_list",
+                "icon": "fas fa-print",
+                "roles": ["admin","manager", "production_manager"]
+        }
         }
     },
-    
+
     "الإعدادات": {
         "الإعدادات العامة": {
             "url_name": "settings:general",
@@ -420,6 +425,7 @@
             "roles": ["*"]
         }
     },
+
     "تسجيل الخروج": {
         "تسجيل الخروج": {
             "url_name": "#logoutModal",

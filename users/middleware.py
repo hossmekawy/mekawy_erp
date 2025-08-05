@@ -3,6 +3,7 @@ from django.contrib import messages
 from django.urls import reverse
 from django.utils.deprecation import MiddlewareMixin
 from django.http import JsonResponse
+from django.utils.cache import add_never_cache_headers
 
 class RoleBasedAccessMiddleware(MiddlewareMixin):
     """
@@ -79,12 +80,9 @@ class RoleBasedAccessMiddleware(MiddlewareMixin):
         except:
             return None
 
-        # --- FIX STARTS HERE ---
-        # Check if the URL is exempt from permission checks. This must be done
-        # before any other role checks.
+        # Check if the URL is exempt from permission checks.
         if full_url_name in self.EXEMPT_URLS:
             return None
-        # --- FIX ENDS HERE ---
             
         user_role = getattr(request.user, 'role', 'viewer')
         
@@ -110,3 +108,19 @@ class RoleBasedAccessMiddleware(MiddlewareMixin):
                 return redirect('dashboard:index')
                 
         return None
+
+# --- NEW MIDDLEWARE TO PREVENT CACHING ---
+class NoCacheForAuthenticatedMiddleware:
+    """
+    Prevents caching of pages for authenticated users.
+    This helps avoid one user seeing another user's cached session data.
+    """
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        # Add cache-control headers if the user is logged in
+        if hasattr(request, 'user') and request.user.is_authenticated:
+            add_never_cache_headers(response)
+        return response
