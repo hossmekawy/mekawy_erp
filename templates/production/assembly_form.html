@@ -116,6 +116,15 @@
         border-color: var(--bs-danger);
         box-shadow: 0 0 0 0.25rem rgba(var(--bs-danger-rgb), .25);
     }
+    /* MODIFIED STYLE for product details card */
+    .production-card-subtle {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-left: 4px solid var(--production-primary);
+        padding: 1rem;
+        border-radius: 0.375rem;
+        transition: all 0.3s ease-in-out;
+    }
 </style>
 {% endblock %}
 
@@ -125,7 +134,7 @@
         <form method="post" novalidate id="assembly-form">
             {% csrf_token %}
             <div class="production-card">
-                 <div class="production-card-header">
+                <div class="production-card-header">
                     <i class="fas fa-cogs me-2"></i>
                     {% if form.instance.pk %} تعديل بيانات إرسال التجميع {% else %} إرسال أمر إنتاج للتجميع {% endif %}
                 </div>
@@ -145,18 +154,32 @@
                         <div id="order-selection-error" class="text-danger mt-2" style="display: none;"></div>
                     </div>
 
+                    <!-- MODIFIED: Product Details Display -->
+                    <div id="product-details-card" class="production-card-subtle mb-4" style="display: none;">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h6 class="text-primary mb-0">المنتج المختار</h6>
+                                <p id="product-name-display" class="mb-0 fs-5"></p>
+                            </div>
+                            <div class="col-md-4 text-md-end mt-2 mt-md-0">
+                                <strong>الكمية المطلوبة:</strong>
+                                <p id="product-quantity-display" class="mb-0 fw-bold fs-4 text-success"></p>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- STEP 2: Assembly Type -->
                     <div class="mb-4">
                         <h5 class="form-step-header"><span class="step-number">2</span>حدد نوع التجميع</h5>
                         <div class="d-flex gap-3 assembly-type-selector">
-                           <input type="radio" class="btn-check" name="{{ form.assembly_type.html_name }}" id="id_assembly_type_in_house" value="in_house" autocomplete="off" {% if form.assembly_type.value == 'in_house' or not form.assembly_type.value %}checked{% endif %}>
-                           <label class="btn btn-outline-primary" for="id_assembly_type_in_house">
-                               <i class="fas fa-user-cog me-2"></i>داخلي
-                           </label>
-                           <input type="radio" class="btn-check" name="{{ form.assembly_type.html_name }}" id="id_assembly_type_outsourced" value="outsourced" autocomplete="off" {% if form.assembly_type.value == 'outsourced' %}checked{% endif %}>
-                           <label class="btn btn-outline-primary" for="id_assembly_type_outsourced">
-                               <i class="fas fa-industry me-2"></i>خارجي
-                           </label>
+                            <input type="radio" class="btn-check" name="{{ form.assembly_type.html_name }}" id="id_assembly_type_in_house" value="in_house" autocomplete="off" {% if form.assembly_type.value == 'in_house' or not form.assembly_type.value %}checked{% endif %}>
+                            <label class="btn btn-outline-primary" for="id_assembly_type_in_house">
+                                <i class="fas fa-user-cog me-2"></i>داخلي
+                            </label>
+                            <input type="radio" class="btn-check" name="{{ form.assembly_type.html_name }}" id="id_assembly_type_outsourced" value="outsourced" autocomplete="off" {% if form.assembly_type.value == 'outsourced' %}checked{% endif %}>
+                            <label class="btn btn-outline-primary" for="id_assembly_type_outsourced">
+                                <i class="fas fa-industry me-2"></i>خارجي
+                            </label>
                         </div>
                         {% for error in form.assembly_type.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
                     </div>
@@ -238,27 +261,27 @@
                     <div class="mt-4">
                         <h5 class="form-step-header"><span class="step-number">4</span>أدخل تفاصيل الإرسال</h5>
                         <div class="row">
-                           <div class="col-md-6 mb-4">
-                               <label for="{{ form.quantity_sent.id_for_label }}" class="form-label">{{ form.quantity_sent.label }}</label>
-                               <div class="input-group">
-                                   <span class="input-group-text"><i class="fas fa-box"></i></span>
-                                   {% render_field form.quantity_sent class+="form-control" placeholder="0" %}
-                               </div>
-                               {% for error in form.quantity_sent.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
-                               <div class="form-text">هذه هي كمية القطع الرئيسية الجاهزة للتجميع (تأتي من مرحلة القص).</div>
-                           </div>
-                           <div class="col-md-6 mb-4">
-                               <label for="{{ form.expected_completion_date.id_for_label }}" class="form-label">{{ form.expected_completion_date.label }}</label>
-                               <div class="input-group">
-                                    <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
-                                   {% render_field form.expected_completion_date class+="form-control" %}
-                               </div>
-                               {% for error in form.expected_completion_date.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
-                           </div>
-                           <div class="col-12 mb-4">
-                                <label for="{{ form.notes.id_for_label }}" class="form-label">{{ form.notes.label }}</label>
-                               {% render_field form.notes class+="form-control" rows="3" placeholder="أضف أي ملاحظات خاصة بعملية الإرسال..." %}
-                           </div>
+                            <div class="col-md-6 mb-4">
+                                <label for="{{ form.quantity_sent.id_for_label }}" class="form-label">{{ form.quantity_sent.label }}</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-box"></i></span>
+                                    {% render_field form.quantity_sent class+="form-control" placeholder="0" %}
+                                </div>
+                                {% for error in form.quantity_sent.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                                <div class="form-text">هذه هي كمية القطع الرئيسية الجاهزة للتجميع (تأتي من مرحلة القص).</div>
+                            </div>
+                            <div class="col-md-6 mb-4">
+                                <label for="{{ form.expected_completion_date.id_for_label }}" class="form-label">{{ form.expected_completion_date.label }}</label>
+                                <div class="input-group">
+                                     <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                                    {% render_field form.expected_completion_date class+="form-control" %}
+                                </div>
+                                {% for error in form.expected_completion_date.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                            </div>
+                            <div class="col-12 mb-4">
+                                 <label for="{{ form.notes.id_for_label }}" class="form-label">{{ form.notes.label }}</label>
+                                {% render_field form.notes class+="form-control" rows="3" placeholder="أضف أي ملاحظات خاصة بعملية الإرسال..." %}
+                            </div>
                         </div>
                     </div>
 
@@ -302,13 +325,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const manualComponentSearch = $('#manual-component-search');
     const cancelBtn = document.getElementById('cancel-btn');
     const globalWarningDiv = document.getElementById('global-components-warning');
-    // MODIFICATION START: Get the quantity_sent input field
     const quantitySentInput = document.getElementById('{{ form.quantity_sent.id_for_label }}');
-    // MODIFICATION END
+    const productCard = document.getElementById('product-details-card');
 
     const sessionStorageKey = `assemblyFormState_{{ request.user.id }}`;
 
-    // --- State Management Functions (Restored from original) ---
+    // --- State Management Functions ---
     const saveState = () => {
         const components = [];
         componentsTbody.querySelectorAll('tr').forEach(row => {
@@ -366,7 +388,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (state.components && state.components.length > 0) {
             state.components.forEach(comp => {
                 const componentData = { ...comp, warehouses: JSON.parse(comp.warehouses_json || '[]') };
-                addComponentRow(componentData, false); // Don't re-save state while loading it
+                addComponentRow(componentData, false);
                 const newRow = componentsTbody.querySelector(`tr[data-material-id="${comp.material_id}"]`);
                 if (newRow) {
                     newRow.querySelector('.quantity-input').value = comp.quantity_sent;
@@ -448,7 +470,6 @@ document.addEventListener('DOMContentLoaded', function() {
         quantityInput.classList.add('quantity-input');
         const hiddenWarehouseInput = newRow.querySelector('input[name$="-source_warehouse"]');
 
-        // **FIX**: Check if warehouses exist and create dropdown or warning message
         if (comp.warehouses && Array.isArray(comp.warehouses) && comp.warehouses.length > 0) {
             const warehouseSelect = document.createElement('select');
             warehouseSelect.className = 'form-select form-select-sm component-warehouse-select';
@@ -496,31 +517,28 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!orderId) return;
         componentsLoader.style.display = 'block';
         loadBomBtn.disabled = true;
-        globalWarningDiv.style.display = 'none'; // Hide previous warnings
+        globalWarningDiv.style.display = 'none';
         try {
             const url = `{% url 'production:ajax_get_bom_components_for_order' %}?order_id=${orderId}`;
             const response = await fetch(url);
             
             if (!response.ok) {
-                // Handle server errors (like 500) more gracefully
                 console.error(`Server responded with status: ${response.status}`);
                 if (typeof showErrorToast === 'function') showErrorToast(`حدث خطأ في الاتصال بالخادم (Code: ${response.status})`);
                 throw new Error(`Server error`);
             }
             
             const data = await response.json();
-            console.log("Received BOM data from server:", data); 
 
             if (data.error) {
-                 if (typeof showErrorToast === 'function') showErrorToast(data.error);
-                 console.error("Backend Error:", data.error);
+                if (typeof showErrorToast === 'function') showErrorToast(data.error);
+                console.error("Backend Error:", data.error);
             } else if (!data.components || !Array.isArray(data.components)) {
                 if (typeof showErrorToast === 'function') showErrorToast('Received invalid data structure from server.');
                 console.error('Invalid data structure. Expected a "components" array.', data);
             } else if (data.components.length === 0) {
-                 if (typeof showWarningToast === 'function') showWarningToast('لا توجد مكونات إضافية في قائمة المواد لهذا المنتج.');
+                if (typeof showWarningToast === 'function') showWarningToast('لا توجد مكونات إضافية في قائمة المواد لهذا المنتج.');
             } else {
-                // Check if ALL components lack warehouses, which indicates a system-wide setup issue.
                 const allComponentsLackWarehouses = data.components.every(c => !c.warehouses || c.warehouses.length === 0);
                 if (allComponentsLackWarehouses) {
                     globalWarningDiv.innerHTML = '<strong><i class="fas fa-exclamation-triangle me-2"></i>تنبيه:</strong> لم يتم العثور على مخازن للمواد الخام (نوع "مكونات" أو "أقمشة"). يرجى التأكد من وجود مخازن نشطة من هذه الأنواع في النظام ليتم عرضها.';
@@ -557,7 +575,6 @@ document.addEventListener('DOMContentLoaded', function() {
             templateSelection: () => "ابحث عن مادة خام...",
         }).on('select2:select', function(e) {
             const data = e.params.data;
-            console.log("Manual add data:", data);
             const componentData = {
                 material_id: data.id,
                 name: data.name,
@@ -609,15 +626,15 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // --- Event Listeners ---
-    // MODIFICATION START: Updated the change event listener for orderSelect
     orderSelect.on('change', async (e) => {
         const orderId = e.target.value;
 
-        // Reset fields when selection changes
+        // Reset fields
         loadBomBtn.disabled = !orderId;
         componentsTbody.innerHTML = '';
         totalFormsInput.value = 0;
-        if(quantitySentInput) quantitySentInput.value = ''; // Reset quantity sent
+        if(quantitySentInput) quantitySentInput.value = '';
+        if(productCard) productCard.style.display = 'none'; // Hide card
         updateTablePlaceholder();
         
         if (!orderId) {
@@ -625,7 +642,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Fetch order details to update quantity
+        // Fetch order details
         try {
             const url = `{% url 'production:get_order_details_ajax' %}?order_id=${orderId}`;
             const response = await fetch(url);
@@ -636,18 +653,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (quantitySentInput) {
                     quantitySentInput.value = data.quantity_ordered;
                 }
+                // MODIFIED: Populate and show simplified product card
+                if (productCard) {
+                    document.getElementById('product-name-display').textContent = data.product_name || 'N/A';
+                    document.getElementById('product-quantity-display').textContent = data.quantity_ordered || '0';
+                    productCard.style.display = 'block';
+                }
             } else {
                 console.error('Failed to get order details:', data.error);
-                 if (typeof showErrorToast === 'function') showErrorToast(data.error || 'فشل في جلب تفاصيل الأمر.');
+                if (typeof showErrorToast === 'function') showErrorToast(data.error || 'فشل في جلب تفاصيل الأمر.');
             }
         } catch (error) {
             console.error('Error fetching order details:', error);
             if (typeof showErrorToast === 'function') showErrorToast('خطأ في الاتصال لجلب تفاصيل الأمر.');
         }
 
-        saveState(); // Save state after all updates
+        saveState();
     });
-    // MODIFICATION END
 
     loadBomBtn.addEventListener('click', loadBomComponents);
 
@@ -699,7 +721,16 @@ document.addEventListener('DOMContentLoaded', function() {
     orderSelect.select2({ placeholder: '--- اختر أمر إنتاج ---', allowClear: true, language: "ar" });
     $('#{{ form.external_manufacturer.id_for_label }}').select2({ placeholder: '--- اختر مصنعاً ---', allowClear: true, language: "ar" });
     initializeManualAddComponent();
-    loadState();
+
+    // MODIFIED: This is the main fix for the loading issue.
+    // It checks if an order is already selected when the page loads.
+    if (orderSelect.val()) {
+        orderSelect.trigger('change');
+    } else {
+        // If no order is pre-selected, then try to load from session storage.
+        loadState();
+    }
+
     updateTablePlaceholder();
     toggleConditionalPanels();
     loadBomBtn.disabled = !orderSelect.val();

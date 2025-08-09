@@ -37,7 +37,7 @@ SECRET_KEY = env('SECRET_KEY', default='django-insecure-frqrxc_5k#*_%of8!=7g0*8&
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True 
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['167.86.71.246']
 
 
 CSRF_TRUSTED_ORIGINS = [
@@ -137,6 +137,7 @@ DATABASES = {
         'PASSWORD': config('DATABASE_PASSWORD'),
         'HOST': 'localhost',
         'PORT': config('DATABASE_PORT', default='5432'), # Add this line
+        'CONN_MAX_AGE': 600,
     }
 }
 

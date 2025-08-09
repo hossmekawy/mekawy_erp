@@ -157,8 +157,6 @@ urlpatterns = [
     # =============================================================================
     path('ajax/get-bom-components-for-order/', views.ajax_get_bom_components_for_order, name='ajax_get_bom_components_for_order'),
     path('ajax/get-stock-for-material-in-warehouse/', views.get_stock_for_material_in_warehouse_ajax, name='ajax_get_stock_for_material_in_warehouse'),
+    # =============================================================================
 ]
 
-public_urlpatterns = [
-    path('track/<str:order_number>/', views.public_order_detail_view, name='public_order_detail'),
-]

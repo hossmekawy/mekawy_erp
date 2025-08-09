@@ -23,7 +23,7 @@ from django.views.generic import (
 from django.utils.translation import gettext_lazy as _
 
 from django.views.decorators.http import require_POST
-from django.urls import reverse_lazy, reverse
+from django.urls import NoReverseMatch, reverse_lazy, reverse
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Q, Sum, Avg, Count, F
 from django.db import models
@@ -788,7 +788,7 @@ class CuttingProcessSharedMixin:
         context = super().get_context_data(**kwargs)
         order = getattr(self.object, 'production_order', None)
         if not order and self.request.GET.get('order_id'):
-                order = get_object_or_404(ProductionOrder, pk=self.request.GET.get('order_id'))
+                order = get_object_or_404(ProductionOrder.objects.select_related('product', 'bom_version__size_group'), pk=self.request.GET.get('order_id'))
 
         if self.request.POST:
             # On POST, the original formset works correctly
@@ -814,12 +814,19 @@ class CuttingProcessSharedMixin:
             if self.object and self.object.is_completed:
                 context['cut_piece_formset'] = CutPieceFormSet(instance=self.object, prefix='pieces')
 
-        # Provide context for the template
-        context['available_sizes'] = order.product.size_group.sizes if order and order.product and order.product.size_group else []
+        # --- FIX START ---
+        # The error was here. The correct way to get the size group is through the
+        # production order's linked Bill of Materials (bom_version), not directly from the product.
+        if order and order.bom_version and order.bom_version.size_group:
+            context['available_sizes'] = order.bom_version.size_group.sizes
+        else:
+            context['available_sizes'] = []
+        # --- FIX END ---
             
         if self.object and self.object.marker_details:
                 context['marker_sizes_str'] = ','.join(self.object.marker_details.get('sizes', []))
         return context
+        
     def form_valid(self, form):
         context = self.get_context_data()
         table_formset = context['cutting_table_formset']
@@ -839,10 +846,6 @@ class CuttingProcessSharedMixin:
                 if not getattr(self.object, 'cutter', None): self.object.cutter = self.request.user
                 self.object.marker_details = marker_details_data
                 
-                # --- THIS LINE IS THE ONLY CHANGE IN THIS METHOD ---
-                # The form now automatically handles saving the new single-layer fields
-                # because we added them to the form's Meta.fields.
-                # The model's save() method will perform the calculation.
                 self.object.save()
 
                 table_formset.instance = self.object
@@ -862,6 +865,7 @@ class CuttingProcessSharedMixin:
         else:
             messages.error(self.request, "يرجى تصحيح الأخطاء في البيانات المدخلة.")
             return self.form_invalid(form)
+
     def get_success_url(self):
         return reverse('production:cutting_detail', kwargs={'pk': self.object.pk})
 
@@ -5393,8 +5397,8 @@ def print_shipping_label_pdf(request, pk):
         pk=pk
     )
 
-    # 1. Generate the public URL for the QR code
-    # --- FIX: Removed the 'production:' namespace prefix ---
+    # --- FIX: The reverse call is now for the global URL name ---
+    # It no longer needs the 'production:' namespace prefix.
     public_url = request.build_absolute_uri(
         reverse('public_order_detail', kwargs={'order_number': order.order_number})
     )
@@ -5429,7 +5433,7 @@ def print_shipping_label_pdf(request, pk):
     # 5. Render the HTML template
     html_string = render_to_string('pdf/production/shipping_label_a5.html', context)
 
-    # 6. Configure PDF options for A5, black and white
+    # 6. Configure PDF options for A5
     options = {
         'page-size': 'A5',
         'margin-top': '0.5in',
@@ -5437,7 +5441,7 @@ def print_shipping_label_pdf(request, pk):
         'margin-bottom': '0.5in',
         'margin-left': '0.5in',
         'encoding': "UTF-8",
-        'grayscale': '', # This option makes the PDF black and white
+        'grayscale': '', 
         '--load-error-handling': 'ignore',
     }
 
@@ -5451,7 +5455,7 @@ def print_shipping_label_pdf(request, pk):
         response['Content-Disposition'] = f'inline; filename="{filename}"'
         return response
     except Exception as e:
-        logging.error(f"PDF generation error for order {pk}: {e}")
+        logger.error(f"PDF generation error for order {pk}: {e}")
         messages.error(request, f"خطأ في إنشاء ملف PDF: {e}")
         return redirect('production:order_data_list')
 
@@ -5464,17 +5468,39 @@ def public_order_detail_view(request, order_number):
     try:
         order = get_object_or_404(
             ProductionOrder.objects.select_related(
-                'product', 'bom_version__size_group'
+                'product', 
+                'bom_version__size_group', 
+                'cutting_process__cutter'
             ).prefetch_related(
-                'cutting_process',
-                'assembly_processes',
-                'assembly_processes__dyeing_processes',
-                'assembly_processes__dyeing_processes__finishing_process'
+                # --- FIX: Prefetch components and their related materials for efficiency ---
+                'assembly_processes__components__material__unit_new',
+                'assembly_processes__dyeing_processes__finishing_process__components__material__unit_new',
+                'assembly_processes__external_manufacturer',
+                'assembly_processes__assembler',
+                'assembly_processes__dyeing_processes__dyeing_facility',
+                'assembly_processes__dyeing_processes__finishing_process__external_manufacturer',
+                'assembly_processes__dyeing_processes__finishing_process__finisher'
             ),
             order_number=order_number
         )
 
-        # Get sizes from the linked BOM
+        status_workflow = [
+            'draft', 'approved', 'in_cutting', 'in_assembly',
+            'in_dyeing', 'in_finishing', 'completed'
+        ]
+        
+        try:
+            current_status_index = status_workflow.index(order.status)
+        except ValueError:
+            current_status_index = -1
+
+        assembly_process = order.assembly_processes.first()
+        dyeing_process = assembly_process.dyeing_processes.first() if assembly_process else None
+        
+        finishing_process = None
+        if dyeing_process and hasattr(dyeing_process, 'finishing_process'):
+            finishing_process = dyeing_process.finishing_process
+
         sizes_list = []
         if order.bom_version and order.bom_version.size_group:
             sizes_list = order.bom_version.size_group.sizes
@@ -5482,8 +5508,13 @@ def public_order_detail_view(request, order_number):
         context = {
             'order': order,
             'sizes_str': ", ".join(sizes_list),
+            'current_status_index': current_status_index,
+            'cutting_process': getattr(order, 'cutting_process', None),
+            'assembly_process': assembly_process,
+            'dyeing_process': dyeing_process,
+            'finishing_process': finishing_process,
         }
         return render(request, 'production/public_order_detail.html', context)
     except ProductionOrder.DoesNotExist:
         return HttpResponse("Order not found.", status=404)
-  
+

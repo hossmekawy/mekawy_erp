@@ -25,6 +25,12 @@
             <td><strong>الكمية:</strong></td>
             <td>{{ permit.quantity }}</td>
         </tr>
+        <!-- MODIFICATION START: Moved product name to its own row for clarity -->
+        <tr>
+            <td><strong>اسم المنتج:</strong></td>
+            <td colspan="3">{{ permit.production_order.product.name }}</td>
+        </tr>
+        <!-- MODIFICATION END -->
         <tr>
             <td><strong >الوجهة:</strong></td>
             <td colspan="3"><span style="font-weight: bold; font-size: 1.2em;">{{ permit.destination }}</span></td>
@@ -34,8 +40,10 @@
             <td colspan="3">{{ permit.purpose }}</td>
         </tr>
         <tr>
-            <td><strong>وصف المواد:</strong></td>
-            <td colspan="3">{{ permit.items_description|linebreaksbr }}</td>
+            <td style="font-size: 1.1em;"><strong>وصف المواد:</strong></td>
+            <td colspan="3" style="font-size: 1.2em; padding: 10px 5px; line-height: 1.6;">
+                {{ permit.items_description|linebreaksbr }}
+            </td>
         </tr>
         <tr>
             <td><strong>ملاحظات:</strong></td>

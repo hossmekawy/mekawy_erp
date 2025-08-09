@@ -14,9 +14,9 @@
         }
         .timeline-step {
             position: relative;
-            padding-right: 2.5rem; /* Space for line and icon */
+            padding-right: 2.5rem;
             padding-bottom: 1.5rem;
-            border-right: 2px solid #e5e7eb; /* The timeline vertical line */
+            border-right: 2px solid #e5e7eb;
         }
         .timeline-step:last-child {
             border-right: 2px solid transparent;
@@ -24,7 +24,7 @@
         }
         .timeline-icon {
             position: absolute;
-            right: -0.75rem; /* Center the icon on the line */
+            right: -0.75rem;
             top: 0;
             width: 1.5rem;
             height: 1.5rem;
@@ -33,109 +33,280 @@
             align-items: center;
             justify-content: center;
         }
-        .timeline-step.completed .timeline-icon {
-            background-color: #10B981; /* Emerald-500 */
-            color: white;
+        .timeline-step.completed .timeline-icon { background-color: #10B981; color: white; }
+        .timeline-step.active .timeline-icon { background-color: #3B82F6; color: white; }
+        .timeline-step.pending .timeline-icon { background-color: #E5E7EB; color: #6B7280; }
+        .step-date { font-size: 0.8rem; color: #6B7280; margin-top: 0.25rem; }
+        .step-details {
+            margin-top: 0.75rem;
+            padding: 0.75rem;
+            background-color: #f9fafb;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
         }
-        .timeline-step.active .timeline-icon {
-            background-color: #3B82F6; /* Blue-500 */
-            color: white;
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.75rem;
         }
-        .timeline-step.pending .timeline-icon {
-            background-color: #E5E7EB; /* Gray-200 */
-            color: #6B7280; /* Gray-500 */
+        .details-grid > div > span {
+            display: block;
+            font-size: 0.8rem;
+            color: #6b7280;
+            margin-bottom: 0.1rem;
+        }
+        .details-grid > div > p {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        /* Hide buttons when printing */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+        }
+        /* NEW: Styles for components list */
+        .components-list {
+            margin-top: 0.75rem;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 0.75rem;
+        }
+        .components-list h4 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .components-list ul {
+            list-style-type: disc;
+            padding-right: 1.5rem;
+            font-size: 0.85rem;
         }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
 
-    <div class="container mx-auto max-w-2xl p-4 sm:p-6">
+    <div class="container mx-auto max-w-3xl p-4 sm:p-6">
         
-        <!-- Header Card -->
         <div class="bg-white rounded-xl shadow-md p-6 mb-6">
             <div class="text-center">
-                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">تفاصيل أمر الإنتاج</h1>
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">تفاصيل تتبع الإنتاج</h1>
                 <p class="text-lg font-semibold text-blue-600 mt-1">{{ order.order_number }}</p>
                 <p class="text-sm text-gray-500 mt-2">تاريخ البدء: {{ order.start_date|date:"l, j F Y" }}</p>
             </div>
         </div>
 
-        <!-- Main Details Card -->
+        <!-- Action Buttons -->
+        <div class="no-print bg-white rounded-xl shadow-md p-4 mb-6 flex items-center justify-center gap-4">
+            <button onclick="saveAsPDF()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg inline-flex items-center">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                <span>حفظ كـ PDF</span>
+            </button>
+            <button onclick="shareLink()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg inline-flex items-center">
+                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12s-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"></path></svg>
+                <span>مشاركة الرابط</span>
+            </button>
+        </div>
+        <div id="copy-success-msg" class="no-print hidden bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg relative mb-6 text-center" role="alert">
+            <strong class="font-bold">تم النسخ!</strong>
+            <span class="block sm:inline">تم نسخ الرابط بنجاح.</span>
+        </div>
+
+
         <div class="bg-white rounded-xl shadow-md p-6 mb-6">
             <h2 class="text-xl font-bold mb-4 border-b pb-2">معلومات المنتج</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-                <div>
-                    <p class="text-sm text-gray-500">المنتج</p>
-                    <p class="font-semibold text-lg">{{ order.product.name }}</p>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-500">الكمية</p>
-                    <p class="font-semibold text-lg">{{ order.quantity_ordered }} قطعة</p>
-                </div>
-                <div class="sm:col-span-2">
-                    <p class="text-sm text-gray-500">المقاسات</p>
-                    <p class="font-semibold text-lg">{{ sizes_str|default:"غير محددة" }}</p>
-                </div>
-                <div class="sm:col-span-2">
-                    <p class="text-sm text-gray-500">رقم الباتش</p>
-                    <p class="font-mono text-gray-700">{{ order.batch_number }}</p>
-                </div>
+                <div><span>المنتج</span><p class="font-semibold text-lg">{{ order.product.name }}</p></div>
+                <div><span>الكمية</span><p class="font-semibold text-lg">{{ order.quantity_ordered }} قطعة</p></div>
+                <div class="sm:col-span-2"><span>المقاسات</span><p class="font-semibold text-lg">{{ sizes_str|default:"غير محددة" }}</p></div>
+                <div class="sm:col-span-2"><span>رقم الباتش</span><p class="font-mono text-gray-700">{{ order.batch_number }}</p></div>
             </div>
         </div>
         
-        <!-- Workflow Status Card -->
         <div class="bg-white rounded-xl shadow-md p-6">
             <h2 class="text-xl font-bold mb-6 border-b pb-2">مراحل سير العمل</h2>
             <div>
-                {% with status_list="draft,approved,in_cutting,in_assembly,in_dyeing,in_finishing,completed"|split:"," %}
-                {% with current_index=status_list|index_of:order.status %}
                 
-                <div class="timeline-step {% if current_index >= 1 %}completed{% elif order.status == 'approved' %}active{% else %}pending{% endif %}">
+                <div class="timeline-step {% if current_status_index > 1 %}completed{% elif current_status_index == 1 %}active{% else %}pending{% endif %}">
                     <div class="timeline-icon">✓</div>
                     <p class="font-bold">تم اعتماد الأمر</p>
-                    <p class="text-sm text-gray-500">تمت الموافقة على الأمر وجاهز للإنتاج.</p>
+                    {% if order.approved_at %}<p class="step-date">التاريخ: {{ order.approved_at|date:"Y-m-d" }} بواسطة: {{ order.approved_by.username }}</p>{% endif %}
                 </div>
 
-                <div class="timeline-step {% if current_index >= 2 %}completed{% elif order.status == 'in_cutting' %}active{% else %}pending{% endif %}">
+                <div class="timeline-step {% if current_status_index > 2 %}completed{% elif current_status_index == 2 %}active{% else %}pending{% endif %}">
                     <div class="timeline-icon">✓</div>
                     <p class="font-bold">مرحلة القص</p>
-                    <p class="text-sm text-gray-500">يتم قص القماش حسب المواصفات.</p>
+                    {% if cutting_process.completed_at %}<p class="step-date">التاريخ: {{ cutting_process.completed_at|date:"Y-m-d" }}</p>{% endif %}
+                    {% if cutting_process %}
+                    <div class="step-details">
+                        <div class="details-grid">
+                            <div><span>القاص:</span><p>{{ cutting_process.cutter.get_full_name|default:"-" }}</p></div>
+                            <div><span>القماش المستخدم:</span><p>{{ cutting_process.total_fabric_used|floatformat:2 }} متر</p></div>
+                            <div><span>القطع المقصوصة:</span><p>{{ cutting_process.total_pieces_cut }}</p></div>
+                            <div><span>طول الفرشة:</span><p>{{ cutting_process.single_layer_fabric_length|floatformat:2|default:"-" }} م</p></div>
+                            <div><span>عرض الفرشة:</span><p>{{ cutting_process.single_layer_width|floatformat:2|default:"-" }} م</p></div>
+                            <div><span>الميتراج المحسوب:</span><p class="text-blue-600">{{ cutting_process.single_layer_meterage|floatformat:3|default:"-" }}</p></div>
+                            <div><span>الميتراج الحقيقي:</span><p class="text-green-600">{{ cutting_process.actual_meterage|floatformat:3|default:"-" }}</p></div>
+                        </div>
+                        {% if cutting_process.notes %}<div class="mt-2"><span>ملاحظات:</span><p class="text-sm font-normal">{{ cutting_process.notes }}</p></div>{% endif %}
+                    </div>
+                    {% endif %}
                 </div>
 
-                <div class="timeline-step {% if current_index >= 3 %}completed{% elif order.status == 'in_assembly' %}active{% else %}pending{% endif %}">
+                <div class="timeline-step {% if current_status_index > 3 %}completed{% elif current_status_index == 3 %}active{% else %}pending{% endif %}">
                     <div class="timeline-icon">✓</div>
                     <p class="font-bold">مرحلة التجميع</p>
-                    <p class="text-sm text-gray-500">يتم تجميع القطع المقصوصة.</p>
+                    {% if assembly_process.actual_completion_date %}<p class="step-date">التاريخ: {{ assembly_process.actual_completion_date|date:"Y-m-d" }}</p>{% endif %}
+                    {% if assembly_process %}
+                    <div class="step-details">
+                        <div class="details-grid">
+                            <div><span>النوع:</span><p>{{ assembly_process.get_assembly_type_display }}</p></div>
+                            <div><span>المسؤول:</span><p>{% if assembly_process.assembly_type == 'outsourced' %}{{ assembly_process.external_manufacturer.name }}{% else %}{{ assembly_process.assembler.get_full_name }}{% endif %}</p></div>
+                            <div><span>الكمية المرسلة:</span><p>{{ assembly_process.quantity_sent }}</p></div>
+                            <div><span>الكمية المستلمة:</span><p>{{ assembly_process.quantity_received }}</p></div>
+                            <div><span>العيوب:</span><p>{{ assembly_process.defects_count }}</p></div>
+                            <div><span>الفاقد:</span><p>{{ assembly_process.losses_count }}</p></div>
+                        </div>
+                        {% if assembly_process.notes %}<div class="mt-2"><span>ملاحظات:</span><p class="text-sm font-normal">{{ assembly_process.notes }}</p></div>{% endif %}
+                        
+                        <!-- NEW: Display Assembly Components -->
+                        {% if assembly_process.components.all %}
+                        <div class="components-list">
+                            <h4>المكونات المرسلة:</h4>
+                            <ul>
+                                {% for component in assembly_process.components.all %}
+                                <li>{{ component.material.name }}: <strong>{{ component.quantity_sent|floatformat:2 }}</strong> {{ component.material.unit_new.symbol|default:'وحدة' }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </div>
 
-                <div class="timeline-step {% if current_index >= 4 %}completed{% elif order.status == 'in_dyeing' %}active{% else %}pending{% endif %}">
+                <div class="timeline-step {% if current_status_index > 4 %}completed{% elif current_status_index == 4 %}active{% else %}pending{% endif %}">
                     <div class="timeline-icon">✓</div>
                     <p class="font-bold">مرحلة الصباغة</p>
-                    <p class="text-sm text-gray-500">يتم صباغة المنتج باللون المطلوب.</p>
+                    {% if dyeing_process.actual_return_date %}<p class="step-date">التاريخ: {{ dyeing_process.actual_return_date|date:"Y-m-d" }}</p>{% endif %}
+                    {% if dyeing_process %}
+                    <div class="step-details">
+                        <div class="details-grid">
+                            <div><span>المصبغة:</span><p>{{ dyeing_process.dyeing_facility.name }}</p></div>
+                            <div><span>اللون:</span><p>{{ dyeing_process.color_specification }}</p></div>
+                            <div><span>الكمية المرسلة:</span><p>{{ dyeing_process.quantity_sent }}</p></div>
+                            <div><span>الكمية المستلمة:</span><p>{{ dyeing_process.quantity_received }}</p></div>
+                            <div><span>الفاقد:</span><p>{{ dyeing_process.losses_count }}</p></div>
+                        </div>
+                        {% if dyeing_process.notes %}<div class="mt-2"><span>ملاحظات:</span><p class="text-sm font-normal">{{ dyeing_process.notes }}</p></div>{% endif %}
+                    </div>
+                    {% endif %}
                 </div>
 
-                <div class="timeline-step {% if current_index >= 5 %}completed{% elif order.status == 'in_finishing' %}active{% else %}pending{% endif %}">
+                <div class="timeline-step {% if current_status_index > 5 %}completed{% elif current_status_index == 5 %}active{% else %}pending{% endif %}">
                     <div class="timeline-icon">✓</div>
                     <p class="font-bold">مرحلة التشطيب</p>
-                    <p class="text-sm text-gray-500">يتم إضافة اللمسات النهائية للمنتج.</p>
+                    {% if finishing_process.actual_completion_date %}<p class="step-date">التاريخ: {{ finishing_process.actual_completion_date|date:"Y-m-d" }}</p>{% endif %}
+                    {% if finishing_process %}
+                    <div class="step-details">
+                        <div class="details-grid">
+                             <div><span>النوع:</span><p>{{ finishing_process.get_finishing_type_display }}</p></div>
+                             <div><span>المسؤول:</span><p>{% if finishing_process.finishing_type == 'outsourced' %}{{ finishing_process.external_manufacturer.name }}{% else %}{{ finishing_process.finisher.get_full_name }}{% endif %}</p></div>
+                             <div><span>الكمية المدخلة:</span><p>{{ finishing_process.quantity_input }}</p></div>
+                             <div><span>الكمية المخرجة:</span><p>{{ finishing_process.quantity_output }}</p></div>
+                             <div><span>العيوب:</span><p>{{ finishing_process.defects_in_finishing }}</p></div>
+                        </div>
+                        {% if finishing_process.notes %}<div class="mt-2"><span>ملاحظات:</span><p class="text-sm font-normal">{{ finishing_process.notes }}</p></div>{% endif %}
+
+                        <!-- NEW: Display Finishing Components -->
+                        {% if finishing_process.components.all %}
+                        <div class="components-list">
+                            <h4>المكونات المرسلة:</h4>
+                            <ul>
+                                {% for component in finishing_process.components.all %}
+                                <li>{{ component.material.name }}: <strong>{{ component.quantity_sent|floatformat:2 }}</strong> {{ component.material.unit_new.symbol|default:'وحدة' }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </div>
                 
-                <div class="timeline-step {% if order.status == 'completed' %}completed{% else %}pending{% endif %}">
+                <div class="timeline-step {% if current_status_index >= 6 %}completed{% else %}pending{% endif %}">
                     <div class="timeline-icon">✓</div>
                     <p class="font-bold">اكتمل الإنتاج</p>
-                    <p class="text-sm text-gray-500">تم الانتهاء من جميع مراحل الإنتاج بنجاح.</p>
+                    {% if order.actual_completion_date %}<p class="step-date">التاريخ: {{ order.actual_completion_date|date:"Y-m-d" }}</p>{% endif %}
                 </div>
-                
-                {% endwith %}
-                {% endwith %}
+
             </div>
         </div>
 
-        <footer class="text-center text-sm text-gray-400 mt-8">
+        <footer class="text-center text-sm text-gray-400 mt-8 no-print">
             <p>&copy; {% now "Y" %} A&M. All rights reserved.</p>
         </footer>
 
     </div>
 
+    <script>
+        function saveAsPDF() {
+            // This opens the browser's print dialog
+            window.print();
+        }
+
+        function shareLink() {
+            const link = window.location.href;
+            const successMsg = document.getElementById('copy-success-msg');
+
+            // Modern clipboard API (preferred)
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(link).then(() => {
+                    showSuccessMessage();
+                }).catch(err => {
+                    console.error('Failed to copy with modern API:', err);
+                    fallbackCopyTextToClipboard(link); // Fallback on error
+                });
+            } else {
+                fallbackCopyTextToClipboard(link); // Fallback for older browsers
+            }
+        }
+        
+        function fallbackCopyTextToClipboard(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            
+            // Avoid scrolling to bottom
+            textArea.style.top = "0";
+            textArea.style.left = "0";
+            textArea.style.position = "fixed";
+
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showSuccessMessage();
+                } else {
+                    console.error('Fallback: Copying text command was unsuccessful');
+                    alert('لم نتمكن من نسخ الرابط تلقائياً. يرجى نسخه يدوياً.');
+                }
+            } catch (err) {
+                console.error('Fallback: Oops, unable to copy', err);
+                alert('لم نتمكن من نسخ الرابط تلقائياً. يرجى نسخه يدوياً.');
+            }
+
+            document.body.removeChild(textArea);
+        }
+
+        function showSuccessMessage() {
+            const successMsg = document.getElementById('copy-success-msg');
+            successMsg.classList.remove('hidden');
+            setTimeout(() => {
+                successMsg.classList.add('hidden');
+            }, 3000); // Hide after 3 seconds
+        }
+    </script>
+
 </body>
 </html>
+

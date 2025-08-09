@@ -4,6 +4,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 from .error_views import custom_page_not_found_view, custom_server_error_view
+from production import views as production_views
 
 
 def root_redirect(request):
@@ -26,7 +27,10 @@ urlpatterns = [
     path('hr/', include('hr.urls')),
     path('settings/', include('settings.urls')),
     path('api/', include('api.urls')),
-    path('pwa/', include('pwa.urls')),  # Move PWA to specific path
+    path('pwa/', include('pwa.urls')), 
+    path('track/<str:order_number>/', production_views.public_order_detail_view, name='public_order_detail'),
+
+# Move PWA to specific path
 ]
 
 handler404 = custom_page_not_found_view

@@ -1,0 +1,19 @@
+[0;1;32m●[0m nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded (/lib/systemd/system/nginx.service; enabled; vendor preset: enabled)
+     Active: [0;1;32mactive (running)[0m since Thu 2025-08-07 09:28:31 CEST; 2min 29s ago
+       Docs: man:nginx(8)
+    Process: 328647 ExecStartPre=/usr/sbin/nginx -t -q -g daemon on; master_process on; (code=exited, status=0/SUCCESS)
+    Process: 328648 ExecStart=/usr/sbin/nginx -g daemon on; master_process on; (code=exited, status=0/SUCCESS)
+   Main PID: 328650 (nginx)
+      Tasks: 4 (limit: 9455)
+     Memory: 4.4M
+     CGroup: /system.slice/nginx.service
+             ├─328650 nginx: master process /usr/sbin/nginx -g daemon on; master_process on;
+             ├─328651 nginx: worker process
+             ├─328652 nginx: worker process
+             └─328653 nginx: worker process
+
+Aug 07 09:28:31 vmi2695393.contaboserver.net systemd[1]: Starting A high performance web server and a reverse proxy server...
+Aug 07 09:28:31 vmi2695393.contaboserver.net nginx[328647]: nginx: [warn] could not build optimal proxy_headers_hash, you should increase either proxy_headers_hash_max_size: 512 or proxy_headers_hash_bucket_size: 64; ignoring proxy_headers_hash_bucket_size
+Aug 07 09:28:31 vmi2695393.contaboserver.net nginx[328648]: nginx: [warn] could not build optimal proxy_headers_hash, you should increase either proxy_headers_hash_max_size: 512 or proxy_headers_hash_bucket_size: 64; ignoring proxy_headers_hash_bucket_size
+Aug 07 09:28:31 vmi2695393.contaboserver.net systemd[1]: Started A high performance web server and a reverse proxy server.
