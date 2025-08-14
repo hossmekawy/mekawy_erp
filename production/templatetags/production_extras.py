@@ -3,6 +3,19 @@ from decimal import Decimal
 
 register = template.Library()
 
+
+@register.filter
+def sub(value, arg):
+    """Subtracts the arg from the value."""
+    try:
+        return int(value) - int(arg)
+    except (ValueError, TypeError):
+        try:
+            return value - arg
+        except Exception:
+            return ''
+
+
 @register.filter
 def class_name(value):
     """Returns the name of the object's class."""

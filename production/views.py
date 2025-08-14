@@ -53,7 +53,7 @@ from .models import (
 )
 from .forms import (
     CutPieceFormSet, CuttingTableForm, ProductionOrderForm, BillOfMaterialsForm, BOMItemFormSet, CuttingProcessForm, 
-    AssemblyProcessForm, DyeingProcessForm, FinishingProcessForm, FinishingReceiveForm,
+    AssemblyProcessForm, DyeingProcessForm, FinishingProcessForm, FinishingBatchReceiveForm,
     AssemblyReceiveForm, DyeingReceiveForm, ExternalManufacturerForm, ExitPermitForm,
     ReceiptConfirmationForm, QualityControlCheckForm, ProductionCostAnalysisUpdateForm,SendAdditionalComponentFormSet,
     AssemblySendForm, DyeingSendForm, FinishingSendForm ,CuttingTableFormSet,CustomAssemblyComponentFormSet,ManufacturerProductPriceFormSet ,ExternalManufacturerForm, CustomFinishingComponentFormSet  
@@ -1997,7 +1997,7 @@ class FinishingProcessDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'finishing_process'
 
     def get_queryset(self):
-        # CORRECTED: The query now follows the correct, deep path to the size_group
+        # This optimized query pre-fetches all necessary related data
         return super().get_queryset().select_related(
             'dyeing_process__assembly_process__production_order__product',
             'dyeing_process__assembly_process__production_order__bom_version__size_group',
@@ -2009,11 +2009,20 @@ class FinishingProcessDetailView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         process = self.get_object()
-        context['exit_permit'] = process.exit_permits.first()
         
+        # --- Batch Receiving Form ---
+        # Provide the form for receiving a new batch if the process is still active
         if not process.is_completed:
-            context['receive_form'] = FinishingReceiveForm(instance=process)
+            context['batch_receive_form'] = FinishingBatchReceiveForm(instance=process)
 
+        # --- Quantity Tracking ---
+        # Calculate how many items are still expected to be received
+        total_accounted_for = process.quantity_output + process.defects_in_finishing
+        remaining_quantity = process.quantity_input - total_accounted_for
+        context['remaining_quantity'] = remaining_quantity
+
+        # --- Performance Statistics ---
+        # Calculate key performance indicators for this specific process
         quantity_input = Decimal(process.quantity_input or 0)
         quantity_output = Decimal(process.quantity_output or 0)
         defects = Decimal(process.defects_in_finishing or 0)
@@ -2028,12 +2037,14 @@ class FinishingProcessDetailView(LoginRequiredMixin, DetailView):
             'defect_rate': defect_rate,
             'loss_rate': loss_rate,
         }
-
+        
+        # --- Exit Permit Logic ---
+        # Check for an existing permit and provide a form to create one if needed for outsourced processes
+        context['exit_permit'] = process.exit_permits.first()
         if process.finishing_type == 'outsourced' and not context['exit_permit'] and not process.is_completed:
             production_order = process.dyeing_process.assembly_process.production_order
             product = production_order.product
             
-            # CORRECTED: Get the size group from the order's specific BOM version
             bom = production_order.bom_version
             size_group = bom.size_group if bom else None
 
@@ -2139,87 +2150,83 @@ def ajax_get_finishing_bom_components_for_dyeing(request):
 
 @login_required
 @require_POST
-def receive_finishing_process(request, pk):
-    """
-    Handles receiving finished goods.
-    FIX: Now correctly calculates the cost and adds products to stock.
-    """
-    finishing_process = get_object_or_404(FinishingProcess, pk=pk, is_completed=False)
-    form = FinishingReceiveForm(request.POST, instance=finishing_process)
+def receive_finishing_batch(request, pk):
+    process = get_object_or_404(FinishingProcess, pk=pk, is_completed=False)
+    form = FinishingBatchReceiveForm(request.POST, instance=process)
 
     if form.is_valid():
-        with transaction.atomic():
-            process = form.save(commit=False)
-            process.is_completed = True
-            process.actual_completion_date = timezone.now()
-            
-            # FIX: Explicit cost calculation
-            process.calculate_total_cost() # This method should use ManufacturerProductPrice
-            process.save()
+        data = form.cleaned_data
+        
+        try:
+            with transaction.atomic():
+                # 1. Create a history record for the batch
+                history_entry = {
+                    'date': timezone.now().isoformat(),
+                    'user_id': request.user.id,
+                    'username': request.user.username,
+                    'quantity': data['quantity_received'],
+                    'defects': data['defects_in_batch'],
+                    'notes': data['notes'],
+                }
+                process.receipt_history.append(history_entry)
 
-            # FINANCIAL LOGIC
-            if process.finishing_type == 'outsourced' and process.external_manufacturer and process.total_finishing_cost > 0:
-                success = create_invoice_and_transaction(
-                    request=request,
-                    process_instance=process,
-                    manufacturer=process.external_manufacturer,
-                    cost=process.total_finishing_cost,
-                    expense_name=_("Outsourced Finishing Costs"),
-                    notes=_("تكلفة تشطيب: {prod_name} ({qty} قطعة)").format(
-                        prod_name=process.dyeing_process.assembly_process.production_order.product.name,
-                        qty=process.quantity_output
+                # 2. Update the total received and defect counts on the process instance
+                process.quantity_output += data['quantity_received']
+                process.defects_in_finishing += data['defects_in_batch']
+                
+                # 3. Handle stock movement for the received batch
+                production_order = process.dyeing_process.assembly_process.production_order
+                if data['quantity_received'] > 0:
+                    stock_item, _ = StockItem.objects.get_or_create(
+                        product=production_order.product,
+                        warehouse=process.destination_warehouse,
+                        defaults={'quantity': 0}
                     )
-                )
-                if not success:
-                    raise ValueError("Failed to create financial records for finishing.")
+                    # Create a batch record for traceability
+                    ProductBatch.objects.create(
+                        stock=stock_item,
+                        batch_number=production_order.batch_number,
+                        quantity=data['quantity_received'],
+                        production_finishing_source=process,
+                        cost_per_piece=production_order.cost_analysis.cost_per_piece if hasattr(production_order, 'cost_analysis') else 0
+                    )
+                    # Create a stock movement to add the items to inventory
+                    StockMovement.objects.create(
+                        stock_item=stock_item,
+                        movement_type='in',
+                        quantity=data['quantity_received'],
+                        reference_number=f"PROD-FIN-{production_order.order_number}",
+                        notes=f"استلام دفعة من التشطيب لأمر #{production_order.order_number}",
+                        created_by=request.user
+                    )
 
-            # INVENTORY LOGIC
-            production_order = finishing_process.dyeing_process.assembly_process.production_order
-            finished_product = production_order.product
-            destination_warehouse = finishing_process.destination_warehouse
-            quantity_produced = finishing_process.quantity_output
+                # 4. Check if this is the final batch and complete the process
+                is_final = data.get('is_final_batch', False)
+                total_accounted_for = process.quantity_output + process.defects_in_finishing
+                
+                if is_final or total_accounted_for >= process.quantity_input:
+                    process.is_completed = True
+                    process.actual_completion_date = timezone.now()
+                    
+                    # Update the main ProductionOrder status to 'completed'
+                    production_order.status = 'completed'
+                    production_order.actual_completion_date = timezone.now().date()
+                    production_order.save(update_fields=['status', 'actual_completion_date'])
+                    messages.success(request, f"تم استلام الدفعة الأخيرة وإغلاق عملية التشطيب بنجاح.")
+                else:
+                    messages.success(request, f"تم استلام دفعة بكمية {data['quantity_received']} بنجاح.")
 
-            if quantity_produced > 0:
-                if not destination_warehouse:
-                    messages.error(request, _("Cannot complete: A destination warehouse was not selected."))
-                    raise ValueError("Destination warehouse is missing.")
+                process.save()
 
-                stock_item, created = StockItem.objects.get_or_create(
-                    product=finished_product,
-                    warehouse=destination_warehouse,
-                    defaults={'quantity': 0}
-                )
-
-                ProductBatch.objects.create(
-                    stock=stock_item,
-                    batch_number=production_order.batch_number,
-                    quantity=quantity_produced,
-                    production_finishing_source=finishing_process,
-                    cost_per_piece=production_order.cost_analysis.cost_per_piece if hasattr(production_order, 'cost_analysis') else 0
-                )
-
-                StockMovement.objects.create(
-                    stock_item=stock_item,
-                    movement_type='in',
-                    quantity=quantity_produced,
-                    reference_number=f"PROD-{production_order.order_number}",
-                    notes=_("Completed production from order #{num}").format(num=production_order.order_number),
-                    created_by=request.user
-                )
-                messages.info(request, _("{qty} pieces of '{prod}' added to warehouse '{wh}'.").format(
-                    qty=quantity_produced, prod=finished_product.name, wh=destination_warehouse.name
-                ))
-
-            production_order.status = 'completed'
-            production_order.actual_completion_date = timezone.now().date()
-            production_order.save(update_fields=['status', 'actual_completion_date'])
-            messages.success(request, _("Finishing process for order {order_num} has been completed.").format(
-                order_num=production_order.order_number
-            ))
+        except Exception as e:
+            messages.error(request, f"حدث خطأ غير متوقع: {e}")
+            
     else:
+        # If the form is not valid, display the errors
         for field, errors in form.errors.items():
             for error in errors:
-                messages.error(request, f"{form.fields[field].label if field != '__all__' else 'Error'}: {error}")
+                field_label = form.fields[field].label if field != '__all__' else 'خطأ عام'
+                messages.error(request, f"خطأ في الحقل '{field_label}': {error}")
 
     return redirect('production:finishing_detail', pk=pk)
 

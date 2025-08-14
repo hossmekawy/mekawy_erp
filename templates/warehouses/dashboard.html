@@ -1,132 +1,355 @@
 {% extends 'warehouses/base.html' %}
-{% load static %}
+{% load static humanize %}
 
 {% block warehouse_content %}
-<div class="container-fluid">
-    <div class="row mb-4">
-        <div class="col-12">
-            <h2>لوحة تحكم المخازن</h2>
+<div class="container-fluid p-4" style="background-color: #f8f9fa;">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">لوحة تحكم المخازن</h1>
+            <p class="mb-0 text-muted">نظرة شاملة على حالة المخزون والمخازن</p>
+        </div>
+        <div>
+            <a href="{% url 'warehouses:inventory_count' %}" class="btn btn-primary shadow-sm">
+                <i class="fas fa-tasks fa-sm text-white-50 me-2"></i>بدء جرد جديد
+            </a>
+            <a href="#" class="btn btn-secondary shadow-sm" data-bs-toggle="modal" data-bs-target="#reportsModal">
+                <i class="fas fa-download fa-sm text-white-50 me-2"></i>تصدير تقارير
+            </a>
         </div>
     </div>
-    
-    <!-- Statistics Cards -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card bg-primary text-white">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h4>{{ total_warehouses }}</h4>
-                            <p class="mb-0">إجمالي المخازن</p>
-                        </div>
-                        <div class="align-self-center">
-                            <i class="fas fa-warehouse fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-3">
-            <div class="card bg-success text-white">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h4>{{ total_products }}</h4>
-                            <p class="mb-0">إجمالي المنتجات</p>
-                        </div>
-                        <div class="align-self-center">
-                            <i class="fas fa-box fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-3">
-            <div class="card bg-warning text-white">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h4>{{ low_stock_items }}</h4>
-                            <p class="mb-0">مخزون منخفض</p>
-                        </div>
-                        <div class="align-self-center">
-                            <i class="fas fa-exclamation-triangle fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-                <a href="{% url 'warehouses:low_stock' %}" class="card-footer text-white">
-                    عرض التفاصيل <i class="fas fa-arrow-left"></i>
-                </a>
-            </div>
-        </div>
-        
-        <div class="col-md-3">
-            <div class="card bg-info text-white">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h4>{{ pending_transfers }}</h4>
-                            <p class="mb-0">تحويلات معلقة</p>
-                        </div>
-                        <div class="align-self-center">
-                            <i class="fas fa-clock fa-2x"></i>
-                        </div>
-                    </div>
-                </div>
-                <a href="{% url 'warehouses:pending_transfers' %}" class="card-footer text-white">
-                    عرض التفاصيل <i class="fas fa-arrow-left"></i>
-                </a>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Recent Movements -->
+
+    <!-- Stat Cards Row -->
     <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5>آخر حركات المخزون</h5>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">إجمالي قيمة المخزون</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_stock_value|floatformat:2|intcomma }} جنيه</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">عدد المنتجات</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_products|intcomma }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-boxes fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">تحذيرات المخزون المنخفض</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ low_stock_items|intcomma }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+                 <a href="{% url 'warehouses:low_stock' %}" class="card-footer text-warning small">
+                    عرض التفاصيل <i class="fas fa-arrow-circle-right"></i>
+                </a>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">تحويلات معلقة</div>
+                            <div class="h5 mb-0 mr-3 font-weight-bold text-gray-800">{{ pending_transfers|intcomma }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-truck-loading fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+                 <a href="{% url 'warehouses:transfer_list' %}?status=pending" class="card-footer text-info small">
+                    عرض التفاصيل <i class="fas fa-arrow-circle-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row">
+        <!-- Stock Value by Warehouse (Bar Chart) -->
+        <div class="col-xl-8 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">قيمة المخزون حسب المخزن</h6>
                 </div>
                 <div class="card-body">
+                    <div class="chart-area" style="height: 320px;">
+                        <canvas id="warehouseValueChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stock Distribution by Type (Doughnut Chart) -->
+        <div class="col-xl-4 col-lg-5">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">توزيع المخزون حسب النوع</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-pie pt-4 pb-2" style="height: 320px;">
+                        <canvas id="stockTypeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Products and Recent Movements Row -->
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">أعلى 5 منتجات من حيث القيمة</h6>
+                </div>
+                <div class="card-body">
+                    {% for product in top_value_products %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a href="{% url 'warehouses:product_detail' product.product.id %}">{{ product.product.name }}</a>
+                            <span class="font-weight-bold">{{ product.total_value|floatformat:2|intcomma }} جنيه</span>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-primary" role="progressbar" style="width: {{ product.percentage_of_total }}%" aria-valuenow="{{ product.percentage_of_total }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-center text-muted">لا توجد بيانات لعرضها.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">آخر 10 حركات للمخزون</h6>
+                </div>
+                <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>المنتج</th>
-                                    <th>المخزن</th>
-                                    <th>نوع الحركة</th>
-                                    <th>الكمية</th>
-                                    <th>بواسطة</th>
-                                    <th>التاريخ</th>
-                                </tr>
-                            </thead>
+                        <table class="table table-sm table-hover mb-0">
                             <tbody>
                                 {% for movement in recent_movements %}
                                 <tr>
-                                    <td>{{ movement.stock_item.product.name }}</td>
-                                    <td>{{ movement.stock_item.warehouse.name }}</td>
                                     <td>
-                                        <span class="badge bg-{% if movement.movement_type == 'in' %}success{% elif movement.movement_type == 'out' %}danger{% else %}info{% endif %}">
-                                            {{ movement.get_movement_type_display }}
-                                        </span>
+                                        {% if movement.movement_type == 'in' %}
+                                        <i class="fas fa-arrow-down text-success"></i>
+                                        {% elif movement.movement_type == 'out' %}
+                                        <i class="fas fa-arrow-up text-danger"></i>
+                                        {% else %}
+                                        <i class="fas fa-exchange-alt text-info"></i>
+                                        {% endif %}
                                     </td>
-                                    <td>{{ movement.quantity }}</td>
-                                    <td>{{ movement.created_by.get_full_name|default:movement.created_by.username }}</td>
-                                    <td>{{ movement.created_at|date:"Y-m-d H:i" }}</td>
+                                    <td><a href="{% url 'warehouses:product_detail' movement.stock_item.product.id %}">{{ movement.stock_item.product.name }}</a></td>
+                                    <td><span class="badge bg-secondary">{{ movement.stock_item.warehouse.name }}</span></td>
+                                    <td class="font-weight-bold">{{ movement.quantity|floatformat:2 }}</td>
+                                    <td><small class="text-muted">{{ movement.created_at|timesince }} ago</small></td>
                                 </tr>
                                 {% empty %}
-                                <tr>
-                                    <td colspan="6" class="text-center">لا توجد حركات مخزون</td>
-                                </tr>
+                                <tr><td class="text-center p-3">لا توجد حركات مخزون حديثة.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
                 </div>
+                 <div class="card-footer text-center">
+                    <a href="{% url 'warehouses:movement_list' %}" class="text-primary small">عرض كل الحركات &rarr;</a>
+                </div>
             </div>
         </div>
     </div>
+
 </div>
+
+<!-- Reports Modal -->
+<div class="modal fade" id="reportsModal" tabindex="-1" aria-labelledby="reportsModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="reportsModalLabel">تصدير تقارير المخزون</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>اختر التقرير الذي ترغب في تصديره كملف PDF.</p>
+        <div class="list-group">
+          <a href="{% url 'warehouses:low_stock_pdf' %}" class="list-group-item list-group-item-action" target="_blank">
+            <i class="fas fa-file-pdf text-danger me-2"></i> تقرير المخزون المنخفض
+          </a>
+          <a href="{% url 'warehouses:product_list_pdf' %}" class="list-group-item list-group-item-action" target="_blank">
+            <i class="fas fa-file-pdf text-danger me-2"></i> تقرير قائمة المنتجات الكاملة
+          </a>
+           <a href="{% url 'warehouses:movement_print' %}" class="list-group-item list-group-item-action" target="_blank">
+            <i class="fas fa-file-pdf text-danger me-2"></i> تقرير حركات المخزون
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Chart.js Global Configuration
+    Chart.defaults.font.family = "Tajawal, sans-serif";
+    Chart.register(ChartDataLabels);
+
+    // --- Stock Distribution by Type (Doughnut Chart) ---
+    const stockTypeCtx = document.getElementById('stockTypeChart').getContext('2d');
+    const stockTypeData = {{ stock_by_type_json|safe }};
+    new Chart(stockTypeCtx, {
+        type: 'doughnut',
+        data: {
+            labels: stockTypeData.labels,
+            datasets: [{
+                data: stockTypeData.values,
+                backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796'],
+                hoverBackgroundColor: ['#2e59d9', '#17a673', '#2c9faf', '#dda20a', '#be2617', '#60616f'],
+                borderColor: '#ffffff',
+                borderWidth: 3,
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 20,
+                        boxWidth: 12,
+                        font: { size: 12 }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: "rgb(255,255,255)",
+                    bodyColor: "#858796",
+                    borderColor: '#dddfeb',
+                    borderWidth: 1,
+                    padding: 15,
+                    displayColors: false,
+                    caretPadding: 10,
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed !== null) {
+                                label += new Intl.NumberFormat('ar-EG', { style: 'currency', currency: 'EGP' }).format(context.parsed);
+                            }
+                            return label;
+                        }
+                    }
+                },
+                datalabels: {
+                    formatter: (value, ctx) => {
+                        let sum = 0;
+                        let dataArr = ctx.chart.data.datasets[0].data;
+                        dataArr.map(data => {
+                            sum += data;
+                        });
+                        if (sum === 0) return '0%';
+                        let percentage = (value*100 / sum).toFixed(1) + "%";
+                        return percentage;
+                    },
+                    color: '#fff',
+                    font: {
+                        weight: 'bold',
+                        size: 14,
+                    }
+                }
+            },
+            cutout: '75%',
+        },
+    });
+
+    // --- Stock Value by Warehouse (Bar Chart) ---
+    const warehouseValueCtx = document.getElementById('warehouseValueChart').getContext('2d');
+    const warehouseValueData = {{ top_warehouses_json|safe }};
+    new Chart(warehouseValueCtx, {
+        type: 'bar',
+        data: {
+            labels: warehouseValueData.labels,
+            datasets: [{
+                label: "قيمة المخزون",
+                data: warehouseValueData.values,
+                backgroundColor: 'rgba(78, 115, 223, 0.8)',
+                borderColor: 'rgba(78, 115, 223, 1)',
+                borderWidth: 1,
+                borderRadius: 4,
+                barThickness: 30,
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return new Intl.NumberFormat('ar-EG', { notation: 'compact', compactDisplay: 'short' }).format(value);
+                        }
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                     callbacks: {
+                        label: function(context) {
+                            return ' القيمة: ' + new Intl.NumberFormat('ar-EG', { style: 'currency', currency: 'EGP' }).format(context.raw);
+                        }
+                    }
+                },
+                datalabels: {
+                    display: false
+                }
+            }
+        }
+    });
+
+});
+</script>
 {% endblock %}

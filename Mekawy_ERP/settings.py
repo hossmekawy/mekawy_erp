@@ -56,7 +56,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize', 
-
+    'crm',  # Add the new crm app
+    'phonenumber_field',
      # Third party apps
     'rest_framework',
     'django_tables2',

@@ -73,6 +73,12 @@
     .stat-card-lg {
         border-left: 5px solid var(--production-info);
     }
+    .notes-section {
+        white-space: pre-wrap; /* Ensures line breaks in notes are respected */
+        font-family: 'Tajawal', sans-serif;
+        line-height: 1.6;
+        color: #5a5c69;
+    }
 </style>
 {% endblock %}
 
@@ -137,7 +143,7 @@
 
 <div class="row mt-4">
     <!-- Totals & Marker Details -->
-    <div class="col-lg-6">
+    <div class="col-lg-6 mb-4">
         <div class="detail-card h-100">
             <div class="detail-card-header"><i class="fas fa-ruler-combined me-2"></i>تفاصيل الرسمة والإجماليات</div>
             <div class="detail-card-body">
@@ -152,6 +158,11 @@
                 <div class="detail-item">
                     <span class="label">إجمالي القصه:</span>
                     <span class="value">{{ cutting_stats.total_garments }}</span>
+                </div>
+                 <!-- NEW: Total Layers calculated by JS -->
+                <div class="detail-item">
+                    <span class="label">إجمالي عدد الطبقات:</span>
+                    <span class="value"><strong id="total-layers-display">0</strong></span>
                 </div>
                 <div class="detail-item">
                     <span class="label">إجمالي القطع المفردة:</span>
@@ -170,7 +181,7 @@
         </div>
     </div>
     <!-- Cutting Tables -->
-    <div class="col-lg-6">
+    <div class="col-lg-6 mb-4">
         <div class="detail-card h-100">
             <div class="detail-card-header"><i class="fas fa-table me-2"></i>جداول القص (الفرشات)</div>
             <div class="table-responsive">
@@ -180,17 +191,19 @@
                             <th>طول الثوب</th>
                             <th>الطبقات</th>
                             <th>الإجمالي</th>
+                            <th>ملاحظات الفرشة</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for table in cutting_tables %}
                         <tr>
                             <td>{{ table.fabric_length|floatformat:2 }} م</td>
-                            <td>{{ table.layers_count }}</td>
+                            <td class="layer-count-cell">{{ table.layers_count }}</td>
                             <td><strong>{{ table.total_pieces }}</strong></td>
+                            <td>{{ table.notes|default:"-" }}</td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="3" class="text-center p-3">لا توجد فرشات.</td></tr>
+                        <tr><td colspan="4" class="text-center p-3">لا توجد فرشات.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -198,6 +211,16 @@
         </div>
     </div>
 </div>
+
+<!-- General Notes Card -->
+{% if cutting_process.notes %}
+<div class="detail-card mt-4">
+    <div class="detail-card-header"><i class="fas fa-sticky-note me-2"></i>الملاحظات العامة</div>
+    <div class="detail-card-body">
+        <p class="notes-section">{{ cutting_process.notes }}</p>
+    </div>
+</div>
+{% endif %}
 
 <div class="detail-card mt-4">
     <div class="detail-card-header"><i class="fas fa-puzzle-piece me-2"></i>جرد القطع المقصوصة</div>
@@ -238,4 +261,40 @@
      </div>
 </div>
 
+{% endblock %}
+
+{% block production_extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Function to calculate the sum of layers from the cutting tables
+    function calculateTotalLayers() {
+        // Get all the table cells that contain a layer count
+        const layerCells = document.querySelectorAll('.layer-count-cell');
+        
+        let totalLayers = 0;
+        
+        // Loop through each cell
+        layerCells.forEach(function(cell) {
+            // Get the text content, remove any whitespace, and convert it to an integer
+            const layerCount = parseInt(cell.textContent.trim(), 10);
+            
+            // If the conversion is successful (i.e., it's a number), add it to the total
+            if (!isNaN(layerCount)) {
+                totalLayers += layerCount;
+            }
+        });
+        
+        // Find the element where we want to display the total
+        const totalDisplayElement = document.getElementById('total-layers-display');
+        
+        // If the display element exists, update its content with the calculated total
+        if (totalDisplayElement) {
+            totalDisplayElement.textContent = totalLayers;
+        }
+    }
+    
+    // Run the calculation function once the page has fully loaded
+    calculateTotalLayers();
+});
+</script>
 {% endblock %}

@@ -373,8 +373,14 @@ class CutPiece(models.Model):
     
     @property
     def available_quantity(self):
-        """Calculates the quantity available for the next production stage."""
-        return self.quantity - self.reserved_for_assembly
+        """
+        Calculates the quantity available for the next production stage.
+        Handles cases where quantity or reserved_for_assembly might be None.
+        """
+        # CORRECTION: Treat None as 0 to prevent TypeError
+        quantity = self.quantity or 0
+        reserved = self.reserved_for_assembly or 0
+        return quantity - reserved
 class ExternalManufacturer(models.Model):
     """المصنعين الخارجيين"""
     name = models.CharField(max_length=200, verbose_name="اسم المصنع")
@@ -730,7 +736,8 @@ class FinishingProcess(models.Model):
     quantity_input = models.PositiveIntegerField(verbose_name="الكمية المدخلة")
     quantity_output = models.PositiveIntegerField(default=0, verbose_name="الكمية المخرجة")
     defects_in_finishing = models.PositiveIntegerField(default=0, verbose_name="العيوب في التشطيب")
-    
+    receipt_history = models.JSONField(default=list, blank=True, verbose_name="سجل دفعات الاستلام")
+
     # التكاليف
     # REMOVED: finishing_cost_per_piece
     total_finishing_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="إجمالي تكلفة التشطيب")

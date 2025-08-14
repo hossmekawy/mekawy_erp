@@ -1,146 +1,137 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Sum, Q, F
+from django.db.models import Count, Sum, Q, F, Avg, DecimalField, Max, Min, Value, ExpressionWrapper
+from django.db.models.functions import Coalesce
 from django.utils import timezone
-from datetime import datetime, timedelta
-from users.models import User
-from warehouses.models import Product, StockItem, StockMovement
-from suppliers.models import Supplier, PurchaseOrder
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.views.generic import TemplateView
-from django.db import models
-from django.views.decorators.cache import cache_page
+from datetime import timedelta
+from django.http import JsonResponse
+import json
+from decimal import Decimal
+
+# Import models from all relevant apps
+from warehouses.models import Product, StockItem, Warehouse
+from production.models import ProductionOrder, AssemblyProcess, FinishingProcess, ExternalManufacturer, CuttingProcess, CutPiece, BillOfMaterials
+from hr.models import Employee, Attendance, Department
 
 @login_required
-@cache_page(60 * 15) # Cache the view for 15 minutes
 def index(request):
-    """Dashboard main page with statistics"""
-    
-    # Get current date and calculate date ranges
+    """
+    Dashboard main page with comprehensive statistics.
+    """
     today = timezone.now().date()
     last_30_days = today - timedelta(days=30)
     
-    # User Statistics
-    total_users = User.objects.count()
-    active_users = User.objects.filter(is_active=True).count()
-    new_users_this_month = User.objects.filter(
-        date_joined__date__gte=last_30_days
+    # --- HR Statistics ---
+    total_employees = Employee.objects.filter(is_active=True).count()
+    try:
+        attended_today_count = Attendance.objects.filter(date=today, check_in__isnull=False).count()
+    except Exception:
+        attended_today_count = 0
+    on_leave_or_absent = total_employees - attended_today_count
+    departments_data = list(Employee.objects.filter(is_active=True).values('department__name').annotate(count=Count('id')).order_by('-count'))
+
+    # --- Warehouse Statistics ---
+    total_products = Product.objects.filter(is_active=True).count()
+    low_stock_products_count = StockItem.objects.filter(
+        quantity__lte=F('product__min_stock_level'), 
+        product__min_stock_level__gt=0
     ).count()
-    users_by_role = User.objects.values('role').annotate(
-        count=Count('id')
-    ).order_by('-count')
+    total_stock_value = StockItem.objects.annotate(
+        item_value=F('quantity') * F('product__cost_price')
+    ).aggregate(
+        total_value=Coalesce(Sum('item_value'), 0, output_field=DecimalField())
+    )['total_value']
+    warehouses_summary = Warehouse.objects.annotate(
+        num_items=Count('stock_items', distinct=True),
+        total_quantity=Coalesce(Sum('stock_items__quantity'), 0, output_field=DecimalField())
+    ).order_by('-total_quantity')[:5]
+
+    # --- Production Statistics ---
+    active_orders_count = ProductionOrder.objects.filter(is_active=True, status__in=['approved', 'in_cutting', 'in_assembly', 'in_dyeing', 'in_finishing']).count()
+    completed_this_month = ProductionOrder.objects.filter(status='completed', actual_completion_date__gte=last_30_days).count()
+    orders_by_status = list(ProductionOrder.objects.values('status').annotate(count=Count('id')).order_by('-count'))
+    total_defects_assembly = AssemblyProcess.objects.aggregate(total=Coalesce(Sum('defects_count'), 0))['total']
+    total_pieces_sent_assembly = AssemblyProcess.objects.aggregate(total=Coalesce(Sum('quantity_sent'), 0))['total']
+    defect_rate = (total_defects_assembly / total_pieces_sent_assembly * 100) if total_pieces_sent_assembly > 0 else 0
+    recent_production_orders = ProductionOrder.objects.select_related('product').order_by('-created_at')[:5]
+
+    # --- Cutting and Meterage Analysis ---
+    total_pieces_cut = CuttingProcess.objects.aggregate(total=Coalesce(Sum('total_pieces_cut'), 0))['total']
     
-    # Product Statistics
-    total_products = Product.objects.count()
-    active_products = Product.objects.filter(is_active=True).count()
+    product_search_id = request.GET.get('product_id')
+    selected_product = None
+    product_orders = None
+    total_quantity_ordered_for_product = 0 # Initialize
     
-    # Get low stock products --- OPTIMIZED QUERY ---
-    try:
-        low_stock_products = StockItem.objects.select_related('product').filter(
-            quantity__lte=F('product__min_stock_level')
-        ).count()
-    except Exception:
-        low_stock_products = 0
+    meterage_query = CuttingProcess.objects.filter(total_pieces_cut__gt=0, total_fabric_used__gt=0)
     
-    # Get best products by stock quantity
-    try:
-        best_products = StockItem.objects.select_related('product').order_by('-quantity')[:5]
-    except Exception:
-        best_products = []
-    
-    # Recent stock movements
-    try:
-        recent_movements = StockMovement.objects.select_related(
-            'stock_item__product', 'created_by'
-        ).order_by('-created_at')[:10]
-    except Exception:
-        recent_movements = []
-    
-    # Supplier Statistics
-    total_suppliers = Supplier.objects.count()
-    active_suppliers = Supplier.objects.filter(is_active=True).count()
-    
-    # Purchase Order Statistics
-    total_purchase_orders = PurchaseOrder.objects.count()
-    pending_orders = PurchaseOrder.objects.filter(status='pending').count()
-    completed_orders = PurchaseOrder.objects.filter(status='completed').count()
-    overdue_orders = PurchaseOrder.objects.filter(
-        expected_delivery_date__lt=today,
-        status__in=['pending', 'approved', 'in_delivery']
-    ).count()
-    
-    # Recent Purchase Orders
-    recent_purchase_orders = PurchaseOrder.objects.select_related(
-        'supplier'
-    ).order_by('-created_at')[:5]
-    
-    # Monthly statistics for charts
-    monthly_users = []
-    monthly_orders = []
-    for i in range(6):
-        month_start = today.replace(day=1) - timedelta(days=30*i)
-        month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-        
-        users_count = User.objects.filter(
-            date_joined__date__range=[month_start, month_end]
-        ).count()
-        
-        orders_count = PurchaseOrder.objects.filter(
-            created_at__date__range=[month_start, month_end]
-        ).count()
-        
-        monthly_users.append({
-            'month': month_start.strftime('%B'),
-            'count': users_count
-        })
-        
-        monthly_orders.append({
-            'month': month_start.strftime('%B'),
-            'count': orders_count
-        })
-    
-    monthly_users.reverse()
-    monthly_orders.reverse()
-    
+    if product_search_id:
+        try:
+            selected_product = Product.objects.get(pk=product_search_id)
+            meterage_query = meterage_query.filter(production_order__product=selected_product)
+            product_orders = ProductionOrder.objects.filter(product=selected_product).order_by('-created_at')
+
+            # NEW: Calculate total quantity ordered for the selected product
+            if product_orders:
+                total_quantity_ordered_for_product = product_orders.aggregate(
+                    total=Coalesce(Sum('quantity_ordered'), 0)
+                )['total']
+
+        except (Product.DoesNotExist, ValueError):
+            product_search_id = None
+
+    meterage_stats = meterage_query.annotate(
+        actual_meterage=ExpressionWrapper(
+            F('total_fabric_used') / F('total_pieces_cut'),
+            output_field=DecimalField()
+        )
+    ).aggregate(
+        highest_meterage=Coalesce(Max('actual_meterage'), Value(0), output_field=DecimalField()),
+        lowest_meterage=Coalesce(Min('actual_meterage'), Value(0), output_field=DecimalField())
+    )
+
     context = {
-        'total_users': total_users,
-        'active_users': active_users,
-        'new_users_this_month': new_users_this_month,
-        'users_by_role': users_by_role,
-        'total_products': total_products,
-        'active_products': active_products,
-        'low_stock_products': low_stock_products,
-        'best_products': best_products,
-        'recent_movements': recent_movements,
-        'total_suppliers': total_suppliers,
-        'active_suppliers': active_suppliers,
-        'total_purchase_orders': total_purchase_orders,
-        'pending_orders': pending_orders,
-        'completed_orders': completed_orders,
-        'overdue_orders': overdue_orders,
-        'recent_purchase_orders': recent_purchase_orders,
-        'monthly_users': monthly_users,
-        'monthly_orders': monthly_orders,
+        'total_employees': total_employees, 'attended_today_count': attended_today_count,
+        'on_leave_or_absent': on_leave_or_absent,
+        'departments_data': departments_data, 'total_products': total_products,
+        'low_stock_products_count': low_stock_products_count, 'total_stock_value': total_stock_value,
+        'warehouses_summary': warehouses_summary,
+        'active_orders_count': active_orders_count, 'completed_this_month': completed_this_month,
+        'orders_by_status': orders_by_status, 'defect_rate': defect_rate,
+        'recent_production_orders': recent_production_orders, 'total_pieces_cut': total_pieces_cut,
+        'selected_product': selected_product, 'meterage_stats': meterage_stats,
+        'product_search_id': product_search_id,
+        'total_quantity_ordered_for_product': total_quantity_ordered_for_product, # Changed variable
+        'product_orders': product_orders,
+        'today_date': today,
     }
     
     return render(request, 'dashboard/index.html', context)
 
 @login_required
-def sales_report(request):
-    """Sales report view"""
-    return render(request, 'dashboard/reports/sales.html')
+def product_search_ajax(request):
+    """
+    Handles AJAX requests for searching finished products.
+    """
+    term = request.GET.get('term', '')
+    if len(term) < 2:
+        return JsonResponse([], safe=False)
+    
+    products = Product.objects.filter(
+        product_type='finished',
+        is_active=True,
+        name__icontains=term
+    ).values('id', 'name', 'code')[:10]
+    
+    return JsonResponse(list(products), safe=False)
 
-@login_required
-def inventory_report(request):
-    """Inventory report view"""
-    return render(request, 'dashboard/reports/inventory.html')
 
+# Placeholder report views
 @login_required
-def production_report(request):
-    """Production report view"""
-    return render(request, 'dashboard/reports/production.html')
-
+def sales_report(request): return render(request, 'dashboard/reports/sales.html')
 @login_required
-def financial_report(request):
-    """Financial report view"""
-    return render(request, 'dashboard/reports/financial.html')
+def inventory_report(request): return render(request, 'dashboard/reports/inventory.html')
+@login_required
+def production_report(request): return render(request, 'dashboard/reports/production.html')
+@login_required
+def financial_report(request): return render(request, 'dashboard/reports/financial.html')

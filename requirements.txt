@@ -13,12 +13,15 @@ django-environ==0.12.0
 django-extensions==4.1
 django-filter==25.1
 django-htmx==1.23.0
+django-postgrespool2==2.0.5
 django-pwa==2.0.1
 django-tables2==2.7.5
 django-widget-tweaks==1.5.0
 djangorestframework==3.16.0
 et_xmlfile==2.0.0
 future==1.0.0
+gevent==25.5.1
+greenlet==3.2.3
 gunicorn==23.0.0
 html5lib==1.1
 idna==3.10
@@ -41,9 +44,11 @@ python-decouple==3.8
 pytz==2025.2
 PyYAML==6.0.2
 pyzk==0.9
+qrcode==8.2
 reportlab==4.4.2
 requests==2.32.4
 six==1.17.0
+SQLAlchemy==2.0.42
 sqlparse==0.5.3
 svglib==1.5.1
 tinycss2==1.4.0
@@ -54,3 +59,5 @@ uritools==5.0.0
 urllib3==2.5.0
 webencodings==0.5.1
 xhtml2pdf==0.2.17
+zope.event==5.1.1
+zope.interface==7.2

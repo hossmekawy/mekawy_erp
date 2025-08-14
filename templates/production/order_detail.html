@@ -2,252 +2,400 @@
 {% load static %}
 {% load production_extras %}
 
-{% block production_title %}تفاصيل أمر الإنتاج {{ order.order_number }}{% endblock %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block production_title %}تفاصيل أمر الإنتاج {{ order.order_number }}{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts (Tajawal for Arabic) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 
-{% block production_breadcrumb_items %}
-    <li class="breadcrumb-item"><a href="{% url 'production:order_list' %}">أوامر الإنتاج</a></li>
-    <li class="breadcrumb-item active" aria-current="page">تفاصيل أمر الإنتاج {{ order.order_number }}</li>
-{% endblock %}
+    <style>
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: #f0f2f5;
+        }
+        .production-card {
+            background-color: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 0.75rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .production-card-header {
+            background-color: #f8f9fa;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #e0e0e0;
+            font-weight: 700;
+            color: #343a40;
+        }
+        .production-card-body {
+            padding: 1.5rem;
+        }
+        .btn-production {
+            background-color: #0d6efd;
+            color: white;
+        }
+        .btn-production-outline {
+            border-color: #0d6efd;
+            color: #0d6efd;
+        }
+        .btn-production-outline:hover {
+            background-color: #0d6efd;
+            color: white;
+        }
+    </style>
+    {% block production_extra_css %}
+    <style>
+        .workflow-panel { border: 1px solid #dee2e6; border-radius: .75rem; margin-bottom: 2rem; overflow: hidden; background-color: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .workflow-header { padding: 1rem 1.5rem; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; }
+        .workflow-tracker { list-style: none; padding: 1.5rem 1rem 1rem 1rem; display: flex; justify-content: space-between; position: relative; }
+        .workflow-tracker::before { content: ''; position: absolute; top: 2.2rem; left: 5%; right: 5%; height: 4px; background-color: #e9ecef; z-index: 1; }
+        .workflow-step { text-align: center; position: relative; z-index: 2; flex: 1; }
+        .workflow-step .step-icon { width: 32px; height: 32px; border-radius: 50%; background-color: #e9ecef; color: #adb5bd; display: inline-flex; align-items: center; justify-content: center; border: 3px solid #e9ecef; transition: all 0.3s ease; }
+        .workflow-step .step-label { margin-top: 0.5rem; font-size: 0.8rem; color: #6c757d; font-weight: 500; }
+        .workflow-step.completed .step-icon { background-color: #198754; border-color: #198754; color: white; }
+        .workflow-step.completed .step-label { color: #198754; }
+        .workflow-step.active .step-icon { background-color: #0dcaf0; border-color: #0dcaf0; color: white; transform: scale(1.2); box-shadow: 0 0 10px rgba(13, 202, 240, 0.5); }
+        .workflow-step.active .step-label { color: #0d6efd; font-weight: 700; }
+        .workflow-action-box { padding: 1.5rem; text-align: center; border-top: 1px solid #dee2e6; background-color: #f8f9fa; }
+        .workflow-step .step-link { text-decoration: none; display: inline-block; cursor: pointer; }
+        .workflow-step .step-link .step-label { color: #0d6efd; font-weight: 700; }
+        .workflow-step .step-link:hover .step-icon { transform: scale(1.25); box-shadow: 0 0 15px rgba(13, 202, 240, 0.7); }
+        .details-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+        .details-grid > div { background-color: #f8f9fa; padding: 0.75rem; border-radius: 0.5rem; }
+        .details-grid strong { display: block; color: #6c757d; font-size: 0.8rem; margin-bottom: 0.25rem; }
+        .details-grid p, .details-grid .d-flex { margin-bottom: 0; }
+        
+        /* New styles for size badges */
+        .bg-info-soft { background-color: #eefbff; }
+        .text-info-dark { color: #0b7a9e; }
+        .fs-sm { font-size: 0.85rem; }
+        .fw-semibold { font-weight: 600; }
 
-{% block production_page_title %}تفاصيل أمر الإنتاج{% endblock %}
+        /* Styles for summary card */
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .summary-item:last-child {
+            border-bottom: none;
+        }
+        .summary-label {
+            color: #6c757d;
+        }
+        .summary-value {
+            font-weight: 700;
+            color: #343a40;
+        }
+        .summary-value .badge {
+            font-size: 0.9rem;
+        }
 
-{% block production_header_actions %}
-    <div class="d-flex justify-content-end align-items-center gap-2">
-        {% if order.status == 'draft' %}
-        <a href="{% url 'production:order_update' order.pk %}" class="btn btn-production-outline">
-            <i class="fas fa-edit me-1"></i> تعديل
-        </a>
-        {% endif %}
-        <div class="dropdown">
-            <button class="btn btn-production dropdown-toggle" type="button" id="orderActionsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="fas fa-cogs me-1"></i> إجراءات
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="orderActionsDropdown">
-                <li><a class="dropdown-item" href="{% url 'production:print_production_order' order.pk %}" target="_blank"><i class="fas fa-print me-2 text-info"></i> طباعة الأمر</a></li>
-                {% if order.status == 'draft' %}
-                <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#deleteConfirmationModal" data-delete-url="{% url 'production:order_delete' order.pk %}" data-item-name="أمر الإنتاج رقم {{ order.order_number }}"><i class="fas fa-trash-alt me-2"></i> حذف الأمر</a></li>
-                {% endif %}
-            </ul>
-        </div>
-    </div>
-{% endblock %}
+    </style>
+    {% endblock %}
+</head>
+<body>
+    <main class="container-fluid py-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                {% block production_breadcrumb_items %}
+                    <li class="breadcrumb-item"><a href="{% url 'production:order_list' %}">أوامر الإنتاج</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">تفاصيل أمر الإنتاج {{ order.order_number }}</li>
+                {% endblock %}
+            </ol>
+        </nav>
 
-{% block production_extra_css %}
-<style>
-    .workflow-panel { border: 1px solid #dee2e6; border-radius: .75rem; margin-bottom: 2rem; overflow: hidden; background-color: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-    .workflow-header { padding: 1rem 1.5rem; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; }
-    .workflow-tracker { list-style: none; padding: 1.5rem 1rem 1rem 1rem; display: flex; justify-content: space-between; position: relative; }
-    .workflow-tracker::before { content: ''; position: absolute; top: 2.2rem; left: 5%; right: 5%; height: 4px; background-color: #e9ecef; z-index: 1; }
-    .workflow-step { text-align: center; position: relative; z-index: 2; flex: 1; }
-    .workflow-step .step-icon { width: 32px; height: 32px; border-radius: 50%; background-color: #e9ecef; color: #adb5bd; display: inline-flex; align-items: center; justify-content: center; border: 3px solid #e9ecef; transition: all 0.3s ease; }
-    .workflow-step .step-label { margin-top: 0.5rem; font-size: 0.8rem; color: #6c757d; font-weight: 500; }
-    .workflow-step.completed .step-icon { background-color: #198754; border-color: #198754; color: white; }
-    .workflow-step.completed .step-label { color: #198754; }
-    .workflow-step.active .step-icon { background-color: #0dcaf0; border-color: #0dcaf0; color: white; transform: scale(1.2); box-shadow: 0 0 10px rgba(13, 202, 240, 0.5); }
-    .workflow-step.active .step-label { color: #0d6efd; font-weight: 700; }
-    .workflow-action-box { padding: 1.5rem; text-align: center; border-top: 1px solid #dee2e6; background-color: #f8f9fa; }
-    .workflow-step .step-link { text-decoration: none; display: inline-block; cursor: pointer; }
-    .workflow-step .step-link .step-label { color: #0d6efd; font-weight: 700; }
-    .workflow-step .step-link:hover .step-icon { transform: scale(1.25); box-shadow: 0 0 15px rgba(13, 202, 240, 0.7); }
-    .details-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
-    .details-grid > div { background-color: #f8f9fa; padding: 0.75rem; border-radius: 0.25rem; }
-    .details-grid strong { display: block; color: #6c757d; font-size: 0.8rem; margin-bottom: 0.25rem; }
-</style>
-{% endblock %}
-
-{% block production_content %}
-    <!-- Workflow Panel -->
-    <div class="workflow-panel">
-        <div class="workflow-header">
-            <h4><i class="fas fa-project-diagram me-2"></i>مراحل سير عمل الأمر</h4>
-        </div>
-        {% with status_list="draft,approved,in_cutting,in_assembly,in_dyeing,in_finishing,completed"|split:"," %}
-        {% with current_index=status_list|index_of:order.status %}
-        <div class="workflow-tracker">
-            <div class="workflow-step {% if current_index >= 2 %}completed{% endif %} {% if order.status == 'approved' %}active{% endif %}">
-                <div class="step-icon"><i class="fas fa-check-double"></i></div>
-                <div class="step-label">معتمد</div>
-            </div>
-            <div class="workflow-step {% if current_index >= 3 %}completed{% endif %} {% if order.status == 'in_cutting' %}active{% endif %}">
-                {% if order.status == 'approved' %}<a href="{% url 'production:cutting_create' %}?order_id={{ order.pk }}" class="step-link" title="بدء عملية القص"><div class="step-icon"><i class="fas fa-cut"></i></div><div class="step-label">البدء في القص</div></a>
-                {% elif order.cutting_process %}<a href="{% url 'production:cutting_detail' order.cutting_process.pk %}" class="step-link" title="عرض تفاصيل القص"><div class="step-icon"><i class="fas fa-cut"></i></div><div class="step-label">قص</div></a>
-                {% else %}<div class="step-icon"><i class="fas fa-cut"></i></div><div class="step-label">قص</div>{% endif %}
-            </div>
-            <div class="workflow-step {% if current_index >= 4 %}completed{% endif %} {% if order.status == 'in_assembly' %}active{% endif %}">
-                {% if order.status == 'in_assembly' and not order.assembly_processes.exists %}<a href="{% url 'production:assembly_create' %}?order_id={{ order.pk }}" class="step-link" title="بدء عملية التجميع"><div class="step-icon"><i class="fas fa-users-cog"></i></div><div class="step-label">البدء في التجميع</div></a>
-                {% elif order.assembly_processes.exists %}<a href="{% url 'production:assembly_detail' order.assembly_processes.first.pk %}" class="step-link" title="عرض تفاصيل التجميع"><div class="step-icon"><i class="fas fa-users-cog"></i></div><div class="step-label">تجميع</div></a>
-                {% else %}<div class="step-icon"><i class="fas fa-users-cog"></i></div><div class="step-label">تجميع</div>{% endif %}
-            </div>
-            <div class="workflow-step {% if current_index >= 5 %}completed{% endif %} {% if order.status == 'in_dyeing' %}active{% endif %}">
-                {% with assembly_process=order.assembly_processes.first %}{% if order.status == 'in_dyeing' and assembly_process and not assembly_process.dyeing_processes.exists %}<a href="{% url 'production:dyeing_create' %}?assembly_id={{ assembly_process.pk }}" class="step-link" title="بدء عملية الصباغة"><div class="step-icon"><i class="fas fa-palette"></i></div><div class="step-label">البدء في الصباغة</div></a>
-                {% elif assembly_process and assembly_process.dyeing_processes.exists %}<a href="{% url 'production:dyeing_detail' assembly_process.dyeing_processes.first.pk %}" class="step-link" title="عرض تفاصيل الصباغة"><div class="step-icon"><i class="fas fa-palette"></i></div><div class="step-label">صباغة</div></a>
-                {% else %}<div class="step-icon"><i class="fas fa-palette"></i></div><div class="step-label">صباغة</div>{% endif %}{% endwith %}
-            </div>
-            <div class="workflow-step {% if current_index >= 6 %}completed{% endif %} {% if order.status == 'in_finishing' %}active{% endif %}">
-                {% with dyeing_process=order.assembly_processes.first.dyeing_processes.first %}{% if order.status == 'in_finishing' and dyeing_process and not dyeing_process.finishing_process %}<a href="{% url 'production:finishing_create' %}?dyeing_id={{ dyeing_process.pk }}" class="step-link" title="بدء عملية التشطيب"><div class="step-icon"><i class="fas fa-tshirt"></i></div><div class="step-label">البدء في التشطيب</div></a>
-                {% elif dyeing_process.finishing_process %}<a href="{% url 'production:finishing_detail' dyeing_process.finishing_process.pk %}" class="step-link" title="عرض تفاصيل التشطيب"><div class="step-icon"><i class="fas fa-tshirt"></i></div><div class="step-label">تشطيب</div></a>
-                {% else %}<div class="step-icon"><i class="fas fa-tshirt"></i></div><div class="step-label">تشطيب</div>{% endif %}{% endwith %}
-            </div>
-            <div class="workflow-step {% if order.status == 'completed' %}completed active{% endif %}">
-                <div class="step-icon"><i class="fas fa-star"></i></div>
-                <div class="step-label">مكتمل</div>
-            </div>
-        </div>
-        <div class="workflow-action-box">
-            {% if order.status == 'draft' %}<h5 class="mb-2"><i class="fas fa-file-alt me-2"></i>الحالة الحالية: مسودة</h5><p class="text-muted">هذا الأمر جاهز للاعتماد. بالضغط على الزر سيتم حجز المواد والبدء في تجهيز الإنتاج.</p><form action="{% url 'production:order_approve' order.pk %}" method="post" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-lg btn-success"><i class="fas fa-check-circle me-2"></i>اعتماد الأمر الآن</button></form>
-            {% elif order.status == 'approved' %}<h5 class="mb-2"><i class="fas fa-check-double me-2 text-success"></i>الحالة الحالية: معتمد</h5><p class="text-muted">تم اعتماد هذا الأمر بنجاح. الخطوة التالية هي بدء عملية القص. اضغط على أيقونة "البدء في القص" أعلاه للمتابعة.</p>
-            {% elif order.status == 'completed' %}<h5 class="mb-2"><i class="fas fa-star me-2 text-warning"></i>الحالة الحالية: مكتمل</h5><p class="text-muted">تم إكمال جميع مراحل الإنتاج لهذا الأمر بنجاح.</p>
-            {% else %}<h5 class="mb-2"><i class="fas fa-tasks me-2"></i>الحالة الحالية: <span class="text-primary">{{ order.get_status_display }}</span></h5><p class="text-muted">الأمر قيد التنفيذ حالياً. اضغط على أيقونة المرحلة الحالية لعرض تفاصيلها، أو أيقونة المرحلة التالية لبدء العمل عليها.</p>{% endif %}
-        </div>
-        {% endwith %}{% endwith %}
-    </div>
-
-    <div class="row">
-        <!-- Main Details Column -->
-        <div class="col-lg-8">
-            <!-- Basic Info Card -->
-            <div class="production-card mb-4">
-                <div class="production-card-header d-flex justify-content-between"><span>المعلومات الأساسية</span></div>
-                <div class="production-card-body">
-                    <div class="details-grid">
-                        <div><strong>رقم الأمر:</strong><p>{{ order.order_number }}</p></div>
-                        <div><strong>رقم الباتش:</strong><p>{{ order.batch_number }}</p></div>
-                        <div><strong>الأولوية:</strong><p><span class="badge bg-{{ order.priority|status_color }}">{{ order.get_priority_display }}</span></p></div>
-                        <div><strong>المنتج:</strong><p><a href="#">{{ order.product.name }}</a></p></div>
-                        <div><strong>الكمية المطلوبة:</strong><p>{{ order.quantity_ordered }} قطعة</p></div>
-                        <div><strong>تاريخ البدء:</strong><p>{{ order.start_date|date:"Y-m-d" }}</p></div>
-                        <div><strong>الإنجاز المتوقع:</strong><p>{{ order.expected_completion_date|date:"Y-m-d" }}</p></div>
-                        {% if order.actual_completion_date %}<div><strong>الإنجاز الفعلي:</strong><p class="text-success">{{ order.actual_completion_date|date:"Y-m-d" }}</p></div>{% endif %}
-                    </div>
-                    <hr>
-                    <strong>تفاصيل القماش:</strong>
-                    <p class="mb-0 lh-sm">
-                        <span class="me-3"><i class="fas fa-layer-group text-muted"></i> {{ order.textile_stock.product.name }}</span>
-                        <span class="me-3"><small class="text-muted">المخصص: {{ order.fabric_meters_allocated }} متر</small></span>
-                        {% if cutting_process and cutting_process.total_fabric_used > 0 %}<span class="me-3"><small class="text-success fw-bold">المستخدم فعلياً: {{ cutting_process.total_fabric_used }} متر</small></span>{% endif %}
-                    </p>
-                    {% if order.notes %}<hr><strong>ملاحظات:</strong><p>{{ order.notes }}</p>{% endif %}
-                </div>
-            </div>
-            
-            <!-- BOM Card -->
-            <div class="production-card mb-4">
-                <div class="production-card-header"><i class="fas fa-cogs me-2"></i>قائمة المواد المستخدمة (BOM)</div>
-                <div class="production-card-body">
-                    {% if order.bom_version %}
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="mb-0">تم استخدام الإصدار: <strong class="text-primary">v{{ order.bom_version.version }}</strong></h6>
-                            <a href="{% url 'production:bom_detail' order.bom_version.pk %}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="fas fa-external-link-alt me-2"></i>عرض تفاصيل BOM</a>
-                        </div>
-                        <table class="table table-sm table-striped">
-                            <thead><tr><th>المادة الخام</th><th>الكمية للقطعة</th><th>الإجمالي المطلوب</th><th>الوحدة</th></tr></thead>
-                            <tbody>{% for item in order.bom_version.items.all %}<tr><td>{{ item.material.name }}</td><td>{{ item.quantity|floatformat:3 }}</td><td>{{ item.quantity|multiply:order.quantity_ordered|floatformat:2 }}</td><td>{{ item.material.unit|default:'قطعة' }}</td></tr>{% endfor %}</tbody>
-                        </table>
-                    {% else %}<div class="alert alert-secondary text-center"><i class="fas fa-info-circle fa-2x mb-2"></i><h5 class="alert-heading">لم يتم ربط BOM بعد</h5><p>سيتم ربط قائمة المواد تلقائياً عند اعتماد هذا الأمر.</p></div>{% endif %}
-                </div>
-            </div>
-            
-            <!-- Cutting Process Card -->
-            {% if cutting_process %}
-            <div class="production-card mb-4">
-                <div class="production-card-header d-flex justify-content-between"><span><i class="fas fa-cut me-2"></i>تفاصيل عملية القص</span><a href="{% url 'production:cutting_detail' cutting_process.pk %}" class="btn btn-sm btn-outline-secondary">عرض التفاصيل</a></div>
-                <div class="production-card-body">
-                    <div class="details-grid">
-                        <div><strong>القاص:</strong><p>{{ cutting_process.cutter.get_full_name|default:"-" }}</p></div>
-                        <div><strong>تاريخ القص:</strong><p>{{ cutting_process.cutting_date|date:"Y-m-d H:i" }}</p></div>
-                        <div><strong>إجمالي القماش المستخدم:</strong><p>{{ cutting_process.total_fabric_used }} متر</p></div>
-                        <div><strong>هدر القماش:</strong><p>{{ cutting_process.fabric_waste }} متر</p></div>
-                        <div><strong>إجمالي القطع المقصوصة:</strong><p>{{ cutting_process.total_pieces_cut }}</p></div>
-                        <div><strong>متراج القطعة:</strong><p>{{ cutting_process.single_layer_meterage|floatformat:3|default:"-" }}</p></div>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>{% block production_page_title %}تفاصيل أمر الإنتاج{% endblock %}</h1>
+            {% block production_header_actions %}
+                <div class="d-flex justify-content-end align-items-center gap-2">
+                    {% if order.status == 'draft' %}
+                    <a href="{% url 'production:order_update' order.pk %}" class="btn btn-production-outline">
+                        <i class="fas fa-edit me-1"></i> تعديل
+                    </a>
+                    {% endif %}
+                    <div class="dropdown">
+                        <button class="btn btn-production dropdown-toggle" type="button" id="orderActionsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-cogs me-1"></i> إجراءات
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="orderActionsDropdown">
+                            <li><a class="dropdown-item" href="{% url 'production:print_production_order' order.pk %}" target="_blank"><i class="fas fa-print me-2 text-info"></i> طباعة الأمر</a></li>
+                            {% if order.status == 'draft' %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#deleteConfirmationModal" data-delete-url="{% url 'production:order_delete' order.pk %}" data-item-name="أمر الإنتاج رقم {{ order.order_number }}"><i class="fas fa-trash-alt me-2"></i> حذف الأمر</a></li>
+                            {% endif %}
+                        </ul>
                     </div>
                 </div>
-            </div>
-            {% endif %}
-
-            <!-- Assembly Processes Card -->
-            {% for process in assembly_processes %}
-            <div class="production-card mb-4">
-                <div class="production-card-header d-flex justify-content-between"><span><i class="fas fa-users-cog me-2"></i>تفاصيل عملية التجميع {% if forloop.counter > 1 %}#{{ forloop.counter }}{% endif %}</span><a href="{% url 'production:assembly_detail' process.pk %}" class="btn btn-sm btn-outline-secondary">عرض التفاصيل</a></div>
-                <div class="production-card-body">
-                    <div class="details-grid">
-                        <div><strong>نوع التجميع:</strong><p>{{ process.get_assembly_type_display }}</p></div>
-                        <div><strong>المسؤول:</strong><p>{% if process.assembly_type == 'outsourced' %}{{ process.external_manufacturer.name }}{% else %}{{ process.assembler.get_full_name }}{% endif %}</p></div>
-                        <div><strong>تاريخ الإرسال:</strong><p>{{ process.start_date|date:"Y-m-d H:i" }}</p></div>
-                        <div><strong>تاريخ الاستلام:</strong><p>{{ process.actual_completion_date|date:"Y-m-d H:i"|default:"-" }}</p></div>
-                        <div><strong>الكمية المرسلة:</strong><p>{{ process.quantity_sent }}</p></div>
-                        <div><strong>الكمية المستلمة:</strong><p>{{ process.quantity_received }}</p></div>
-                        <div><strong>عدد العيوب:</strong><p>{{ process.defects_count }}</p></div>
-                        <div><strong>عدد الفاقد:</strong><p>{{ process.losses_count }}</p></div>
+            {% endblock %}
+        </div>
+        
+        {% block production_content %}
+            <!-- Workflow Panel -->
+            <div class="workflow-panel">
+                <div class="workflow-header">
+                    <h4><i class="fas fa-project-diagram me-2"></i>مراحل سير عمل الأمر</h4>
+                </div>
+                {% with status_list="draft,approved,in_cutting,in_assembly,in_dyeing,in_finishing,completed"|split:"," %}
+                {% with current_index=status_list|index_of:order.status %}
+                <div class="workflow-tracker">
+                    <div class="workflow-step {% if current_index >= 2 %}completed{% endif %} {% if order.status == 'approved' %}active{% endif %}">
+                        <div class="step-icon"><i class="fas fa-check-double"></i></div>
+                        <div class="step-label">معتمد</div>
+                    </div>
+                    <div class="workflow-step {% if current_index >= 3 %}completed{% endif %} {% if order.status == 'in_cutting' %}active{% endif %}">
+                        {% if order.status == 'approved' %}<a href="{% url 'production:cutting_create' %}?order_id={{ order.pk }}" class="step-link" title="بدء عملية القص"><div class="step-icon"><i class="fas fa-cut"></i></div><div class="step-label">البدء في القص</div></a>
+                        {% elif order.cutting_process %}<a href="{% url 'production:cutting_detail' order.cutting_process.pk %}" class="step-link" title="عرض تفاصيل القص"><div class="step-icon"><i class="fas fa-cut"></i></div><div class="step-label">قص</div></a>
+                        {% else %}<div class="step-icon"><i class="fas fa-cut"></i></div><div class="step-label">قص</div>{% endif %}
+                    </div>
+                    <div class="workflow-step {% if current_index >= 4 %}completed{% endif %} {% if order.status == 'in_assembly' %}active{% endif %}">
+                        {% if order.status == 'in_assembly' and not order.assembly_processes.exists %}<a href="{% url 'production:assembly_create' %}?order_id={{ order.pk }}" class="step-link" title="بدء عملية التجميع"><div class="step-icon"><i class="fas fa-users-cog"></i></div><div class="step-label">البدء في التجميع</div></a>
+                        {% elif order.assembly_processes.exists %}<a href="{% url 'production:assembly_detail' order.assembly_processes.first.pk %}" class="step-link" title="عرض تفاصيل التجميع"><div class="step-icon"><i class="fas fa-users-cog"></i></div><div class="step-label">تجميع</div></a>
+                        {% else %}<div class="step-icon"><i class="fas fa-users-cog"></i></div><div class="step-label">تجميع</div>{% endif %}
+                    </div>
+                    <div class="workflow-step {% if current_index >= 5 %}completed{% endif %} {% if order.status == 'in_dyeing' %}active{% endif %}">
+                        {% with assembly_process=order.assembly_processes.first %}{% if order.status == 'in_dyeing' and assembly_process and not assembly_process.dyeing_processes.exists %}<a href="{% url 'production:dyeing_create' %}?assembly_id={{ assembly_process.pk }}" class="step-link" title="بدء عملية الصباغة"><div class="step-icon"><i class="fas fa-palette"></i></div><div class="step-label">البدء في الصباغة</div></a>
+                        {% elif assembly_process and assembly_process.dyeing_processes.exists %}<a href="{% url 'production:dyeing_detail' assembly_process.dyeing_processes.first.pk %}" class="step-link" title="عرض تفاصيل الصباغة"><div class="step-icon"><i class="fas fa-palette"></i></div><div class="step-label">صباغة</div></a>
+                        {% else %}<div class="step-icon"><i class="fas fa-palette"></i></div><div class="step-label">صباغة</div>{% endif %}{% endwith %}
+                    </div>
+                    <div class="workflow-step {% if current_index >= 6 %}completed{% endif %} {% if order.status == 'in_finishing' %}active{% endif %}">
+                        {% with dyeing_process=order.assembly_processes.first.dyeing_processes.first %}{% if order.status == 'in_finishing' and dyeing_process and not dyeing_process.finishing_process %}<a href="{% url 'production:finishing_create' %}?dyeing_id={{ dyeing_process.pk }}" class="step-link" title="بدء عملية التشطيب"><div class="step-icon"><i class="fas fa-tshirt"></i></div><div class="step-label">البدء في التشطيب</div></a>
+                        {% elif dyeing_process.finishing_process %}<a href="{% url 'production:finishing_detail' dyeing_process.finishing_process.pk %}" class="step-link" title="عرض تفاصيل التشطيب"><div class="step-icon"><i class="fas fa-tshirt"></i></div><div class="step-label">تشطيب</div></a>
+                        {% else %}<div class="step-icon"><i class="fas fa-tshirt"></i></div><div class="step-label">تشطيب</div>{% endif %}{% endwith %}
+                    </div>
+                    <div class="workflow-step {% if order.status == 'completed' %}completed active{% endif %}">
+                        <div class="step-icon"><i class="fas fa-star"></i></div>
+                        <div class="step-label">مكتمل</div>
                     </div>
                 </div>
-            </div>
-            
-                <!-- Nested Dyeing and Finishing Cards -->
-                {% for dyeing in process.dyeing_processes.all %}
-                <div class="production-card mb-4 ms-4 border-start border-info border-3">
-                    <div class="production-card-header d-flex justify-content-between"><span><i class="fas fa-palette me-2"></i>تفاصيل عملية الصباغة</span><a href="{% url 'production:dyeing_detail' dyeing.pk %}" class="btn btn-sm btn-outline-secondary">عرض التفاصيل</a></div>
-                    <div class="production-card-body">
-                        <div class="details-grid">
-                            <div><strong>مصنع الصباغة:</strong><p>{{ dyeing.dyeing_facility.name }}</p></div>
-                            <div><strong>اللون:</strong><p>{{ dyeing.color_specification }}</p></div>
-                            <div><strong>تاريخ الإرسال:</strong><p>{{ dyeing.sent_date|date:"Y-m-d H:i" }}</p></div>
-                            <div><strong>تاريخ الاستلام:</strong><p>{{ dyeing.actual_return_date|date:"Y-m-d H:i"|default:"-" }}</p></div>
-                            <div><strong>الكمية المرسلة:</strong><p>{{ dyeing.quantity_sent }}</p></div>
-                            <div><strong>الكمية المستلمة:</strong><p>{{ dyeing.quantity_received }}</p></div>
-                            <div><strong>عدد الفاقد:</strong><p>{{ dyeing.losses_count }}</p></div>
-                            <div><strong>التكلفة الإجمالية:</strong><p>{{ dyeing.total_dyeing_cost }}</p></div>
-                        </div>
-                    </div>
+                <div class="workflow-action-box">
+                    {% if order.status == 'draft' %}<h5 class="mb-2"><i class="fas fa-file-alt me-2"></i>الحالة الحالية: مسودة</h5><p class="text-muted">هذا الأمر جاهز للاعتماد. بالضغط على الزر سيتم حجز المواد والبدء في تجهيز الإنتاج.</p><form action="{% url 'production:order_approve' order.pk %}" method="post" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-lg btn-success"><i class="fas fa-check-circle me-2"></i>اعتماد الأمر الآن</button></form>
+                    {% elif order.status == 'approved' %}<h5 class="mb-2"><i class="fas fa-check-double me-2 text-success"></i>الحالة الحالية: معتمد</h5><p class="text-muted">تم اعتماد هذا الأمر بنجاح. الخطوة التالية هي بدء عملية القص. اضغط على أيقونة "البدء في القص" أعلاه للمتابعة.</p>
+                    {% elif order.status == 'completed' %}<h5 class="mb-2"><i class="fas fa-star me-2 text-warning"></i>الحالة الحالية: مكتمل</h5><p class="text-muted">تم إكمال جميع مراحل الإنتاج لهذا الأمر بنجاح.</p>
+                    {% else %}<h5 class="mb-2"><i class="fas fa-tasks me-2"></i>الحالة الحالية: <span class="text-primary">{{ order.get_status_display }}</span></h5><p class="text-muted">الأمر قيد التنفيذ حالياً. اضغط على أيقونة المرحلة الحالية لعرض تفاصيلها، أو أيقونة المرحلة التالية لبدء العمل عليها.</p>{% endif %}
                 </div>
+                {% endwith %}{% endwith %}
+            </div>
 
-                    {% if dyeing.finishing_process %}
-                    {% with finishing=dyeing.finishing_process %}
-                    <div class="production-card mb-4 ms-5 border-start border-success border-3">
-                        <div class="production-card-header d-flex justify-content-between"><span><i class="fas fa-tshirt me-2"></i>تفاصيل عملية التشطيب</span><a href="{% url 'production:finishing_detail' finishing.pk %}" class="btn btn-sm btn-outline-secondary">عرض التفاصيل</a></div>
+            <div class="row">
+                <!-- Main Details Column -->
+                <div class="col-lg-8">
+                    <!-- Basic Info Card -->
+                    <div class="production-card mb-4">
+                        <div class="production-card-header d-flex justify-content-between"><span>المعلومات الأساسية</span></div>
                         <div class="production-card-body">
                             <div class="details-grid">
-                                <div><strong>نوع التشطيب:</strong><p>{{ finishing.get_finishing_type_display }}</p></div>
-                                <div><strong>المسؤول:</strong><p>{% if finishing.finishing_type == 'outsourced' %}{{ finishing.external_manufacturer.name }}{% else %}{{ finishing.finisher.get_full_name }}{% endif %}</p></div>
-                                <div><strong>تاريخ البدء:</strong><p>{{ finishing.start_date|date:"Y-m-d H:i" }}</p></div>
-                                <div><strong>تاريخ الانتهاء:</strong><p>{{ finishing.actual_completion_date|date:"Y-m-d H:i"|default:"-" }}</p></div>
-                                <div><strong>الكمية المدخلة:</strong><p>{{ finishing.quantity_input }}</p></div>
-                                <div><strong>الكمية المخرجة:</strong><p>{{ finishing.quantity_output }}</p></div>
-                                <div><strong>عيوب التشطيب:</strong><p>{{ finishing.defects_in_finishing }}</p></div>
-                                <div><strong>المخزن النهائي:</strong><p>{{ finishing.destination_warehouse.name|default:"-" }}</p></div>
+                                <div><strong>رقم الأمر:</strong><p>{{ order.order_number }}</p></div>
+                                <div><strong>رقم الباتش:</strong><p>{{ order.batch_number }}</p></div>
+                                <div><strong>المنتج:</strong><p><a href="#">{{ order.product.name }}</a></p></div>
+                                <div><strong>الكمية المطلوبة:</strong><p>{{ order.quantity_ordered }} قطعة</p></div>
+                                
+                                <!-- ================== SIZES BLOCK ================== -->
+                                {% if order.bom_version and order.bom_version.size_group and order.bom_version.size_group.sizes %}
+                                <div>
+                                    <strong>المقاسات:</strong>
+                                    <div class="d-flex flex-wrap align-items-center gap-1 mt-1">
+                                        {% for size in order.bom_version.size_group.sizes %}
+                                            <span class="badge bg-info-soft text-info-dark fs-sm fw-semibold px-2 py-1">{{ size }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                                <!-- ================== END SIZES BLOCK ================== -->
+                                
+                                <div><strong>الأولوية:</strong><p><span class="badge bg-{{ order.priority|status_color }}">{{ order.get_priority_display }}</span></p></div>
+                                <div><strong>تاريخ البدء:</strong><p>{{ order.start_date|date:"Y-m-d" }}</p></div>
+                                <div><strong>الإنجاز المتوقع:</strong><p>{{ order.expected_completion_date|date:"Y-m-d" }}</p></div>
+                                {% if order.actual_completion_date %}<div><strong>الإنجاز الفعلي:</strong><p class="text-success">{{ order.actual_completion_date|date:"Y-m-d" }}</p></div>{% endif %}
+                            </div>
+                            <hr>
+                            <strong>تفاصيل القماش:</strong>
+                            <p class="mb-0 lh-sm">
+                                <span class="me-3"><i class="fas fa-layer-group text-muted"></i> {{ order.textile_stock.product.name }}</span>
+                                <span class="me-3"><small class="text-muted">المخصص: {{ order.fabric_meters_allocated }} متر</small></span>
+                                {% if cutting_process and cutting_process.total_fabric_used > 0 %}<span class="me-3"><small class="text-success fw-bold">المستخدم فعلياً: {{ cutting_process.total_fabric_used }} متر</small></span>{% endif %}
+                            </p>
+                            {% if order.notes %}<hr><strong>ملاحظات:</strong><p>{{ order.notes }}</p>{% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- BOM Card -->
+                    <div class="production-card mb-4">
+                        <div class="production-card-header"><i class="fas fa-cogs me-2"></i>قائمة المواد المستخدمة (BOM)</div>
+                        <div class="production-card-body">
+                            {% if order.bom_version %}
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="mb-0">تم استخدام الإصدار: <strong class="text-primary">v{{ order.bom_version.version }}</strong></h6>
+                                    <a href="{% url 'production:bom_detail' order.bom_version.pk %}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="fas fa-external-link-alt me-2"></i>عرض تفاصيل BOM</a>
+                                </div>
+                                <table class="table table-sm table-striped">
+                                    <thead><tr><th>المادة الخام</th><th>الكمية للقطعة</th><th>الإجمالي المطلوب</th><th>الوحدة</th></tr></thead>
+                                    <tbody>{% for item in order.bom_version.items.all %}<tr><td>{{ item.material.name }}</td><td>{{ item.quantity|floatformat:3 }}</td><td>{{ item.quantity|multiply:order.quantity_ordered|floatformat:2 }}</td><td>{{ item.material.unit|default:'قطعة' }}</td></tr>{% endfor %}</tbody>
+                                </table>
+                            {% else %}<div class="alert alert-secondary text-center"><i class="fas fa-info-circle fa-2x mb-2"></i><h5 class="alert-heading">لم يتم ربط BOM بعد</h5><p>سيتم ربط قائمة المواد تلقائياً عند اعتماد هذا الأمر.</p></div>{% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Cutting Process Card -->
+                    {% if cutting_process %}
+                    <div class="production-card mb-4">
+                        <div class="production-card-header d-flex justify-content-between"><span><i class="fas fa-cut me-2"></i>تفاصيل عملية القص</span><a href="{% url 'production:cutting_detail' cutting_process.pk %}" class="btn btn-sm btn-outline-secondary">عرض التفاصيل</a></div>
+                        <div class="production-card-body">
+                            <div class="details-grid">
+                                <div><strong>القاص:</strong><p>{{ cutting_process.cutter.get_full_name|default:"-" }}</p></div>
+                                <div><strong>تاريخ القص:</strong><p>{{ cutting_process.cutting_date|date:"Y-m-d H:i" }}</p></div>
+                                <div><strong>إجمالي القماش المستخدم:</strong><p>{{ cutting_process.total_fabric_used }} متر</p></div>
+                                <div><strong>هدر القماش:</strong><p>{{ cutting_process.fabric_waste }} متر</p></div>
+                                <div><strong>إجمالي القطع المقصوصة:</strong><p>{{ cutting_process.total_pieces_cut }}</p></div>
+                                <div><strong>متراج القطعة:</strong><p>{{ cutting_process.single_layer_meterage|floatformat:3|default:"-" }}</p></div>
                             </div>
                         </div>
                     </div>
-                    {% endwith %}
                     {% endif %}
-                {% endfor %}
-            {% endfor %}
-        </div>
 
-        <!-- Sidebar Column -->
-        <div class="col-lg-4">
-            <!-- Admin Info Card -->
-            <div class="production-card mb-4">
-                <div class="production-card-header">معلومات إدارية</div>
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item"><strong>تم الإنشاء بواسطة:</strong> {{ order.created_by.username }}</li>
-                    <li class="list-group-item"><strong>تاريخ الإنشاء:</strong> {{ order.created_at|date:"Y-m-d H:i" }}</li>
-                    {% if order.approved_by %}<li class="list-group-item"><strong>تم الاعتماد بواسطة:</strong> {{ order.approved_by.username }}</li><li class="list-group-item"><strong>تاريخ الاعتماد:</strong> {{ order.approved_at|date:"Y-m-d H:i" }}</li>{% endif %}
-                </ul>
-            </div>
-
-            <!-- Cost Analysis Card -->
-            {% if cost_analysis %}
-            <div class="production-card mb-4">
-                <div class="production-card-header d-flex justify-content-between"><span><i class="fas fa-calculator me-2"></i>تحليل التكلفة</span><a href="{% url 'production:cost_analysis_detail' cost_analysis.pk %}" class="btn btn-sm btn-outline-secondary">عرض التفاصيل</a></div>
-                <div class="production-card-body">
-                    <div class="details-grid">
-                        <div><strong>إجمالي التكلفة:</strong><p class="fw-bold text-primary">{{ cost_analysis.total_production_cost|floatformat:2 }}</p></div>
-                        <div><strong>تكلفة القطعة:</strong><p class="fw-bold text-success">{{ cost_analysis.cost_per_piece|floatformat:2 }}</p></div>
+                    <!-- Assembly Processes Card -->
+                    {% for process in assembly_processes %}
+                    <div class="production-card mb-4">
+                        <div class="production-card-header d-flex justify-content-between"><span><i class="fas fa-users-cog me-2"></i>تفاصيل عملية التجميع {% if forloop.counter > 1 %}#{{ forloop.counter }}{% endif %}</span><a href="{% url 'production:assembly_detail' process.pk %}" class="btn btn-sm btn-outline-secondary">عرض التفاصيل</a></div>
+                        <div class="production-card-body">
+                            <div class="details-grid">
+                                <div><strong>نوع التجميع:</strong><p>{{ process.get_assembly_type_display }}</p></div>
+                                <div><strong>المسؤول:</strong><p>{% if process.assembly_type == 'outsourced' %}{{ process.external_manufacturer.name }}{% else %}{{ process.assembler.get_full_name }}{% endif %}</p></div>
+                                <div><strong>تاريخ الإرسال:</strong><p>{{ process.start_date|date:"Y-m-d H:i" }}</p></div>
+                                <div><strong>تاريخ الاستلام:</strong><p>{{ process.actual_completion_date|date:"Y-m-d H:i"|default:"-" }}</p></div>
+                                <div><strong>الكمية المرسلة:</strong><p>{{ process.quantity_sent }}</p></div>
+                                <div><strong>الكمية المستلمة:</strong><p>{{ process.quantity_received }}</p></div>
+                                <div><strong>عدد العيوب:</strong><p>{{ process.defects_count }}</p></div>
+                                <div><strong>عدد الفاقد:</strong><p>{{ process.losses_count }}</p></div>
+                            </div>
+                        </div>
                     </div>
+                    
+                        <!-- Nested Dyeing and Finishing Cards -->
+                        {% for dyeing in process.dyeing_processes.all %}
+                        <div class="production-card mb-4 ms-4 border-start border-info border-3">
+                            <div class="production-card-header d-flex justify-content-between"><span><i class="fas fa-palette me-2"></i>تفاصيل عملية الصباغة</span><a href="{% url 'production:dyeing_detail' dyeing.pk %}" class="btn btn-sm btn-outline-secondary">عرض التفاصيل</a></div>
+                            <div class="production-card-body">
+                                <div class="details-grid">
+                                    <div><strong>مصنع الصباغة:</strong><p>{{ dyeing.dyeing_facility.name }}</p></div>
+                                    <div><strong>اللون:</strong><p>{{ dyeing.color_specification }}</p></div>
+                                    <div><strong>تاريخ الإرسال:</strong><p>{{ dyeing.sent_date|date:"Y-m-d H:i" }}</p></div>
+                                    <div><strong>تاريخ الاستلام:</strong><p>{{ dyeing.actual_return_date|date:"Y-m-d H:i"|default:"-" }}</p></div>
+                                    <div><strong>الكمية المرسلة:</strong><p>{{ dyeing.quantity_sent }}</p></div>
+                                    <div><strong>الكمية المستلمة:</strong><p>{{ dyeing.quantity_received }}</p></div>
+                                    <div><strong>عدد الفاقد:</strong><p>{{ dyeing.losses_count }}</p></div>
+                                    <div><strong>التكلفة الإجمالية:</strong><p>{{ dyeing.total_dyeing_cost }}</p></div>
+                                </div>
+                            </div>
+                        </div>
+
+                            {% if dyeing.finishing_process %}
+                            {% with finishing=dyeing.finishing_process %}
+                            <div class="production-card mb-4 ms-5 border-start border-success border-3">
+                                <div class="production-card-header d-flex justify-content-between"><span><i class="fas fa-tshirt me-2"></i>تفاصيل عملية التشطيب</span><a href="{% url 'production:finishing_detail' finishing.pk %}" class="btn btn-sm btn-outline-secondary">عرض التفاصيل</a></div>
+                                <div class="production-card-body">
+                                    <div class="details-grid">
+                                        <div><strong>نوع التشطيب:</strong><p>{{ finishing.get_finishing_type_display }}</p></div>
+                                        <div><strong>المسؤول:</strong><p>{% if finishing.finishing_type == 'outsourced' %}{{ finishing.external_manufacturer.name }}{% else %}{{ finishing.finisher.get_full_name }}{% endif %}</p></div>
+                                        <div><strong>تاريخ البدء:</strong><p>{{ finishing.start_date|date:"Y-m-d H:i" }}</p></div>
+                                        <div><strong>تاريخ الانتهاء:</strong><p>{{ finishing.actual_completion_date|date:"Y-m-d H:i"|default:"-" }}</p></div>
+                                        <div><strong>الكمية المدخلة:</strong><p>{{ finishing.quantity_input }}</p></div>
+                                        <div><strong>الكمية المخرجة:</strong><p>{{ finishing.quantity_output }}</p></div>
+                                        <div><strong>عيوب التشطيب:</strong><p>{{ finishing.defects_in_finishing }}</p></div>
+                                        <div><strong>المخزن النهائي:</strong><p>{{ finishing.destination_warehouse.name|default:"-" }}</p></div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endwith %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+
+                <!-- Sidebar Column -->
+                <div class="col-lg-4">
+                    <!-- Admin Info Card -->
+                    <div class="production-card mb-4">
+                        <div class="production-card-header">معلومات إدارية</div>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item"><strong>تم الإنشاء بواسطة:</strong> {{ order.created_by.username }}</li>
+                            <li class="list-group-item"><strong>تاريخ الإنشاء:</strong> {{ order.created_at|date:"Y-m-d H:i" }}</li>
+                            {% if order.approved_by %}<li class="list-group-item"><strong>تم الاعتماد بواسطة:</strong> {{ order.approved_by.username }}</li><li class="list-group-item"><strong>تاريخ الاعتماد:</strong> {{ order.approved_at|date:"Y-m-d H:i" }}</li>{% endif %}
+                        </ul>
+                    </div>
+
+                    <!-- ================== PRODUCTION SUMMARY CARD (FIXED) ================== -->
+                    <div class="production-card mb-4">
+                        <div class="production-card-header"><i class="fas fa-chart-pie me-2"></i>ملخص الإنتاج</div>
+                        <div class="production-card-body p-3">
+                            <div class="summary-item">
+                                <span class="summary-label"><i class="fas fa-box-open me-2 text-muted"></i>الكمية المطلوبة</span>
+                                <span class="summary-value"><span class="badge bg-primary">{{ order.quantity_ordered }}</span></span>
+                            </div>
+                            {% if cutting_process %}
+                            <div class="summary-item">
+                                <span class="summary-label"><i class="fas fa-cut me-2 text-muted"></i>الكمية المقصوصة</span>
+                                <span class="summary-value"><span class="badge bg-secondary">{{ cutting_process.total_pieces_cut|default:"0" }}</span></span>
+                            </div>
+                            {% endif %}
+                            {% with assembly_process=assembly_processes.first %}
+                            {% if assembly_process %}
+                            <div class="summary-item">
+                                <span class="summary-label"><i class="fas fa-users-cog me-2 text-muted"></i>الكمية المجمعة</span>
+                                <span class="summary-value"><span class="badge bg-info">{{ assembly_process.quantity_received|default:"0" }}</span></span>
+                            </div>
+                                {% with dyeing_process=assembly_process.dyeing_processes.first %}
+                                {% if dyeing_process %}
+                                <div class="summary-item">
+                                    <span class="summary-label"><i class="fas fa-palette me-2 text-muted"></i>الكمية المصبوغة</span>
+                                    <span class="summary-value"><span class="badge bg-warning text-dark">{{ dyeing_process.quantity_received|default:"0" }}</span></span>
+                                </div>
+                                    {% if dyeing_process.finishing_process %}
+                                    {% with finishing_process=dyeing_process.finishing_process %}
+                                    <div class="summary-item">
+                                        <span class="summary-label"><i class="fas fa-tshirt me-2 text-muted"></i>الكمية النهائية</span>
+                                        <span class="summary-value"><span class="badge bg-success">{{ finishing_process.quantity_output|default:"0" }}</span></span>
+                                    </div>
+                                    {% endwith %}
+                                    {% endif %}
+                                {% endif %}
+                                {% endwith %}
+                            {% endif %}
+                            {% endwith %}
+                        </div>
+                    </div>
+                    <!-- ================== END PRODUCTION SUMMARY CARD ================== -->
+
+                    <!-- Cost Analysis Card -->
+                    {% if cost_analysis %}
+                    <div class="production-card mb-4">
+                        <div class="production-card-header d-flex justify-content-between"><span><i class="fas fa-calculator me-2"></i>تحليل التكلفة</span><a href="{% url 'production:cost_analysis_detail' cost_analysis.pk %}" class="btn btn-sm btn-outline-secondary">عرض التفاصيل</a></div>
+                        <div class="production-card-body">
+                            <div class="details-grid">
+                                <div><strong>إجمالي التكلفة:</strong><p class="fw-bold text-primary">{{ cost_analysis.total_production_cost|floatformat:2 }}</p></div>
+                                <div><strong>تكلفة القطعة:</strong><p class="fw-bold text-success">{{ cost_analysis.cost_per_piece|floatformat:2 }}</p></div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
-            {% endif %}
-        </div>
-    </div>
-{% endblock %}
+        {% endblock %}
+    </main>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

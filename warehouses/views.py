@@ -42,15 +42,56 @@ except (ImportError, AppRegistryNotReady):
 
 class WarehouseDashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'warehouses/dashboard.html'
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+
+        # Eager load related data for efficiency
+        all_stock = StockItem.objects.filter(product__is_active=True).select_related('product', 'warehouse')
+
+        # Calculate total stock value in Python to handle potential Decimal/float issues
+        total_stock_value = sum(item.total_value for item in all_stock)
+        
+        # Stock distribution by product type
+        stock_by_type = all_stock.values('product__product_type').annotate(
+            total_value=Sum(F('quantity') * F('product__cost_price'))
+        ).order_by('-total_value')
+
+        product_type_display = dict(Product.PRODUCT_TYPES)
+        stock_by_type_data = {
+            "labels": [product_type_display.get(item['product__product_type'], 'غير معروف') for item in stock_by_type],
+            "values": [float(item['total_value'] or 0) for item in stock_by_type]
+        }
+
+        # Top 5 most valuable products (calculated in Python for flexibility)
+        top_value_products = sorted(
+            [item for item in all_stock if item.total_value > 0], 
+            key=lambda x: x.total_value, 
+            reverse=True
+        )[:5]
+        
+        for p in top_value_products:
+            p.percentage_of_total = (p.total_value / total_stock_value * 100) if total_stock_value > 0 else 0
+
+        # Top 5 warehouses by stock value
+        top_warehouses = Warehouse.objects.filter(is_active=True).annotate(
+            value=Sum(F('stock_items__quantity') * F('stock_items__product__cost_price'))
+        ).filter(value__gt=0).order_by('-value')[:5]
+
+        top_warehouses_data = {
+            "labels": [w.name for w in top_warehouses],
+            "values": [float(w.value or 0) for w in top_warehouses]
+        }
+
         context.update({
-            'total_warehouses': Warehouse.objects.filter(is_active=True).count(),
             'total_products': Product.objects.filter(is_active=True).count(),
-            'low_stock_items': StockItem.objects.filter(quantity__lte=F('product__min_stock_level')).count(),
+            'low_stock_items': all_stock.filter(quantity__lte=F('product__min_stock_level'), quantity__gt=0).count(),
             'pending_transfers': StockTransfer.objects.filter(status='pending').count(),
-            'recent_movements': StockMovement.objects.select_related('stock_item__product', 'created_by')[:10],
+            'recent_movements': StockMovement.objects.select_related('stock_item__product', 'stock_item__warehouse').order_by('-created_at')[:10],
+            'total_stock_value': total_stock_value,
+            'top_value_products': top_value_products,
+            'stock_by_type_json': json.dumps(stock_by_type_data, ensure_ascii=False),
+            'top_warehouses_json': json.dumps(top_warehouses_data, ensure_ascii=False),
         })
         return context
 

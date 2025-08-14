@@ -28,6 +28,24 @@
             "roles": ["*"]
         }
     },
+    "crm": {
+    "title": "إدارة علاقات العملاء",
+    "icon": "fas fa-users",
+    "roles": ["admin", "manager", "employee"],
+    "submenu": {
+        "قائمة العملاء": {
+            "url_name": "crm:customer_list",
+            "icon": "fas fa-list-ul",
+            "roles": ["admin", "manager", "employee"]
+        },
+        "إضافة عميل جديد": {
+            "url_name": "crm:customer_create",
+            "icon": "fas fa-user-plus",
+            "roles": ["admin", "manager", "employee"]
+        }
+    }
+},
+
     "الموردين": {
         "title": "الموردين",
         "icon": "fas fa-truck",

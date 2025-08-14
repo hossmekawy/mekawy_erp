@@ -5,6 +5,8 @@ app_name = 'dashboard'
 
 urlpatterns = [
     path('', views.index, name='index'),
+    path('ajax/product-search/', views.product_search_ajax, name='product_search_ajax'),
+
     path('reports/sales/', views.sales_report, name='sales_report'),
     path('reports/inventory/', views.inventory_report, name='inventory_report'),
     path('reports/production/', views.production_report, name='production_report'),

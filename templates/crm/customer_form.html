@@ -1,0 +1,278 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block production_title %}{% if form.instance.pk %}تعديل عميل{% else %}إضافة عميل جديد{% endif %}{% endblock %}
+
+{% block production_page_title %}{% if form.instance.pk %}تعديل بيانات العميل{% else %}إضافة عميل جديد{% endif %}{% endblock %}
+
+{% block production_content %}
+<form method="post" novalidate id="customer-form">
+    {% csrf_token %}
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Customer Information Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-user-circle me-2"></i>معلومات العميل</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.name.label }}</label>
+                            {% render_field form.name class+="form-control" %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.customer_type.label }}</label>
+                            {% render_field form.customer_type class+="form-select" %}
+                        </div>
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">{{ form.phone_number.label }}</label>
+                            <div class="input-group">
+                                <select id="phone_code_select" class="form-select" style="max-width: 120px;">
+                                    <!-- Phone codes will be populated by JS -->
+                                </select>
+                                <input type="text" id="id_phone_number_input" class="form-control" placeholder="1012345678">
+                            </div>
+                             {{ form.phone_number.as_hidden }}
+                        </div>
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">{{ form.email.label }}</label>
+                            {% render_field form.email class+="form-control" %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Company Information Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-building me-2"></i>معلومات الشركة (اختياري)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.company_name.label }}</label>
+                            {% render_field form.company_name class+="form-control" %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.tax_id.label }}</label>
+                            {% render_field form.tax_id class+="form-control" %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Address Information Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>العنوان</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.address_line_1.label }}</label>
+                        {% render_field form.address_line_1 class+="form-control" %}
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label" for="id_country_select">{{ form.country.label }}</label>
+                            <select id="id_country_select" class="form-select">
+                                <option value="">--- تحميل الدول ---</option>
+                            </select>
+                            {{ form.country.as_hidden }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label" for="id_governorate_select">{{ form.governorate.label }}</label>
+                            <select id="id_governorate_select" class="form-select" disabled>
+                                <option value="">--- اختر محافظة ---</option>
+                            </select>
+                            {{ form.governorate.as_hidden }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label" for="id_city_input">{{ form.city.label }}</label>
+                            <input type="text" id="id_city_input" class="form-control" value="{{ form.city.value|default:'' }}">
+                             {{ form.city.as_hidden }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Notes and Status Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-cog me-2"></i>إعدادات</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.notes.label }}</label>
+                        {% render_field form.notes class+="form-control" %}
+                    </div>
+                    <div class="form-check form-switch">
+                        {% render_field form.is_active class+="form-check-input" %}
+                        <label class="form-check-label" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-4 d-flex justify-content-end">
+        <a href="{% if form.instance.pk %}{% url 'crm:customer_detail' form.instance.pk %}{% else %}{% url 'crm:customer_list' %}{% endif %}" class="btn btn-secondary me-2">إلغاء</a>
+        <button type="submit" class="btn btn-primary">حفظ</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block production_extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const mainForm = document.getElementById('customer-form');
+    const phoneCodeSelect = document.getElementById('phone_code_select');
+    const phoneInput = document.getElementById('id_phone_number_input');
+    const countrySelect = document.getElementById('id_country_select');
+    const governorateSelect = document.getElementById('id_governorate_select');
+    const cityInput = document.getElementById('id_city_input');
+    
+    const hiddenPhoneNumberInput = document.querySelector('input[name="{{ form.phone_number.name }}"]');
+    const hiddenCountryInput = document.querySelector('input[name="{{ form.country.name }}"]');
+    const hiddenGovernorateInput = document.querySelector('input[name="{{ form.governorate.name }}"]');
+    const hiddenCityInput = document.querySelector('input[name="{{ form.city.name }}"]');
+
+    const apiKey = "RDBzSmhwMTlJVTQ3OHhlOG5OTWM0azFSTXd2WG05ejg2SHN2dzE2dw==";
+    const headers = new Headers();
+    headers.append("X-CSCAPI-KEY", apiKey);
+    const requestOptions = { method: 'GET', headers: headers, redirect: 'follow' };
+
+    let allCountries = [];
+    const egyptianGovernorates = [
+        "القاهرة", "الجيزة", "الأسكندرية", "الدقهلية", "الشرقية", "المنوفية", "القليوبية", "البحيرة", "الغربية", "بور سعيد",
+        "دمياط", "الإسماعيلية", "السويس", "كفر الشيخ", "الفيوم", "بني سويف", "مطروح", "شمال سيناء", "جنوب سيناء",
+        "المنيا", "أسيوط", "سوهاج", "قنا", "الأقصر", "أسوان", "البحر الأحمر", "الوادي الجديد"
+    ];
+
+    // --- Fetch and Store Countries ---
+    fetch("https://api.countrystatecity.in/v1/countries", requestOptions)
+        .then(response => response.json())
+        .then(countries => {
+            allCountries = countries;
+            let countryOptions = "";
+            let phoneCodeOptions = "";
+
+            countries.sort((a, b) => a.name.localeCompare(b.name)).forEach(country => {
+                const isSelected = country.iso2 === 'EG' ? 'selected' : '';
+                countryOptions += `<option value="${country.iso2}" data-phonecode="${country.phonecode}" data-name="${country.name}" ${isSelected}>${country.name}</option>`;
+                if (country.phonecode) {
+                    phoneCodeOptions += `<option value="${country.iso2}" data-phonecode="${country.phonecode}" ${isSelected}>${country.emoji} +${country.phonecode}</option>`;
+                }
+            });
+            countrySelect.innerHTML = countryOptions;
+            phoneCodeSelect.innerHTML = phoneCodeOptions;
+
+            const initialCountry = "{{ form.country.value|escapejs }}";
+            if(initialCountry){
+                 for(let i=0; i < countrySelect.options.length; i++) {
+                    if(countrySelect.options[i].getAttribute('data-name') === initialCountry) {
+                        countrySelect.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+            countrySelect.dispatchEvent(new Event('change'));
+
+            const initialPhoneNumber = "{{ form.phone_number.value|escapejs }}";
+            if (initialPhoneNumber) {
+                const phoneCodeOption = Array.from(phoneCodeSelect.options).find(opt => initialPhoneNumber.startsWith("+" + opt.dataset.phonecode));
+                if (phoneCodeOption) {
+                    phoneCodeSelect.value = phoneCodeOption.value;
+                    phoneInput.value = initialPhoneNumber.substring(1 + phoneCodeOption.dataset.phonecode.length);
+                }
+            }
+
+        })
+        .catch(error => console.error('Error fetching countries:', error));
+
+    // --- Event Listener for Phone Input ---
+    phoneInput.addEventListener('keyup', function() {
+        const phoneValue = this.value.replace(/\s+/g, '');
+        if (phoneValue.startsWith('+')) {
+            const potentialCode = phoneValue.substring(1, 5); // Check up to 4 digits for code
+            for (let i = potentialCode.length; i > 0; i--) {
+                const code = potentialCode.substring(0, i);
+                const country = allCountries.find(c => c.phonecode === code);
+                if (country) {
+                    countrySelect.value = country.iso2;
+                    countrySelect.dispatchEvent(new Event('change'));
+                    return;
+                }
+            }
+        }
+    });
+
+    // --- Event Listener for Country Change ---
+    countrySelect.addEventListener('change', function() {
+        const countryIso = this.value;
+        const selectedOption = this.options[this.selectedIndex];
+        const countryName = selectedOption ? selectedOption.getAttribute('data-name') : '';
+        if(hiddenCountryInput) hiddenCountryInput.value = countryName;
+
+        governorateSelect.innerHTML = '<option value="">--- اختر محافظة ---</option>';
+        cityInput.value = "";
+        cityInput.disabled = true;
+        governorateSelect.disabled = true;
+
+        if (countryIso === 'EG') {
+            let stateOptions = '<option value="">--- اختر محافظة ---</option>';
+            egyptianGovernorates.sort().forEach(gov => {
+                stateOptions += `<option value="${gov}">${gov}</option>`;
+            });
+            governorateSelect.innerHTML = stateOptions;
+            governorateSelect.disabled = false;
+            cityInput.disabled = false;
+
+            const initialGovernorate = "{{ form.governorate.value|escapejs }}";
+            if (initialGovernorate) {
+                governorateSelect.value = initialGovernorate;
+            }
+        } else if (countryIso) {
+            // For other countries, we can still fetch states if needed, or just enable manual entry
+            governorateSelect.disabled = false; // Or keep it disabled if not needed
+            cityInput.disabled = false;
+        }
+    });
+    
+    phoneCodeSelect.addEventListener('change', function() {
+        countrySelect.value = this.value;
+        countrySelect.dispatchEvent(new Event('change'));
+    });
+
+    // --- Event Listeners for Governorate and City ---
+    governorateSelect.addEventListener('change', function() {
+        if(hiddenGovernorateInput) hiddenGovernorateInput.value = this.value;
+    });
+
+    cityInput.addEventListener('input', function() {
+        if(hiddenCityInput) hiddenCityInput.value = this.value;
+    });
+
+    mainForm.addEventListener('submit', function(event) {
+        const selectedCodeOption = phoneCodeSelect.options[phoneCodeSelect.selectedIndex];
+        const phoneCode = selectedCodeOption ? selectedCodeOption.dataset.phonecode : '';
+        const phoneNumber = phoneInput.value.trim().replace(/[^0-9]/g, ''); // Sanitize number
+
+        if (phoneCode && phoneNumber) {
+            hiddenPhoneNumberInput.value = `+${phoneCode}${phoneNumber}`;
+        } else if (phoneNumber) {
+            event.preventDefault();
+            showErrorToast("الرجاء اختيار رمز الدولة لرقم الهاتف.");
+        } else {
+            hiddenPhoneNumberInput.value = ''; // Clear if no number
+        }
+
+        // Update hidden city input on submit
+        if(hiddenCityInput) hiddenCityInput.value = cityInput.value;
+    });
+});
+</script>
+{% endblock %}

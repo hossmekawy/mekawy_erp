@@ -1,270 +1,169 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load i18n %}
 
-{% block title %}لوحة التحكم - Mekawy ERP{% endblock %}
+{% block title %}{% trans "لوحة التحكم" %} - Mekawy ERP{% endblock %}
 
 {% block extra_css %}
-<link href="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.css" rel="stylesheet"> 
 <style>
-    .stats-card {
-        transition: transform 0.2s ease-in-out;
-        border-left: 4px solid var(--primary-color);
+    :root {
+        --primary-gradient: linear-gradient(45deg, #4e73df, #224abe);
+        --success-gradient: linear-gradient(45deg, #1cc88a, #13855c);
+        --info-gradient: linear-gradient(45deg, #36b9cc, #2a96a5);
+        --warning-gradient: linear-gradient(45deg, #f6c23e, #dda20a);
+        --purple-gradient: linear-gradient(45deg, #6f42c1, #5a32a3);
     }
+    body { text-align: right; }
+    .stats-card { position: relative; overflow: hidden; border: none; border-radius: 0.75rem; box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1); transition: transform 0.3s ease, box-shadow 0.3s ease; color: white; }
+    .stats-card:hover { transform: translateY(-5px); box-shadow: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.15); }
+    .stats-card .card-body { position: relative; z-index: 2; }
+    .stats-card .icon-bg { position: absolute; left: -20px; top: 50%; transform: translateY(-50%); font-size: 5rem; color: rgba(255, 255, 255, 0.15); z-index: 1; transition: transform 0.4s ease; }
+    .stats-card:hover .icon-bg { transform: translateY(-50%) scale(1.1) rotate(5deg); }
+    .card-title-custom { font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem; }
+    .card-value { font-size: 2.25rem; font-weight: 700; }
+    .card-footer-text { font-size: 0.8rem; opacity: 0.8; }
+    .card-footer-text .fas { margin-left: 0.25rem; }
+    .chart-container { position: relative; height: 320px; width: 100%; }
+    .table-responsive { max-height: 400px; }
+    .table thead th { background-color: #f8f9fc; font-weight: 700; }
+    .badge-status { font-size: 0.8rem; padding: 0.4em 0.7em; font-weight: 600; }
+    .fas, .far, .fab { margin-left: 0.25rem; }
+    .d-sm-flex .fas { margin-left: 0.5rem; margin-right: 0; }
+    .meterage-stat-item { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid #e3e6f0; }
+    .meterage-stat-item:last-child { border-bottom: none; }
+    .meterage-stat-item .stat-label { display: flex; align-items: center; color: #5a5c69; font-weight: 600; }
+    .meterage-stat-item .stat-label i { font-size: 1.2rem; margin-left: 0.75rem; width: 20px; text-align: center; }
+    .meterage-stat-item .stat-value { font-size: 1.1rem; font-weight: 700; color: #4e73df; }
     
-    .stats-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    }
-    
-    .stats-icon {
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 24px;
-        color: white;
-    }
-    
-    .chart-container {
-        position: relative;
-        height: 300px;
-    }
-    
-    .recent-activity {
-        max-height: 400px;
+    /* Styles for AJAX search */
+    .search-container { position: relative; }
+    #product-search-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        border: 1px solid #d1d3e2;
+        border-top: none;
+        border-radius: 0 0 .35rem .35rem;
+        background-color: #fff;
+        max-height: 250px;
         overflow-y: auto;
     }
-    
-    .activity-item {
-        border-bottom: 1px solid #eee;
-        padding: 10px 0;
+    .search-result-item {
+        padding: 0.75rem 1.25rem;
+        cursor: pointer;
+        transition: background-color 0.15s ease-in-out;
     }
-    
-    .activity-item:last-child {
-        border-bottom: none;
-    }
-    
-    .badge-status {
-        font-size: 0.75rem;
-    }
+    .search-result-item:hover { background-color: #f8f9fc; }
+    .search-result-item small { color: #858796; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid">
+<div class="container-fluid" dir="rtl">
     <!-- Page Header -->
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">لوحة التحكم</h1>
-        <div>
-            <span class="text-muted">آخر تحديث: </span>
-            <span class="text-primary">{{ "now"|date:"Y-m-d H:i" }}</span>
+        <h1 class="h3 mb-0 text-gray-800">{% trans "لوحة التحكم الرئيسية" %}</h1>
+        <div class="d-none d-sm-inline-block">
+            <i class="fas fa-calendar-alt fa-fw text-gray-400 ms-1"></i>
+            <span class="text-primary fw-bold">{{ today_date|date:"l, d F Y" }}</span>
         </div>
     </div>
 
     <!-- Statistics Cards Row -->
-    <div class="row mb-4">
-        <!-- Users Statistics -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card stats-card h-100">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                إجمالي المستخدمين
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_users }}</div>
-                            <div class="text-xs text-success">
-                                <i class="fas fa-user-plus"></i>
-                                {{ new_users_this_month }} جديد هذا الشهر
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <div class="stats-icon bg-primary">
-                                <i class="fas fa-users"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Active Users -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card stats-card h-100">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                المستخدمين النشطين
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ active_users }}</div>
-                            <div class="text-xs text-muted">
-                                من أصل {{ total_users }} مستخدم
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <div class="stats-icon bg-success">
-                                <i class="fas fa-user-check"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Products Statistics -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card stats-card h-100">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                                إجمالي المنتجات
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_products }}</div>
-                            <div class="text-xs text-warning">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                {{ low_stock_products }} منتج بمخزون منخفض
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <div class="stats-icon bg-info">
-                                <i class="fas fa-boxes"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Suppliers Statistics -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card stats-card h-100">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                الموردين النشطين
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ active_suppliers }}</div>
-                            <div class="text-xs text-muted">
-                                من أصل {{ total_suppliers }} مورد
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <div class="stats-icon bg-warning">
-                                <i class="fas fa-truck"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Purchase Orders Row -->
-    <div class="row mb-4">
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-primary shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                إجمالي أوامر الشراء
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_purchase_orders }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-shopping-cart fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-warning shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                أوامر معلقة
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ pending_orders }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-clock fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-success shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                أوامر مكتملة
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ completed_orders }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-danger shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
-                                أوامر متأخرة
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ overdue_orders }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Charts and Tables Row -->
     <div class="row">
-        <!-- Users by Role Chart -->
-        <div class="col-xl-4 col-lg-5">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">توزيع المستخدمين حسب الدور</h6>
-                </div>
-                <div class="card-body">
-                    <div class="chart-container">
-                        <canvas id="usersRoleChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <div class="col-xl-3 col-md-6 mb-4"><div class="card stats-card" style="background: var(--primary-gradient);"><div class="card-body"><div class="card-title-custom">{% trans "أوامر الإنتاج النشطة" %}</div><div class="card-value">{{ active_orders_count }}</div><div class="card-footer-text"><i class="fas fa-check-circle"></i> {{ completed_this_month }} {% trans "أمر مكتمل هذا الشهر" %}</div></div><div class="icon-bg"><i class="fas fa-cogs"></i></div></div></div>
+        <div class="col-xl-3 col-md-6 mb-4"><div class="card stats-card" style="background: var(--success-gradient);"><div class="card-body"><div class="card-title-custom">{% trans "الموارد البشرية" %}</div><div class="card-value">{{ total_employees }}</div><div class="card-footer-text"><i class="fas fa-user-check"></i> {{ attended_today_count }} {% trans "حاضرون اليوم" %}</div></div><div class="icon-bg"><i class="fas fa-users"></i></div></div></div>
+        <div class="col-xl-3 col-md-6 mb-4"><div class="card stats-card" style="background: var(--info-gradient);"><div class="card-body"><div class="card-title-custom">{% trans "قيمة المخزون الإجمالية" %}</div><div class="card-value">{{ total_stock_value|floatformat:2 }}</div><div class="card-footer-text"><i class="fas fa-boxes"></i> {{ total_products }} {% trans "منتجات نشطة" %}</div></div><div class="icon-bg"><i class="fas fa-dollar-sign"></i></div></div></div>
+        <div class="col-xl-3 col-md-6 mb-4"><div class="card stats-card" style="background: var(--warning-gradient);"><div class="card-body"><div class="card-title-custom">{% trans "معدل عيوب التجميع" %}</div><div class="card-value">{{ defect_rate|floatformat:2 }}%</div><div class="card-footer-text"><i class="fas fa-exclamation-triangle"></i> {{ low_stock_products_count }} {% trans "عناصر ذات مخزون منخفض" %}</div></div><div class="icon-bg"><i class="fas fa-chart-line"></i></div></div></div>
+    </div>
 
-        <!-- Monthly Statistics Chart -->
-        <div class="col-xl-8 col-lg-7">
+    <!-- Charts Row -->
+    <div class="row">
+        <div class="col-xl-5 col-lg-6"><div class="card shadow mb-4"><div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">{% trans "حالة أوامر الإنتاج" %}</h6></div><div class="card-body"><div class="chart-container"><canvas id="productionStatusChart"></canvas></div></div></div></div>
+        <div class="col-xl-7 col-lg-6"><div class="card shadow mb-4"><div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">{% trans "الموظفون حسب القسم" %}</h6></div><div class="card-body"><div class="chart-container"><canvas id="departmentChart"></canvas></div></div></div></div>
+    </div>
+    
+    <!-- Cutting Analysis Row -->
+    <div class="row">
+        <div class="col-12">
             <div class="card shadow mb-4">
-                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">الإحصائيات الشهرية</h6>
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">{% trans "تحليل القص و الميتراج" %}</h6>
                 </div>
                 <div class="card-body">
-                    <div class="chart-container">
-                        <canvas id="monthlyStatsChart"></canvas>
+                    <div class="row">
+                        <div class="col-lg-4 mb-4 mb-lg-0">
+                            <div class="card stats-card h-100" style="background: var(--purple-gradient);">
+                                <div class="card-body text-center">
+                                    <div class="icon-bg" style="font-size: 4rem; opacity: 0.1;"><i class="fas fa-cut"></i></div>
+                                    <div class="card-title-custom">{% trans "إجمالي القطع المقصوصة" %}</div>
+                                    <div class="card-value" style="font-size: 3rem;">{{ total_pieces_cut }}</div>
+                                    <div class="card-footer-text">{% trans "من جميع أوامر الإنتاج" %}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-8">
+                            <form method="get" action="{% url 'dashboard:index' %}" id="product-search-form" class="mb-3">
+                                <div class="input-group search-container">
+                                    <input type="text" id="product-search-bar" class="form-control form-control-lg" placeholder="{% trans "ابحث عن منتج بالاسم أو الكود..." %}" autocomplete="off" value="{{ selected_product.name|default:'' }}">
+                                    <input type="hidden" name="product_id" id="product-id-input" value="{{ product_search_id|default:'' }}">
+                                    <button class="btn btn-primary" type="submit"><i class="fas fa-search fa-fw"></i> {% trans "بحث" %}</button>
+                                    <div id="product-search-results"></div>
+                                </div>
+                            </form>
+                            
+                            {% if selected_product %}
+                                <h5 class="mb-3">{% trans "إحصائيات لـ" %}: <span class="text-primary">{{ selected_product.name }}</span></h5>
+                            {% else %}
+                                <h5 class="mb-3 text-muted">{% trans "إحصائيات الميتراج لجميع المنتجات" %}</h5>
+                            {% endif %}
+                            
+                            <div class="meterage-stat-item">
+                                <div class="stat-label"><i class="fas fa-arrow-up text-success"></i> {% trans "أعلى ميتراج حقيقي" %}</div>
+                                <div class="stat-value text-success">{{ meterage_stats.highest_meterage|floatformat:3 }}</div>
+                            </div>
+                            <div class="meterage-stat-item">
+                                <div class="stat-label"><i class="fas fa-arrow-down text-danger"></i> {% trans "أقل ميتراج حقيقي" %}</div>
+                                <div class="stat-value text-danger">{{ meterage_stats.lowest_meterage|floatformat:3 }}</div>
+                            </div>
+                             <div class="meterage-stat-item">
+                                <div class="stat-label"><i class="fas fa-boxes text-info"></i> {% trans "إجمالي الكمية المطلوبة" %}</div>
+                                <div class="stat-value text-info">{{ total_quantity_ordered_for_product }}</div>
+                            </div>
+                        </div>
                     </div>
+
+                    {% if selected_product %}
+                    <div class="mt-4">
+                        <h6 class="font-weight-bold text-secondary">{% trans "أوامر الإنتاج للمنتج" %}: {{ selected_product.name }}</h6>
+                        <div class="table-responsive" style="max-height: 250px;">
+                            <table class="table table-sm table-striped table-hover">
+                                <thead class="table-light" style="position: sticky; top: 0;">
+                                    <tr>
+                                        <th>{% trans "رقم الأمر" %}</th>
+                                        <th class="text-center">{% trans "الكمية المطلوبة" %}</th>
+                                        <th>{% trans "الحالة" %}</th>
+                                        <th>{% trans "تاريخ الإنشاء" %}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for order in product_orders %}
+                                    <tr>
+                                        <td><code>{{ order.order_number }}</code></td>
+                                        <td class="text-center fw-bold">{{ order.quantity_ordered }}</td>
+                                        <td><span class="badge rounded-pill {% if order.status == 'completed' %}bg-success-soft text-success{% elif order.status == 'cancelled' %}bg-danger-soft text-danger{% else %}bg-info-soft text-info{% endif %}">{{ order.get_status_display }}</span></td>
+                                        <td>{{ order.created_at|date:"d M, Y" }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="4" class="text-center text-muted">{% trans "لا توجد أوامر إنتاج لهذا المنتج." %}</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -272,337 +171,76 @@
 
     <!-- Data Tables Row -->
     <div class="row">
-        <!-- Best Products -->
-        <div class="col-xl-6 col-lg-6">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">أفضل المنتجات (حسب المخزون)</h6>
-                    <a href="{% url 'warehouses:product_list' %}" class="btn btn-sm btn-primary">
-                        <i class="fas fa-eye"></i> عرض الكل
-                    </a>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-hover">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>المنتج</th>
-                                    <th>الكود</th>
-                                    <th>الكمية</th>
-                                    <th>الوحدة</th>
-                                    <th>الحالة</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in best_products %}
-                                <tr>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="me-3">
-                                                <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center" 
-                                                     style="width: 35px; height: 35px;">
-                                                    <i class="fas fa-box text-white"></i>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <div class="font-weight-bold">{{ item.product.name }}</div>
-                                                <div class="text-muted small">{{ item.product.get_product_type_display }}</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td><code>{{ item.product.code }}</code></td>
-                                    <td>
-                                        <span class="badge bg-info">{{ item.quantity|floatformat:0 }}</span>
-                                    </td>
-                                    <td>{{ item.product.get_unit_display }}</td>
-                                    <td>
-                                        {% if item.is_low_stock %}
-                                            <span class="badge bg-warning">مخزون منخفض</span>
-                                        {% else %}
-                                            <span class="badge bg-success">متوفر</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="5" class="text-center text-muted">لا توجد منتجات</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Recent Purchase Orders -->
-        <div class="col-xl-6 col-lg-6">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">أحدث أوامر الشراء</h6>
-                    <a href="{% url 'suppliers:purchase_orders' %}" class="btn btn-sm btn-primary">
-                        <i class="fas fa-eye"></i> عرض الكل
-                    </a>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-hover">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>رقم الأمر</th>
-                                    <th>المورد</th>
-                                    <th>المبلغ</th>
-                                    <th>الحالة</th>
-                                    <th>التاريخ</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for order in recent_purchase_orders %}
-                                <tr>
-                                    <td><code>{{ order.po_number }}</code></td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="me-2">
-                                                <div class="bg-warning rounded-circle d-flex align-items-center justify-content-center" 
-                                                     style="width: 30px; height: 30px;">
-                                                    <i class="fas fa-truck text-white small"></i>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <div class="font-weight-bold small">{{ order.supplier.name }}</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span class="text-success font-weight-bold">
-                                            {{ order.total_amount|floatformat:2 }} ريال
-                                        </span>
-                                    </td>
-                                    <td>
-                                        {% if order.status == 'pending' %}
-                                            <span class="badge bg-warning">معلق</span>
-                                        {% elif order.status == 'approved' %}
-                                            <span class="badge bg-info">موافق عليه</span>
-                                        {% elif order.status == 'completed' %}
-                                            <span class="badge bg-success">مكتمل</span>
-                                        {% elif order.status == 'cancelled' %}
-                                            <span class="badge bg-danger">ملغي</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary">{{ order.get_status_display }}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <small class="text-muted">{{ order.created_at|date:"Y-m-d" }}</small>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="5" class="text-center text-muted">لا توجد أوامر شراء</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Recent Activity -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">النشاط الأخير - حركات المخزون</h6>
-                    <a href="{% url 'warehouses:inventory_count' %}" class="btn btn-sm btn-primary">
-                        <i class="fas fa-eye"></i> عرض الكل
-                    </a>
-                </div>
-                <div class="card-body">
-                    <div class="recent-activity">
-                        {% for movement in recent_movements %}
-                        <div class="activity-item">
-                            <div class="row align-items-center">
-                                <div class="col-auto">
-                                    {% if movement.movement_type == 'in' %}
-                                        <div class="bg-success rounded-circle d-flex align-items-center justify-content-center" 
-                                             style="width: 40px; height: 40px;">
-                                            <i class="fas fa-arrow-down text-white"></i>
-                                        </div>
-                                    {% elif movement.movement_type == 'out' %}
-                                        <div class="bg-danger rounded-circle d-flex align-items-center justify-content-center" 
-                                             style="width: 40px; height: 40px;">
-                                            <i class="fas fa-arrow-up text-white"></i>
-                                        </div>
-                                    {% elif movement.movement_type == 'transfer' %}
-                                        <div class="bg-info rounded-circle d-flex align-items-center justify-content-center" 
-                                             style="width: 40px; height: 40px;">
-                                            <i class="fas fa-exchange-alt text-white"></i>
-                                        </div>
-                                    {% else %}
-                                        <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center" 
-                                             style="width: 40px; height: 40px;">
-                                            <i class="fas fa-edit text-white"></i>
-                                        </div>
-                                    {% endif %}
-                                </div>
-                                <div class="col">
-                                    <div class="font-weight-bold">{{ movement.get_movement_type_display }}</div>
-                                    <div class="text-muted small">
-                                        {{ movement.stock_item.product.name }} - 
-                                        <span class="badge badge-status bg-primary">{{ movement.quantity|floatformat:0 }} {{ movement.stock_item.product.get_unit_display }}</span>
-                                    </div>
-                                    {% if movement.notes %}
-                                        <div class="text-muted small">{{ movement.notes|truncatechars:50 }}</div>
-                                    {% endif %}
-                                </div>
-                                <div class="col-auto text-end">
-                                    <div class="text-muted small">{{ movement.created_at|date:"Y-m-d H:i" }}</div>
-                                    {% if movement.created_by %}
-                                        <div class="text-muted small">{{ movement.created_by.full_name }}</div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                        {% empty %}
-                        <div class="text-center text-muted py-4">
-                            <i class="fas fa-inbox fa-3x mb-3"></i>
-                            <p>لا توجد حركات مخزون حديثة</p>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-        </div>
+        <div class="col-lg-7 mb-4"><div class="card shadow"><div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">{% trans "أحدث أوامر الإنتاج" %}</h6></div><div class="card-body"><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>{% trans "رقم الأمر" %}</th><th>{% trans "المنتج" %}</th><th>{% trans "الكمية" %}</th><th>{% trans "الحالة" %}</th><th>{% trans "التاريخ" %}</th></tr></thead><tbody>{% for order in recent_production_orders %}<tr><td><code>{{ order.order_number }}</code></td><td>{{ order.product.name }}</td><td><span class="fw-bold">{{ order.quantity_ordered }}</span></td><td><span class="badge rounded-pill badge-status {% if order.status == 'completed' %}bg-success-soft text-success{% elif order.status == 'in_progress' or order.status == 'in_cutting' or order.status == 'in_assembly' %}bg-info-soft text-info{% elif order.status == 'approved' %}bg-primary-soft text-primary{% elif order.status == 'cancelled' %}bg-danger-soft text-danger{% else %}bg-secondary-soft text-secondary{% endif %}">{{ order.get_status_display }}</span></td><td>{{ order.created_at|date:"d M, Y" }}</td></tr>{% empty %}<tr><td colspan="5" class="text-center text-muted py-4">{% trans "لا توجد أوامر إنتاج حديثة." %}</td></tr>{% endfor %}</tbody></table></div></div></div></div>
+        <div class="col-lg-5 mb-4"><div class="card shadow"><div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">{% trans "ملخص المخازن" %}</h6></div><div class="card-body"><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>{% trans "المخزن" %}</th><th>{% trans "أنواع الأصناف" %}</th><th>{% trans "إجمالي الكمية" %}</th></tr></thead><tbody>{% for wh in warehouses_summary %}<tr><td><i class="fas fa-warehouse text-primary ms-2"></i>{{ wh.name }}</td><td class="text-center">{{ wh.num_items }}</td><td class="text-center fw-bold">{{ wh.total_quantity|floatformat:0 }}</td></tr>{% empty %}<tr><td colspan="3" class="text-center text-muted py-4">{% trans "لا توجد بيانات للمخازن." %}</td></tr>{% endfor %}</tbody></table></div></div></div></div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-{% comment %} <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script> {% endcomment %}
+{{ orders_by_status|json_script:"production-data" }}
+{{ departments_data|json_script:"department-data" }}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Users by Role Pie Chart
-    const usersRoleCtx = document.getElementById('usersRoleChart').getContext('2d');
-    const usersRoleData = [
-        {% for role in users_by_role %}
-        {
-            label: '{{ role.role }}',
-            count: {{ role.count }}
-        },
-        {% endfor %}
-    ];
-    
-    new Chart(usersRoleCtx, {
-        type: 'doughnut',
-        data: {
-            labels: usersRoleData.map(item => {
-                const roleNames = {
-                    'admin': 'مدير النظام',
-                    'manager': 'مدير',
-                    'warehouse_manager': 'مدير المخازن',
-                    'warehouse_employee': 'موظف مخازن',
-                    'production_manager': 'مدير الإنتاج',
-                    'accountant': 'محاسب',
-                    'employee': 'موظف',
-                    'viewer': 'مشاهد فقط'
-                };
-                return roleNames[item.label] || item.label;
-            }),
-            datasets: [{
-                data: usersRoleData.map(item => item.count),
-                backgroundColor: [
-                    '#4e73df',
-                    '#1cc88a',
-                    '#36b9cc',
-                    '#f6c23e',
-                    '#e74a3b',
-                    '#858796',
-                    '#5a5c69',
-                    '#6f42c1'
-                ],
-                borderWidth: 2,
-                borderColor: '#fff'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 20,
-                        usePointStyle: true
-                    }
-                }
-            }
+    // Chart.js setup
+    const chartColors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796', '#5a5c69', '#6f42c1', '#fd7e14', '#20c997'];
+    const productionData = JSON.parse(document.getElementById('production-data').textContent);
+    const departmentData = JSON.parse(document.getElementById('department-data').textContent);
+    const statusTranslations = {'draft': '{% trans "مسودة" %}', 'approved': '{% trans "معتمد" %}', 'in_cutting': '{% trans "في القص" %}', 'in_assembly': '{% trans "في التجميع" %}', 'in_dyeing': '{% trans "في الصباغة" %}', 'in_finishing': '{% trans "في التشطيب" %}', 'completed': '{% trans "مكتمل" %}', 'cancelled': '{% trans "ملغي" %}'};
+    const productionStatusCtx = document.getElementById('productionStatusChart')?.getContext('2d');
+    if (productionStatusCtx) { new Chart(productionStatusCtx, { type: 'doughnut', data: { labels: productionData.map(item => statusTranslations[item.status] || item.status), datasets: [{ data: productionData.map(item => item.count), backgroundColor: chartColors, borderColor: '#fff', borderWidth: 2 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'left', labels: { padding: 15, boxWidth: 12, font: { family: "'Cairo', 'sans-serif'" } } } }, cutout: '70%' } }); }
+    const departmentCtx = document.getElementById('departmentChart')?.getContext('2d');
+    if (departmentCtx) { new Chart(departmentCtx, { type: 'bar', data: { labels: departmentData.map(item => item.department__name || '{% trans "غير معين" %}'), datasets: [{ label: '{% trans "عدد الموظفين" %}', data: departmentData.map(item => item.count), backgroundColor: chartColors.map(color => color + 'b3'), borderColor: chartColors, borderWidth: 1 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { bodyFont: { family: "'Cairo', 'sans-serif'" }, titleFont: { family: "'Cairo', 'sans-serif'" } } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { ticks: { font: { family: "'Cairo', 'sans-serif'" } } } } } }); }
+
+    // AJAX Product Search Logic
+    const searchBar = document.getElementById('product-search-bar');
+    const resultsContainer = document.getElementById('product-search-results');
+    const idInput = document.getElementById('product-id-input');
+    const searchForm = document.getElementById('product-search-form');
+    let searchTimeout;
+
+    searchBar.addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        const term = searchBar.value;
+
+        if (term.length < 2) {
+            resultsContainer.innerHTML = '';
+            return;
         }
+
+        searchTimeout = setTimeout(() => {
+            fetch(`{% url 'dashboard:product_search_ajax' %}?term=${term}`)
+                .then(response => response.json())
+                .then(data => {
+                    resultsContainer.innerHTML = '';
+                    if (data.length > 0) {
+                        data.forEach(product => {
+                            const item = document.createElement('div');
+                            item.classList.add('search-result-item');
+                            item.innerHTML = `${product.name} <br><small>${product.code || ''}</small>`;
+                            item.addEventListener('click', () => {
+                                searchBar.value = product.name;
+                                idInput.value = product.id;
+                                resultsContainer.innerHTML = '';
+                                searchForm.submit();
+                            });
+                            resultsContainer.appendChild(item);
+                        });
+                    } else {
+                        resultsContainer.innerHTML = `<div class="search-result-item text-muted">{% trans "لا توجد نتائج" %}</div>`;
+                    }
+                });
+        }, 300); // Debounce for 300ms
     });
 
-    // Monthly Statistics Line Chart
-    const monthlyStatsCtx = document.getElementById('monthlyStatsChart').getContext('2d');
-    const monthlyUsersData = {{ monthly_users|safe }};
-    const monthlyOrdersData = {{ monthly_orders|safe }};
-    
-    new Chart(monthlyStatsCtx, {
-        type: 'line',
-        data: {
-            labels: monthlyUsersData.map(item => item.month),
-            datasets: [{
-                label: 'المستخدمين الجدد',
-                data: monthlyUsersData.map(item => item.count),
-                borderColor: '#4e73df',
-                backgroundColor: 'rgba(78, 115, 223, 0.1)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.4
-            }, {
-                label: 'أوامر الشراء',
-                data: monthlyOrdersData.map(item => item.count),
-                borderColor: '#1cc88a',
-                backgroundColor: 'rgba(28, 200, 138, 0.1)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: {
-                        padding: 20,
-                        usePointStyle: true
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: {
-                        color: 'rgba(0,0,0,0.1)'
-                    }
-                },
-                x: {
-                    grid: {
-                        color: 'rgba(0,0,0,0.1)'
-                    }
-                }
-            },
-            interaction: {
-                intersect: false,
-                mode: 'index'
-            }
+    // Hide results when clicking outside
+    document.addEventListener('click', function(event) {
+        if (!searchBar.contains(event.target)) {
+            resultsContainer.innerHTML = '';
         }
     });
-
-    // Auto refresh data every 5 minutes
-    setInterval(function() {
-        location.reload();
-    }, 300000); // 5 minutes
 });
 </script>
 {% endblock %}

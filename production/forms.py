@@ -15,6 +15,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Sum, F
 from django.db.models.functions import Coalesce
 from decimal import Decimal
+from django.utils import timezone
 
 
 User = get_user_model()
@@ -929,42 +930,64 @@ class FinishingSendForm(forms.ModelForm):
 
         return cleaned_data
 
-class FinishingReceiveForm(forms.ModelForm):
-    class Meta:
-        model = FinishingProcess
-        fields = [
-            'quantity_output', 'defects_in_finishing',
-            'ironing_completed', 'belt_loops_completed', 'buttons_completed', 
-            'leather_details_completed', 'cleaning_completed', 'pressing_completed',
-            'ticketing_completed', 'bagging_completed', 'packaging_completed',
-            'notes', # Add the notes field
-        ]
-        widgets = {
-            # This will be hidden and populated by JS from the comment fields
-            'notes': forms.HiddenInput(), 
+class FinishingBatchReceiveForm(forms.Form):
+    """
+    A form to handle receiving a single batch of finished goods.
+    """
+    receipt_date = forms.DateTimeField(
+        label="تاريخ استلام الدفعة",
+        initial=timezone.now,
+        widget=forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+        help_text="سيتم استخدام هذا التاريخ في سجل الاستلام."
+    )
+    quantity_received = forms.IntegerField(
+        label="الكمية المستلمة في هذه الدفعة",
+        min_value=0,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'الكمية الصالحة المستلمة الآن'})
+    )
+    defects_in_batch = forms.IntegerField(
+        label="عدد العيوب في هذه الدفعة",
+        min_value=0,
+        initial=0,
+        widget=forms.NumberInput(attrs={'class': 'form-control'})
+    )
+    is_final_batch = forms.BooleanField(
+        label="هل هذه هي الدفعة الأخيرة؟",
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        help_text="حدد هذا الخيار لإغلاق العملية نهائياً. سيتم حساب أي فرق متبقي كفاقد."
+    )
+    notes = forms.CharField(
+        label="ملاحظات الدفعة",
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'ملاحظات خاصة بهذه الدفعة...'})
+    )
+
+    def __init__(self, *args, **kwargs):
+        # Store the process instance to use for validation
+        self.process_instance = kwargs.pop('instance', None)
+        super().__init__(*args, **kwargs)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        quantity_received = cleaned_data.get('quantity_received', 0)
+        defects_in_batch = cleaned_data.get('defects_in_batch', 0)
+
+        if self.process_instance:
+            # Calculate how many items are still expected
+            total_received_so_far = self.process_instance.quantity_output
+            total_defects_so_far = self.process_instance.defects_in_finishing
+            quantity_input = self.process_instance.quantity_input
             
-            # Use CheckboxInput for better styling control in the template
-            'ironing_completed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'belt_loops_completed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'buttons_completed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'leather_details_completed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'cleaning_completed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'pressing_completed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'ticketing_completed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'bagging_completed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'packaging_completed': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-        }
+            remaining_quantity = quantity_input - (total_received_so_far + total_defects_so_far)
 
-    def get_checklist_fields(self):
-        """Helper method to return only the boolean checklist fields for iteration in the template."""
-        return [self[name] for name in self.fields if name.endswith('_completed')]
-
-    def clean_quantity_output(self):
-        quantity_output = self.cleaned_data.get('quantity_output')
-        quantity_input = self.instance.quantity_input
-        if quantity_output is not None and quantity_output > quantity_input:
-            raise forms.ValidationError(f"الكمية المخرجة ({quantity_output}) لا يمكن أن تكون أكبر من الكمية المدخلة ({quantity_input}).")
-        return quantity_output
+            # Ensure the current batch doesn't exceed the remaining quantity
+            if (quantity_received + defects_in_batch) > remaining_quantity:
+                raise forms.ValidationError(
+                    f"إجمالي المدخلات لهذه الدفعة ({quantity_received + defects_in_batch}) "
+                    f"أكبر من الكمية المتبقية المتوقعة ({remaining_quantity})."
+                )
+        return cleaned_data
 
 
 class FinishingComponentForm(forms.ModelForm):

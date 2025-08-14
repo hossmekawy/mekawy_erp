@@ -1,0 +1,72 @@
+{% extends 'production/production_base.html' %}
+{% load static %}
+
+{% block production_title %}قائمة العملاء{% endblock %}
+
+{% block production_page_title %}العملاء{% endblock %}
+
+{% block production_header_actions %}
+    <a href="{% url 'crm:customer_create' %}" class="btn btn-primary">
+        <i class="fas fa-plus me-2"></i> إضافة عميل جديد
+    </a>
+{% endblock %}
+
+{% block production_content %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">قائمة العملاء</h5>
+    </div>
+    <div class="card-body">
+        <form method="get" class="mb-4">
+            <div class="input-group">
+                <input type="text" name="search" class="form-control" placeholder="ابحث بالاسم, اسم الشركة, أو رقم الهاتف..." value="{{ request.GET.search }}">
+                <button class="btn btn-outline-secondary" type="submit"><i class="fas fa-search"></i></button>
+            </div>
+        </form>
+
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>الاسم</th>
+                        <th>نوع العميل</th>
+                        <th>رقم الهاتف</th>
+                        <th>البريد الإلكتروني</th>
+                        <th>الحالة</th>
+                        <th>الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for customer in customers %}
+                    <tr>
+                        <td>
+                            <a href="{{ customer.get_absolute_url }}">{{ customer.name }}</a>
+                            {% if customer.company_name %}<small class="d-block text-muted">{{ customer.company_name }}</small>{% endif %}
+                        </td>
+                        <td>{{ customer.get_customer_type_display }}</td>
+                        <td>{{ customer.phone_number }}</td>
+                        <td>{{ customer.email|default:"-" }}</td>
+                        <td>
+                            {% if customer.is_active %}
+                                <span class="badge bg-success">نشط</span>
+                            {% else %}
+                                <span class="badge bg-danger">غير نشط</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ customer.get_absolute_url }}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center">لا يوجد عملاء لعرضهم.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

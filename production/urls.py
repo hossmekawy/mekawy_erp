@@ -115,8 +115,9 @@ urlpatterns = [
     path('finishing/<int:pk>/', views.FinishingProcessDetailView.as_view(), name='finishing_detail'),
     path('finishing/<int:pk>/update/', views.FinishingProcessUpdateView.as_view(), name='finishing_update'),
     path('finishing/<int:pk>/delete/', views.FinishingProcessDeleteView.as_view(), name='finishing_delete'),
-    path('finishing/<int:pk>/receive/', views.receive_finishing_process, name='finishing_receive'),
     path('finishing/<int:pk>/print_pdf/', views.print_finishing_process_pdf, name='finishing_print_pdf'),
+    path('finishing/<int:pk>/receive-batch/', views.receive_finishing_batch, name='finishing_receive_batch'),
+
 
     # Bill of Materials
     path('bom/', views.BillOfMaterialsListView.as_view(), name='bom_list'),

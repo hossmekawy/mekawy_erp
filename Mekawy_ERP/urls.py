@@ -29,6 +29,8 @@ urlpatterns = [
     path('api/', include('api.urls')),
     path('pwa/', include('pwa.urls')), 
     path('track/<str:order_number>/', production_views.public_order_detail_view, name='public_order_detail'),
+    path('crm/', include('crm.urls', namespace='crm')), # Add this line
+
 
 # Move PWA to specific path
 ]

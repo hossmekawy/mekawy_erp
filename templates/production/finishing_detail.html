@@ -1,21 +1,30 @@
 {% extends 'production/production_base.html' %}
 {% load static i18n widget_tweaks %}
-{% load production_extras %} {# Load your custom filters from production_extras.py #}
+{% load production_extras %}
 
-{% block production_title %}تفاصيل عملية التشطيب{% endblock %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block production_title %}تفاصيل عملية التشطيب{% endblock %}</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts (Tajawal for Arabic) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 
-{% block production_header_actions %}
-    <a href="{% url 'production:finishing_print_pdf' finishing_process.pk %}" class="btn btn-secondary" target="_blank">
-        <i class="fas fa-print me-2"></i> طباعة
-    </a>
-    {% if not finishing_process.is_completed %}
-        <button type="button" class="btn btn-production" data-bs-toggle="modal" data-bs-target="#receiveFinishingModal">
-            <i class="fas fa-clipboard-check me-2"></i>إنهاء العملية
-        </button>
-    {% endif %}
-{% endblock %}
+    <style>
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: #f0f2f5;
+        }
+    </style>
 
-{% block production_extra_css %}
+    {% block production_extra_css %}
     {{ block.super }}
     <style>
         .details-card .card-header {
@@ -23,7 +32,7 @@
             border-bottom: 2px solid #e9ecef;
         }
         .details-card .card-title {
-            color: var(--production-primary);
+            color: var(--production-primary, #0d6efd);
             font-weight: 600;
         }
         .details-list dt {
@@ -34,11 +43,11 @@
             color: #6c757d;
         }
         .nav-tabs .nav-link {
-            color: var(--production-secondary);
+            color: var(--production-secondary, #6c757d);
             font-weight: 500;
         }
         .nav-tabs .nav-link.active {
-            color: var(--production-primary);
+            color: var(--production-primary, #0d6efd);
             border-color: #dee2e6 #dee2e6 #fff;
             background-color: #fff;
             font-weight: 700;
@@ -77,9 +86,41 @@
             color: #495057;
             border: 1px solid #dee2e6;
         }
+        .production-status {
+            font-size: 0.8rem;
+            font-weight: 700;
+            padding: 0.3rem 0.6rem;
+            border-radius: 1rem;
+        }
+        .production-status.completed {
+            background-color: #d1e7dd;
+            color: #0f5132;
+        }
+        .production-status.in-progress {
+            background-color: #fff3cd;
+            color: #664d03;
+        }
     </style>
-{% endblock %}
+    {% endblock %}
+</head>
+<body>
+<main class="container py-4">
 
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>تفاصيل عملية التشطيب</h1>
+        <div class="d-flex gap-2">
+        {% block production_header_actions %}
+            <a href="{% url 'production:finishing_print_pdf' finishing_process.pk %}" class="btn btn-outline-secondary" target="_blank">
+                <i class="fas fa-print me-2"></i> طباعة
+            </a>
+            {% if not finishing_process.is_completed %}
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#receiveBatchModal">
+                    <i class="fas fa-box-check me-2"></i>استلام دفعة
+                </button>
+            {% endif %}
+        {% endblock %}
+        </div>
+    </div>
 
 {% block production_content %}
 <div class="row">
@@ -89,6 +130,11 @@
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="main-details-tab" data-bs-toggle="tab" data-bs-target="#main-details" type="button" role="tab" aria-controls="main-details" aria-selected="true">
                     <i class="fas fa-info-circle me-2"></i>التفاصيل الأساسية
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="receipt-history-tab" data-bs-toggle="tab" data-bs-target="#receipt-history" type="button" role="tab" aria-controls="receipt-history" aria-selected="false">
+                    <i class="fas fa-history me-2"></i>سجل الاستلام
                 </button>
             </li>
             <li class="nav-item" role="presentation">
@@ -139,15 +185,19 @@
                                     {% else %}
                                         <dt class="col-sm-4">المسؤول</dt>
                                         <dd class="col-sm-8">{{ finishing_process.finisher.get_full_name|default:finishing_process.finisher.username }}</dd>
-                                        <dt class="col-sm-4">المشرف</dt>
-                                        <dd class="col-sm-8">{{ finishing_process.supervisor.get_full_name|default:finishing_process.supervisor.username }}</dd>
                                     {% endif %}
 
                                     <dt class="col-sm-4">الكمية المدخلة</dt>
                                     <dd class="col-sm-8">{{ finishing_process.quantity_input }} قطعة</dd>
                                     
-                                    <dt class="col-sm-4">الكمية المخرجة (الصالحة)</dt>
-                                    <dd class="col-sm-8">{{ finishing_process.quantity_output }} قطعة</dd>
+                                    <dt class="col-sm-4">إجمالي المستلم (صالح)</dt>
+                                    <dd class="col-sm-8 fw-bold text-success">{{ finishing_process.quantity_output }} قطعة</dd>
+
+                                    <dt class="col-sm-4">إجمالي العيوب</dt>
+                                    <dd class="col-sm-8 fw-bold text-warning">{{ finishing_process.defects_in_finishing }} قطعة</dd>
+
+                                    <dt class="col-sm-4">الكمية المتبقية</dt>
+                                    <dd class="col-sm-8 fw-bold text-primary">{{ remaining_quantity }} قطعة</dd>
 
                                     <dt class="col-sm-4">المخزن النهائي</dt>
                                     <dd class="col-sm-8">{{ finishing_process.destination_warehouse.name }}</dd>
@@ -183,6 +233,46 @@
                 </div>
             </div>
 
+            <!-- Receipt History Tab -->
+            <div class="tab-pane fade" id="receipt-history" role="tabpanel" aria-labelledby="receipt-history-tab">
+                <div class="card details-card">
+                    <div class="card-header"><h5 class="card-title mb-0"><i class="fas fa-history me-2"></i>سجل دفعات الاستلام</h5></div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover mb-0 history-table">
+                                <thead>
+                                    <tr>
+                                        <th>التاريخ</th>
+                                        <th>المستخدم</th>
+                                        <th class="text-center">الكمية المستلمة</th>
+                                        <th class="text-center">العيوب</th>
+                                        <th>الملاحظات</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for entry in finishing_process.receipt_history|slice:"::-1" %} {# Reverse the list #}
+                                    <tr>
+                                        <td>{{ entry.date|date:"Y-m-d H:i" }}</td>
+                                        <td>{{ entry.username }}</td>
+                                        <td class="text-center"><span class="badge bg-success">{{ entry.quantity }}</span></td>
+                                        <td class="text-center"><span class="badge bg-warning text-dark">{{ entry.defects }}</span></td>
+                                        <td>{{ entry.notes|default:"-" }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="5" class="text-center p-4">
+                                            <i class="fas fa-box-open fa-2x text-muted mb-2"></i><br>
+                                            لم يتم استلام أي دفعات بعد.
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Related Processes Tab -->
             <div class="tab-pane fade" id="related-processes" role="tabpanel" aria-labelledby="related-processes-tab">
                 <div class="row">
@@ -207,7 +297,7 @@
                                     <dt class="col-sm-5">الكمية المستلمة</dt>
                                     <dd class="col-sm-7">{{ finishing_process.dyeing_process.quantity_received }} قطعة</dd>
                                     <dt class="col-sm-5">المقاسات</dt>
-                                    <dd class="col-sm-7">{% if finishing_process.dyeing_process.assembly_process.production_order.product.size_group %}{{ finishing_process.dyeing_process.assembly_process.production_order.product.size_group.sizes|join:", " }}{% else %}غير محدد{% endif %}</dd>
+                                    <dd class="col-sm-7">{% if finishing_process.dyeing_process.assembly_process.production_order.bom_version.size_group %}{{ finishing_process.dyeing_process.assembly_process.production_order.bom_version.size_group.sizes|join:", " }}{% else %}غير محدد{% endif %}</dd>
                                     <dt class="col-sm-5">الحالة</dt>
                                     <dd class="col-sm-7"><span class="production-status completed">مكتمل</span></dd>
                                 </dl>
@@ -251,64 +341,53 @@
 {% endblock %}
 
 {% block production_modals %}
-    {{ block.super }} {# Include parent modals like confirmDeleteModal #}
+    {{ block.super }}
 
-    <!-- Receive/Complete Modal -->
-    <div class="modal fade" id="receiveFinishingModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+    <!-- Receive Batch Modal -->
+    {% if not finishing_process.is_completed %}
+    <div class="modal fade" id="receiveBatchModal" tabindex="-1">
+        <div class="modal-dialog">
             <div class="modal-content">
-                <form id="receiveFinishingForm" action="{% url 'production:finishing_receive' finishing_process.pk %}" method="post">
+                <form action="{% url 'production:finishing_receive_batch' finishing_process.pk %}" method="post">
                     {% csrf_token %}
                     <div class="modal-header">
-                        <h5 class="modal-title">إنهاء عملية التشطيب</h5>
+                        <h5 class="modal-title">استلام دفعة جديدة</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
-                        <p>توثيق اكتمال عملية التشطيب وإيداع المنتجات في المخزون.</p>
-                        
-                        <!-- This is the hidden notes field that will be populated by JS -->
-                        {{ receive_form.notes }}
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">الكمية المخرجة (الصالحة)</label>
-                                {% render_field receive_form.quantity_output class+="form-control" %}
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">عدد العيوب</label>
-                                {% render_field receive_form.defects_in_finishing class+="form-control" %}
-                            </div>
-                        </div>
+                        <p>الكمية المتبقية المتوقعة: <strong class="text-primary">{{ remaining_quantity }}</strong> قطعة.</p>
                         <hr>
-                        <h6>قائمة التحقق (Checklist)</h6>
-                        <div id="modal-checklist-container" class="card card-body p-0">
-                            {% for field in receive_form.get_checklist_fields %}
-                            <div class="checklist-item">
-                                <div class="form-check form-switch">
-                                    {% render_field field class+="form-check-input" role="switch" %}
-                                    <label for="{{ field.id_for_label }}" class="form-check-label fw-bold">{{ field.label }}</label>
-                                </div>
-                                <div class="comment-wrapper">
-                                    <textarea class="form-control form-control-sm modal-checklist-comment" 
-                                              data-comment-label="{{ field.label }}" 
-                                              placeholder="ملاحظات لـ {{ field.label }}..."></textarea>
-                                </div>
-                            </div>
-                            {% endfor %}
+                        <div class="mb-3">
+                            <label for="{{ batch_receive_form.receipt_date.id_for_label }}" class="form-label">{{ batch_receive_form.receipt_date.label }}</label>
+                            {% render_field batch_receive_form.receipt_date class+="form-control" %}
                         </div>
-                        <div class="mt-3">
-                            <label for="general_notes_modal" class="form-label">ملاحظات عامة</label>
-                            <textarea id="general_notes_modal" class="form-control" rows="3" placeholder="أضف أي ملاحظات عامة عن عملية الاستلام..."></textarea>
+                        <div class="mb-3">
+                            <label for="{{ batch_receive_form.quantity_received.id_for_label }}" class="form-label">{{ batch_receive_form.quantity_received.label }}</label>
+                            {% render_field batch_receive_form.quantity_received class+="form-control" %}
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ batch_receive_form.defects_in_batch.id_for_label }}" class="form-label">{{ batch_receive_form.defects_in_batch.label }}</label>
+                            {% render_field batch_receive_form.defects_in_batch class+="form-control" %}
+                        </div>
+                         <div class="mb-3">
+                            <label for="{{ batch_receive_form.notes.id_for_label }}" class="form-label">{{ batch_receive_form.notes.label }}</label>
+                            {% render_field batch_receive_form.notes class+="form-control" %}
+                        </div>
+                        <div class="form-check form-switch mt-3">
+                            {% render_field batch_receive_form.is_final_batch class+="form-check-input" %}
+                            <label for="{{ batch_receive_form.is_final_batch.id_for_label }}" class="form-check-label">{{ batch_receive_form.is_final_batch.label }}</label>
+                            <small class="form-text text-muted d-block">{{ batch_receive_form.is_final_batch.help_text }}</small>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                        <button type="submit" class="btn btn-production">إنهاء العملية</button>
+                        <button type="submit" class="btn btn-primary">حفظ الاستلام</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
+    {% endif %}
     
     <!-- Exit Permit Modal -->
     {% if finishing_process.finishing_type == 'outsourced' and not exit_permit and not finishing_process.is_completed %}
@@ -412,39 +491,11 @@
                     });
                 });
             }
-
-            // Handle Receive Form Submission (to combine notes)
-            const receiveForm = document.getElementById('receiveFinishingForm');
-            if (receiveForm) {
-                receiveForm.addEventListener('submit', function(e) {
-                    const finalNotesField = receiveForm.querySelector('#id_notes');
-                    const generalNotesField = receiveForm.querySelector('#general_notes_modal');
-                    let combinedNotes = '';
-
-                    if (generalNotesField && generalNotesField.value.trim() !== '') {
-                        combinedNotes += generalNotesField.value.trim();
-                    }
-
-                    const checklistComments = [];
-                    receiveForm.querySelectorAll('.modal-checklist-comment').forEach(textarea => {
-                        if (textarea.value.trim() !== '') {
-                            const label = textarea.dataset.commentLabel;
-                            checklistComments.push(`${label}: ${textarea.value.trim()}`);
-                        }
-                    });
-
-                    if (checklistComments.length > 0) {
-                        if (combinedNotes) {
-                            combinedNotes += '\n\n--- ملاحظات القائمة ---\n';
-                        }
-                        combinedNotes += checklistComments.join('\n');
-                    }
-
-                    if (finalNotesField) {
-                        finalNotesField.value = combinedNotes;
-                    }
-                });
-            }
         });
     </script>
 {% endblock %}
+</main>
+<!-- Bootstrap JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
