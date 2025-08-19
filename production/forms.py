@@ -906,9 +906,13 @@ class FinishingSendForm(forms.ModelForm):
         self.fields['supervisor'].queryset = User.objects.filter(is_active=True)
         self.fields['external_manufacturer'].queryset = ExternalManufacturer.objects.filter(is_active=True)
 
-        # When updating, dyeing_process should not be editable
+        # When updating, dyeing_process and finishing_type should not be editable
         if self.instance and self.instance.pk:
             self.fields['dyeing_process'].disabled = True
+            # --- THIS IS THE FIX ---
+            # This line disables the field in the form's logic, ensuring its
+            # value is respected during validation without being submitted by the browser.
+            self.fields['finishing_type'].disabled = True
 
     def clean(self):
         cleaned_data = super().clean()

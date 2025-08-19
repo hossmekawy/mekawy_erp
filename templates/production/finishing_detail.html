@@ -2,127 +2,116 @@
 {% load static i18n widget_tweaks %}
 {% load production_extras %}
 
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block production_title %}تفاصيل عملية التشطيب{% endblock %}</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts (Tajawal for Arabic) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+{% block production_title %}تفاصيل عملية التشطيب - {{ finishing_process.dyeing_process.assembly_process.production_order.order_number }}{% endblock %}
 
-    <style>
-        body {
-            font-family: 'Tajawal', sans-serif;
-            background-color: #f0f2f5;
-        }
-    </style>
+{% block production_extra_css %}
+{{ block.super }}
+<style>
+    .details-card .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #e9ecef;
+    }
+    .details-card .card-title {
+        color: var(--production-primary, #0d6efd);
+        font-weight: 600;
+    }
+    .details-list dt {
+        font-weight: 600;
+        color: #495057;
+    }
+    .details-list dd {
+        color: #6c757d;
+    }
+    .nav-tabs .nav-link {
+        color: var(--production-secondary, #6c757d);
+        font-weight: 500;
+    }
+    .nav-tabs .nav-link.active {
+        color: var(--production-primary, #0d6efd);
+        border-color: #dee2e6 #dee2e6 #fff;
+        background-color: #fff;
+        font-weight: 700;
+    }
+    .progress-label {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: .25rem;
+        font-size: 0.9rem;
+    }
+    .progress-label .value {
+        font-weight: 700;
+    }
+    .checklist-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .checklist-item:last-child {
+        border-bottom: none;
+    }
+    .checklist-item .form-check {
+        padding-top: 0.3rem;
+    }
+    .checklist-item .comment-wrapper {
+        flex-grow: 1;
+    }
+    .notes-display {
+        background-color: #f8f9fa;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        white-space: pre-wrap; /* Preserve line breaks */
+        font-family: monospace;
+        color: #495057;
+        border: 1px solid #dee2e6;
+    }
+    .production-status {
+        font-size: 0.8rem;
+        font-weight: 700;
+        padding: 0.3rem 0.6rem;
+        border-radius: 1rem;
+    }
+    .production-status.completed {
+        background-color: #d1e7dd;
+        color: #0f5132;
+    }
+    .production-status.in-progress {
+        background-color: #fff3cd;
+        color: #664d03;
+    }
+</style>
+{% endblock %}
 
-    {% block production_extra_css %}
-    {{ block.super }}
-    <style>
-        .details-card .card-header {
-            background-color: #f8f9fa;
-            border-bottom: 2px solid #e9ecef;
-        }
-        .details-card .card-title {
-            color: var(--production-primary, #0d6efd);
-            font-weight: 600;
-        }
-        .details-list dt {
-            font-weight: 600;
-            color: #495057;
-        }
-        .details-list dd {
-            color: #6c757d;
-        }
-        .nav-tabs .nav-link {
-            color: var(--production-secondary, #6c757d);
-            font-weight: 500;
-        }
-        .nav-tabs .nav-link.active {
-            color: var(--production-primary, #0d6efd);
-            border-color: #dee2e6 #dee2e6 #fff;
-            background-color: #fff;
-            font-weight: 700;
-        }
-        .progress-label {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: .25rem;
-            font-size: 0.9rem;
-        }
-        .progress-label .value {
-            font-weight: 700;
-        }
-        .checklist-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 1rem;
-            padding: 1rem;
-            border-bottom: 1px solid #e9ecef;
-        }
-        .checklist-item:last-child {
-            border-bottom: none;
-        }
-        .checklist-item .form-check {
-            padding-top: 0.3rem;
-        }
-        .checklist-item .comment-wrapper {
-            flex-grow: 1;
-        }
-        .notes-display {
-            background-color: #f8f9fa;
-            border-radius: 0.5rem;
-            padding: 1rem;
-            white-space: pre-wrap; /* Preserve line breaks */
-            font-family: monospace;
-            color: #495057;
-            border: 1px solid #dee2e6;
-        }
-        .production-status {
-            font-size: 0.8rem;
-            font-weight: 700;
-            padding: 0.3rem 0.6rem;
-            border-radius: 1rem;
-        }
-        .production-status.completed {
-            background-color: #d1e7dd;
-            color: #0f5132;
-        }
-        .production-status.in-progress {
-            background-color: #fff3cd;
-            color: #664d03;
-        }
-    </style>
-    {% endblock %}
-</head>
-<body>
-<main class="container py-4">
-
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>تفاصيل عملية التشطيب</h1>
-        <div class="d-flex gap-2">
+{% block production_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-1">تفاصيل عملية التشطيب</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'production:dashboard' %}">لوحة التحكم</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'production:finishing_list' %}">عمليات التشطيب</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ finishing_process.dyeing_process.assembly_process.production_order.order_number }}</li>
+            </ol>
+        </nav>
+    </div>
+    <div class="d-flex gap-2">
         {% block production_header_actions %}
             <a href="{% url 'production:finishing_print_pdf' finishing_process.pk %}" class="btn btn-outline-secondary" target="_blank">
                 <i class="fas fa-print me-2"></i> طباعة
             </a>
             {% if not finishing_process.is_completed %}
+                <a href="{% url 'production:finishing_update' finishing_process.pk %}" class="btn btn-outline-primary">
+                    <i class="fas fa-edit me-2"></i> تعديل
+                </a>
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#receiveBatchModal">
                     <i class="fas fa-box-check me-2"></i>استلام دفعة
                 </button>
             {% endif %}
         {% endblock %}
-        </div>
     </div>
+</div>
 
-{% block production_content %}
 <div class="row">
     <div class="col-12">
         <!-- Tab Navigation -->
@@ -252,7 +241,7 @@
                                 <tbody>
                                     {% for entry in finishing_process.receipt_history|slice:"::-1" %} {# Reverse the list #}
                                     <tr>
-                                        <td>{{ entry.date|date:"Y-m-d H:i" }}</td>
+                                        <td>{{ entry.date|parse_iso|date:"Y-m-d H:i" }}</td>
                                         <td>{{ entry.username }}</td>
                                         <td class="text-center"><span class="badge bg-success">{{ entry.quantity }}</span></td>
                                         <td class="text-center"><span class="badge bg-warning text-dark">{{ entry.defects }}</span></td>
@@ -326,7 +315,7 @@
                         </ul>
                     </div>
                 </div>
-                 {% if finishing_process.notes %}
+                {% if finishing_process.notes %}
                 <div class="card details-card mt-4">
                     <div class="card-header"><h5 class="card-title mb-0"><i class="fas fa-file-alt me-2"></i>الملاحظات المسجلة</h5></div>
                     <div class="card-body">
@@ -345,21 +334,21 @@
 
     <!-- Receive Batch Modal -->
     {% if not finishing_process.is_completed %}
-    <div class="modal fade" id="receiveBatchModal" tabindex="-1">
+    <div class="modal fade" id="receiveBatchModal" tabindex="-1" aria-labelledby="receiveBatchModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <form action="{% url 'production:finishing_receive_batch' finishing_process.pk %}" method="post">
                     {% csrf_token %}
                     <div class="modal-header">
-                        <h5 class="modal-title">استلام دفعة جديدة</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        <h5 class="modal-title" id="receiveBatchModalLabel">استلام دفعة جديدة</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <p>الكمية المتبقية المتوقعة: <strong class="text-primary">{{ remaining_quantity }}</strong> قطعة.</p>
                         <hr>
                         <div class="mb-3">
                             <label for="{{ batch_receive_form.receipt_date.id_for_label }}" class="form-label">{{ batch_receive_form.receipt_date.label }}</label>
-                            {% render_field batch_receive_form.receipt_date class+="form-control" %}
+                            {% render_field batch_receive_form.receipt_date class+="form-control" step="1" %}
                         </div>
                         <div class="mb-3">
                             <label for="{{ batch_receive_form.quantity_received.id_for_label }}" class="form-label">{{ batch_receive_form.quantity_received.label }}</label>
@@ -391,7 +380,7 @@
     
     <!-- Exit Permit Modal -->
     {% if finishing_process.finishing_type == 'outsourced' and not exit_permit and not finishing_process.is_completed %}
-    <div class="modal fade" id="createExitPermitModal" tabindex="-1">
+    <div class="modal fade" id="createExitPermitModal" tabindex="-1" aria-labelledby="createExitPermitModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <form id="createFinishingExitPermitForm" action="{% url 'production:ajax_create_exit_permit' %}" method="post">
@@ -400,8 +389,8 @@
                     {{ exit_permit_form.permit_type.as_hidden }}
 
                     <div class="modal-header">
-                        <h5 class="modal-title">إنشاء تصريح خروج للتشطيب</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        <h5 class="modal-title" id="createExitPermitModalLabel">إنشاء تصريح خروج للتشطيب</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                        <p class="mb-3">
@@ -494,8 +483,3 @@
         });
     </script>
 {% endblock %}
-</main>
-<!-- Bootstrap JS Bundle -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>

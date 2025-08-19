@@ -199,14 +199,14 @@
                     <div class="mb-4">
                         <h5 class="form-step-header"><span class="step-number">2</span>حدد نوع التشطيب</h5>
                         <div class="d-flex gap-3 finishing-type-selector">
-                           <input type="radio" class="btn-check" name="{{ form.finishing_type.html_name }}" id="id_finishing_type_in_house" value="in_house" autocomplete="off" {% if form.finishing_type.value == 'in_house' or not form.instance.pk %}checked{% endif %} {% if form.instance.pk %}disabled{% endif %}>
-                           <label class="btn btn-outline-primary" for="id_finishing_type_in_house">
-                               <i class="fas fa-user-cog me-2"></i>داخلي
-                           </label>
-                           <input type="radio" class="btn-check" name="{{ form.finishing_type.html_name }}" id="id_finishing_type_outsourced" value="outsourced" autocomplete="off" {% if form.finishing_type.value == 'outsourced' %}checked{% endif %} {% if form.instance.pk %}disabled{% endif %}>
-                           <label class="btn btn-outline-primary" for="id_finishing_type_outsourced">
-                               <i class="fas fa-industry me-2"></i>خارجي
-                           </label>
+                           <input type="radio" class="btn-check" name="{{ form.finishing_type.html_name }}" id="id_finishing_type_in_house" value="in_house" autocomplete="off" {% if form.finishing_type.value == 'in_house' or not form.instance.pk %}checked{% endif %}>
+                            <label class="btn btn-outline-primary" for="id_finishing_type_in_house">
+                                <i class="fas fa-user-cog me-2"></i>داخلي
+                            </label>
+                            <input type="radio" class="btn-check" name="{{ form.finishing_type.html_name }}" id="id_finishing_type_outsourced" value="outsourced" autocomplete="off" {% if form.finishing_type.value == 'outsourced' %}checked{% endif %}>
+                            <label class="btn btn-outline-primary" for="id_finishing_type_outsourced">
+                                <i class="fas fa-industry me-2"></i>خارجي
+                            </label>
                         </div>
                         {% for error in form.finishing_type.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
                     </div>

@@ -124,9 +124,50 @@
 
                 <!-- Activity Tab Content -->
                 <div id="activity-content" class="tab-content mt-6">
-                    <div class="bg-white rounded-lg shadow-md p-6">
-                        <p class="text-center text-gray-500">لا يوجد نشاط مسجل.</p>
-                        <!-- Future implementation: List of StockMovements -->
+                    <div class="bg-white rounded-lg shadow-md">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التاريخ</th>
+                                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المنتج</th>
+                                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">نوع الحركة</th>
+                                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">الكمية</th>
+                                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المستخدم</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    {% for movement in recent_movements %}
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ movement.created_at|date:"Y-m-d H:i" }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ movement.stock_item.product.name }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
+                                            {% if movement.movement_type == 'in' %}
+                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">وارد</span>
+                                            {% elif movement.movement_type == 'out' %}
+                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">صادر</span>
+                                            {% elif movement.movement_type == 'transfer' %}
+                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">تحويل</span>
+                                            {% else %}
+                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">{{ movement.get_movement_type_display }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-bold {% if movement.quantity > 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                                            {{ movement.quantity|floatformat:2 }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ movement.created_by.username|default:"-" }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="5" class="text-center py-10 text-gray-500">
+                                            <i class="fas fa-history fa-3x"></i>
+                                            <p class="mt-2">لا يوجد نشاط مسجل في هذا المخزن.</p>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
                 

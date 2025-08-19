@@ -8,7 +8,7 @@
     .attendance-grid th, .attendance-grid td {
         text-align: center;
         vertical-align: middle;
-        min-width: 160px;
+        min-width: 180px; /* Increased width to accommodate buttons */
     }
     .attendance-grid th:first-child, .attendance-grid td:first-child {
         min-width: 200px;
@@ -26,12 +26,22 @@
     .table-responsive {
         max-height: 75vh;
     }
+    .time-input-group {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-bottom: 5px;
+    }
     .time-input {
         border: 1px solid #d1d3e2;
         padding: 0.25rem 0.5rem;
         border-radius: 0.35rem;
-        width: 100%;
-        margin-bottom: 5px;
+        flex-grow: 1;
+    }
+    .btn-time-shortcut {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        line-height: 1;
     }
     .status-badge {
         font-size: 0.8rem;
@@ -92,8 +102,14 @@
                                 <td>{{ row.employee.full_name }}</td>
                                 {% for day in row.days %}
                                     <td class="day-cell" data-employee-id="{{ row.employee.id }}" data-date="{{ day.date|date:'Y-m-d' }}">
-                                        <input type="time" class="time-input check-in" value="{{ day.check_in|time:'H:i'|default:'' }}">
-                                        <input type="time" class="time-input check-out" value="{{ day.check_out|time:'H:i'|default:'' }}">
+                                        <div class="time-input-group">
+                                            <input type="time" class="time-input check-in" value="{{ day.check_in|time:'H:i'|default:'' }}">
+                                            <button type="button" class="btn btn-sm btn-outline-info btn-time-shortcut" data-time="08:00">8</button>
+                                        </div>
+                                        <div class="time-input-group">
+                                            <input type="time" class="time-input check-out" value="{{ day.check_out|time:'H:i'|default:'' }}">
+                                            <button type="button" class="btn btn-sm btn-outline-info btn-time-shortcut" data-time="17:00">5</button>
+                                        </div>
                                         <div class="status-container mt-1">
                                             <span class="status-badge status-{{ day.status|cut:' ' }}">{{ day.status }}</span>
                                         </div>
@@ -112,20 +128,16 @@
 {% block extra_js %}
 <script>
 $(document).ready(function() {
-    // This is the most reliable way to get the CSRF token for AJAX requests
     const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
-    $('#attendanceTable').on('change', '.time-input', function() {
-        const input = $(this);
-        const cell = input.closest('.day-cell');
+    function saveAttendance(cell) {
         const employeeId = cell.data('employee-id');
         const recordDate = cell.data('date');
-        
         const checkInVal = cell.find('.check-in').val();
         const checkOutVal = cell.find('.check-out').val();
-
-        // Add visual feedback
-        input.css('border-color', '#f6c23e'); // Yellow for "saving"
+        
+        const inputs = cell.find('.time-input');
+        inputs.css('border-color', '#f6c23e'); // Yellow for "saving"
 
         $.ajax({
             url: "{% url 'hr:update_manual_attendance' %}",
@@ -140,24 +152,37 @@ $(document).ready(function() {
             }),
             success: function(response) {
                 if (response.status === 'success') {
-                    input.css('border-color', '#1cc88a'); // Green for success
-                    setTimeout(() => input.css('border-color', '#d1d3e2'), 2000); // Revert after 2s
+                    inputs.css('border-color', '#1cc88a'); // Green for success
+                    setTimeout(() => inputs.css('border-color', '#d1d3e2'), 2000);
                     
-                    // Update status badge
                     const statusContainer = cell.find('.status-container');
                     const newStatus = response.new_status;
                     const newStatusClass = newStatus.replace(/ /g, '-');
                     statusContainer.html(`<span class="status-badge status-${newStatusClass}">${newStatus}</span>`);
-
                 } else {
-                    input.css('border-color', '#e74a3b'); // Red for error
+                    inputs.css('border-color', '#e74a3b'); // Red for error
                 }
             },
             error: function() {
-                input.css('border-color', '#e74a3b'); // Red for error
+                inputs.css('border-color', '#e74a3b'); // Red for error
                 alert('حدث خطأ أثناء الحفظ. يرجى المحاولة مرة أخرى.');
             }
         });
+    }
+
+    $('#attendanceTable').on('change', '.time-input', function() {
+        const cell = $(this).closest('.day-cell');
+        saveAttendance(cell);
+    });
+
+    $('#attendanceTable').on('click', '.btn-time-shortcut', function() {
+        const button = $(this);
+        const timeToSet = button.data('time');
+        const inputGroup = button.closest('.time-input-group');
+        const timeInput = inputGroup.find('.time-input');
+        
+        // Set the value and trigger the change event to save it
+        timeInput.val(timeToSet).trigger('change');
     });
 });
 </script>

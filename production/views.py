@@ -722,20 +722,29 @@ class CuttingProcessListView(LoginRequiredMixin, ListView):
         return unified_list
 
     def get_context_data(self, **kwargs):
-        # Manually handle pagination for the combined list
-        queryset = self.get_queryset()
-        paginator = Paginator(queryset, self.paginate_by)
+        # Get the full, combined list of items.
+        full_list = self.get_queryset()
+
+        # Create the Paginator object.
+        paginator = Paginator(full_list, self.paginate_by)
         page_number = self.request.GET.get('page')
+
+        # Get the Page object for the requested page number.
+        # Paginator.get_page is safer than .page as it handles invalid numbers.
         page_obj = paginator.get_page(page_number)
 
-        context = super().get_context_data(object_list=page_obj, **kwargs)
-        
-        # Pass filter configuration and current values to the template
+        # Call the grandparent's get_context_data to get the base context
+        # without triggering ListView's pagination logic, which causes the error.
+        context = super(ListView, self).get_context_data(**kwargs)
+
+        # Manually add all the context variables the template expects.
         context.update({
-            'cutting_items': page_obj.object_list,
+            'paginator': paginator,
             'page_obj': page_obj,
             'is_paginated': page_obj.has_other_pages(),
-            'total_count': len(queryset),
+            'object_list': page_obj.object_list,
+            self.context_object_name: page_obj.object_list, # Sets 'cutting_items'
+            'total_count': paginator.count,
             'search_enabled': True,
             'search_placeholder': 'ابحث برقم الأمر أو اسم المنتج...',
             'filters': [
@@ -2151,6 +2160,11 @@ def ajax_get_finishing_bom_components_for_dyeing(request):
 @login_required
 @require_POST
 def receive_finishing_batch(request, pk):
+    """
+    Handles receiving a single batch of finished goods from a FinishingProcess.
+    FIXED: This function now correctly creates a single ProductBatch only when the
+    entire FinishingProcess is completed, resolving the OneToOneField unique constraint violation.
+    """
     process = get_object_or_404(FinishingProcess, pk=pk, is_completed=False)
     form = FinishingBatchReceiveForm(request.POST, instance=process)
 
@@ -2159,7 +2173,7 @@ def receive_finishing_batch(request, pk):
         
         try:
             with transaction.atomic():
-                # 1. Create a history record for the batch
+                # Step 1: Create a history record for this specific batch receipt.
                 history_entry = {
                     'date': timezone.now().isoformat(),
                     'user_id': request.user.id,
@@ -2170,27 +2184,21 @@ def receive_finishing_batch(request, pk):
                 }
                 process.receipt_history.append(history_entry)
 
-                # 2. Update the total received and defect counts on the process instance
+                # Step 2: Update the total received and defect counts on the process instance.
                 process.quantity_output += data['quantity_received']
                 process.defects_in_finishing += data['defects_in_batch']
                 
-                # 3. Handle stock movement for the received batch
                 production_order = process.dyeing_process.assembly_process.production_order
+                
+                # Step 3: Handle the inventory movement for the received quantity.
+                # This happens for every batch received.
                 if data['quantity_received'] > 0:
                     stock_item, _ = StockItem.objects.get_or_create(
                         product=production_order.product,
                         warehouse=process.destination_warehouse,
                         defaults={'quantity': 0}
                     )
-                    # Create a batch record for traceability
-                    ProductBatch.objects.create(
-                        stock=stock_item,
-                        batch_number=production_order.batch_number,
-                        quantity=data['quantity_received'],
-                        production_finishing_source=process,
-                        cost_per_piece=production_order.cost_analysis.cost_per_piece if hasattr(production_order, 'cost_analysis') else 0
-                    )
-                    # Create a stock movement to add the items to inventory
+                    # Create a stock movement to add the items to inventory.
                     StockMovement.objects.create(
                         stock_item=stock_item,
                         movement_type='in',
@@ -2200,7 +2208,7 @@ def receive_finishing_batch(request, pk):
                         created_by=request.user
                     )
 
-                # 4. Check if this is the final batch and complete the process
+                # Step 4: Check if this is the final batch and complete the process.
                 is_final = data.get('is_final_batch', False)
                 total_accounted_for = process.quantity_output + process.defects_in_finishing
                 
@@ -2208,7 +2216,24 @@ def receive_finishing_batch(request, pk):
                     process.is_completed = True
                     process.actual_completion_date = timezone.now()
                     
-                    # Update the main ProductionOrder status to 'completed'
+                    # --- FIX START: Create the ProductBatch record ONLY ONCE upon completion ---
+                    # This ensures the OneToOneField constraint is respected.
+                    if process.quantity_output > 0:
+                        stock_item, _ = StockItem.objects.get_or_create(
+                            product=production_order.product,
+                            warehouse=process.destination_warehouse
+                        )
+                        ProductBatch.objects.create(
+                            stock=stock_item,
+                            batch_number=production_order.batch_number,
+                            # The quantity is the TOTAL output of the process, not just this batch.
+                            quantity=process.quantity_output, 
+                            production_finishing_source=process,
+                            cost_per_piece=production_order.cost_analysis.cost_per_piece if hasattr(production_order, 'cost_analysis') else 0
+                        )
+                    # --- FIX END ---
+                    
+                    # Update the main ProductionOrder status to 'completed'.
                     production_order.status = 'completed'
                     production_order.actual_completion_date = timezone.now().date()
                     production_order.save(update_fields=['status', 'actual_completion_date'])
@@ -2216,13 +2241,15 @@ def receive_finishing_batch(request, pk):
                 else:
                     messages.success(request, f"تم استلام دفعة بكمية {data['quantity_received']} بنجاح.")
 
+                # Save all changes to the process instance.
                 process.save()
 
         except Exception as e:
+            logger.error(f"An unexpected error occurred in receive_finishing_batch: {e}")
             messages.error(request, f"حدث خطأ غير متوقع: {e}")
             
     else:
-        # If the form is not valid, display the errors
+        # If the form is not valid, display the errors to the user.
         for field, errors in form.errors.items():
             for error in errors:
                 field_label = form.fields[field].label if field != '__all__' else 'خطأ عام'

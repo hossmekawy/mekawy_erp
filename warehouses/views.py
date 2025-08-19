@@ -463,12 +463,21 @@ class WarehouseDetailView(DetailView ,LoginRequiredMixin):
                 low_stock_count += 1
         active_items_count = active_stock_items.count()
         normal_stock_count = active_items_count - low_stock_count
+        
+        # --- FIX START: Fetch recent stock movements for this warehouse ---
+        recent_movements = StockMovement.objects.filter(
+            stock_item__warehouse=warehouse
+        ).select_related('stock_item__product', 'created_by').order_by('-created_at')[:15]
+        # --- FIX END ---
+
         context['stock_items'] = active_stock_items
         context['total_stock_items_count'] = active_items_count
         context['total_value'] = total_value
         context['low_stock_count'] = low_stock_count
         context['normal_stock_count'] = normal_stock_count
+        context['recent_movements'] = recent_movements # Pass movements to the template
         return context
+
 
 class WarehouseUpdateView(UpdateView ,LoginRequiredMixin):
     model = Warehouse

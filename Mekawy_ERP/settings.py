@@ -37,7 +37,7 @@ SECRET_KEY = env('SECRET_KEY', default='django-insecure-frqrxc_5k#*_%of8!=7g0*8&
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True 
 
-ALLOWED_HOSTS = ['167.86.71.246']
+ALLOWED_HOSTS = ['167.86.71.246','192.168.1.200']
 
 
 CSRF_TRUSTED_ORIGINS = [
@@ -133,12 +133,12 @@ AUTHENTICATION_BACKENDS = [
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DATABASE_NAME'),
-        'USER': config('DATABASE_USER'),
-        'PASSWORD': config('DATABASE_PASSWORD'),
-        'HOST': 'localhost',
-        'PORT': config('DATABASE_PORT', default='5432'), # Add this line
-        'CONN_MAX_AGE': 600,
+        'NAME': 'mekawy_erp',
+        'USER': 'mekawy_user',
+        'PASSWORD': 'Ahmed2013', # Your actual password
+        'HOST': 'localhost',   # Using localhost is better for performance if DB is on the same server
+        'PORT': '5433',            # The correct port
+        'CONN_MAX_AGE': 600,       # --- FIX: Add this line ---
     }
 }
 

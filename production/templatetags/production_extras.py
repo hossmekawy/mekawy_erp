@@ -1,9 +1,23 @@
 from django import template
+from datetime import datetime
+import logging
+
 from decimal import Decimal
 
+logger = logging.getLogger(__name__)
 register = template.Library()
 
-
+@register.filter(name='parse_iso')
+def parse_iso(value):
+    """Converts an ISO 8601 string to a datetime object."""
+    if not isinstance(value, str):
+        return value
+    try:
+        # Handles datetime strings with or without microseconds
+        return datetime.fromisoformat(value)
+    except (ValueError, TypeError):
+        logger.warning(f"Could not parse ISO date string: {value}")
+        return None
 @register.filter
 def sub(value, arg):
     """Subtracts the arg from the value."""
