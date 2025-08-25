@@ -16,11 +16,24 @@ class CustomerForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # MODIFIED: Make email not required on the form
         self.fields['email'].required = False
         for field_name, field in self.fields.items():
             if not isinstance(field.widget, forms.CheckboxInput):
                 field.widget.attrs.update({'class': 'form-control'})
+
+# --- ADD THIS NEW FORM ---
+class CustomerPOSForm(forms.ModelForm):
+    """
+    A simplified form specifically for creating a customer from the POS modal.
+    """
+    class Meta:
+        model = Customer
+        fields = ['name', 'phone_number', 'email']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['email'].required = False
+
 
 class InteractionForm(forms.ModelForm):
     class Meta:

@@ -4,6 +4,7 @@ from django.core.validators import MinValueValidator
 from decimal import Decimal
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings
+from django.db.models import Sum
 
 User = get_user_model() 
 # التصنيفات
@@ -152,7 +153,7 @@ class Product(models.Model):
     quality_grade = models.CharField(max_length=10, choices=[('A', 'A'), ('B', 'B'), ('C', 'C')], null=True, blank=True, default='A', verbose_name="درجة الجودة")
 
     # == Fields for Finished Product (منتج نهائي) ==
-    selling_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="سعر البيع")
+    selling_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="سعر البيع")
     # The code `size_groups` is not a valid Python code snippet. It seems like it is just a
     # placeholder or a comment. It does not perform any specific operation or functionality in Python.
     # The code `size_groups` is not doing anything as it is just a variable name. It is not assigned
@@ -173,9 +174,25 @@ class Product(models.Model):
     
     @property
     def total_stock(self):
-        return sum(item.quantity for item in self.stock_items.all())
+        """A property for backward compatibility."""
+        return self.get_total_stock()
 
+    def get_total_stock(self):
+        """Calculates total stock across ALL warehouses."""
+        total_quantity = self.stock_items.aggregate(total=Sum('quantity'))['total']
+        return total_quantity or 0
 
+    def get_stock_for_warehouse(self, warehouse_id):
+        """Calculates stock for a SPECIFIC warehouse."""
+        if not warehouse_id or warehouse_id == 'all':
+            return self.get_total_stock()
+
+        try:
+            warehouse_id = int(warehouse_id)
+            total_quantity = self.stock_items.filter(warehouse_id=warehouse_id).aggregate(total=Sum('quantity'))['total']
+            return total_quantity or 0
+        except (ValueError, TypeError):
+            return 0
 
 # عنصر مخزون
 class StockItem(models.Model):

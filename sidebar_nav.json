@@ -50,14 +50,14 @@
     "icon": "fas fa-cash-register",
     "roles": ["admin", "manager", "salesperson"],
     "submenu": {
+        "نقطة_البيع": {
+            "url_name": "sales:pos_view",
+            "icon": "fas fa-cash-register",
+            "roles": ["admin", "manager", "salesperson"]
+        },
         "فواتير_المبيعات": {
             "url_name": "sales:invoice_list",
             "icon": "fas fa-file-invoice-dollar",
-            "roles": ["admin", "manager", "salesperson"]
-        },
-        "إضافة_فاتورة_جديدة": {
-            "url_name": "sales:invoice_create",
-            "icon": "fas fa-plus-circle",
             "roles": ["admin", "manager", "salesperson"]
         },
         "قوائم_الأسعار": {

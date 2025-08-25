@@ -4,14 +4,18 @@ from . import views
 app_name = 'sales'
 
 urlpatterns = [
+    # Standalone Page URLs
+    path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
+    path('pos/', views.POSView.as_view(), name='pos_view'), # This is the main POS page
+
+    # API URLs for the frontend
+    path('api/products/', views.ProductListAPIView.as_view(), name='api_product_list'),
+    path('api/customers/search/', views.CustomerSearchAPIView.as_view(), name='api_customer_search'),
+    path('api/invoice/create/', views.CreateInvoiceAPIView.as_view(), name='api_invoice_create'),
+
+    # You can keep your old invoice URLs if you still need them for a back-office interface
     path('invoices/', views.SalesInvoiceListView.as_view(), name='invoice_list'),
     path('invoices/create/', views.SalesInvoiceCreateView.as_view(), name='invoice_create'),
     path('invoices/<int:pk>/', views.SalesInvoiceDetailView.as_view(), name='invoice_detail'),
     path('invoices/<int:pk>/update/', views.SalesInvoiceUpdateView.as_view(), name='invoice_update'),
-
-    path('pricelists/', views.PriceListView.as_view(), name='pricelist_list'),
-    path('pricelists/create/', views.PriceListCreateView.as_view(), name='pricelist_create'),
-    
-    # --- NEW API URL for Customer Search ---
-    path('api/customers/search/', views.CustomerSearchAPIView.as_view(), name='api_customer_search'),
 ]

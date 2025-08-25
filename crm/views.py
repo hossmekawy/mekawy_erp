@@ -1,12 +1,20 @@
+from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
+from django.views import View
 from django.views.generic import ListView, DetailView, CreateView, UpdateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from django.contrib import messages
 from .models import Customer, Interaction
-from .forms import CustomerForm, InteractionForm
+from .forms import CustomerForm, CustomerPOSForm, InteractionForm
 from django.db import models # Added for Q objects
+from django.db.models import Q
 from django.contrib.auth.decorators import login_required
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .forms import CustomerForm
+from .models import Customer
 
 class CustomerListView(LoginRequiredMixin, ListView):
     model = Customer
@@ -91,3 +99,46 @@ def add_interaction(request, pk):
         else:
             messages.error(request, "حدث خطأ أثناء تسجيل التفاعل.")
     return redirect('crm:customer_detail', pk=pk)
+
+
+class CustomerSearchAPIView(View):
+    """
+    API endpoint for searching customers dynamically for the POS.
+    """
+    def get(self, request, *args, **kwargs):
+        query = request.GET.get('q', '')
+        if len(query) < 2:
+            return JsonResponse([], safe=False)
+        
+        # FIX: The search query for PhoneNumberField is now correct.
+        customers = Customer.objects.filter(
+            Q(name__icontains=query) |
+            Q(phone_number__icontains=query)
+        ).filter(is_active=True)[:10]
+        
+        results = [{'id': c.id, 'text': f"{c.name} - {c.phone_number}"} for c in customers]
+        return JsonResponse(results, safe=False)
+
+class CustomerCreateAPIView(APIView):
+    """
+    API endpoint to handle customer creation from the POS modal.
+    """
+    def post(self, request, *args, **kwargs):
+        # FIX: Use the new, simplified CustomerPOSForm
+        form = CustomerPOSForm(request.data)
+        
+        if form.is_valid():
+            customer = form.save(commit=False)
+            if request.user.is_authenticated:
+                customer.created_by = request.user
+            customer.save()
+            
+            data = {
+                'id': customer.id,
+                'name': str(customer),
+                'message': 'تم إنشاء العميل بنجاح'
+            }
+            return Response(data, status=status.HTTP_201_CREATED)
+        
+        return Response(form.errors, status=status.HTTP_400_BAD_REQUEST)
+
