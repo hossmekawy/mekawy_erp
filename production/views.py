@@ -8,6 +8,9 @@ from django.contrib.contenttypes.models import ContentType
 from finance.models import Account, Transaction # Make sure your finance app is named 'finance'
 from xhtml2pdf import pisa
 import io
+from collections import defaultdict
+from collections import defaultdict
+from itertools import chain
 from datetime import datetime, timedelta
 import logging
 import pdfkit
@@ -2391,57 +2394,36 @@ class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         """
-        Gathers and processes all data needed for the manufacturer detail page.
-        This method now standardizes both active jobs and job history.
+        Gathers and processes all data needed for the manufacturer detail page,
+        including new totals for active and completed pieces, and counts by category.
         """
         context = super().get_context_data(**kwargs)
         manufacturer = self.get_object()
         
-        # --- Combine all job types into a single list ---
-        assembly_jobs = manufacturer.assembly_processes.all()
-        dyeing_jobs = manufacturer.dyeing_jobs.all()
-        finishing_jobs = manufacturer.finishing_jobs.all()
+        # --- Prefetch related data for efficiency ---
+        assembly_jobs = manufacturer.assembly_processes.all().select_related('production_order__product__category')
+        dyeing_jobs = manufacturer.dyeing_jobs.all().select_related('assembly_process__production_order__product__category')
+        finishing_jobs = manufacturer.finishing_jobs.all().select_related('dyeing_process__assembly_process__production_order__product__category')
+        
         all_jobs = list(chain(assembly_jobs, dyeing_jobs, finishing_jobs))
-
         active_jobs_raw = [job for job in all_jobs if not job.is_completed]
         completed_jobs_raw = [job for job in all_jobs if job.is_completed]
         default_date = timezone.now()
 
-        # --- FIX: Standardize the Active Jobs list ---
+        # --- Standardize Active/Completed Jobs Lists ---
         active_jobs_list = []
         for job in active_jobs_raw:
-            production_order = None
-            job_type_display = "غير محدد"
-            start_date = None
-            detail_url = "#"
-
+            production_order, job_type_display, start_date, detail_url = None, "غير محدد", None, "#"
             if isinstance(job, AssemblyProcess):
-                production_order = job.production_order
-                job_type_display = "تجميع"
-                start_date = job.start_date
-                detail_url = reverse('production:assembly_detail', kwargs={'pk': job.pk})
+                production_order, job_type_display, start_date, detail_url = job.production_order, "تجميع", job.start_date, reverse('production:assembly_detail', kwargs={'pk': job.pk})
             elif isinstance(job, DyeingProcess):
-                production_order = job.assembly_process.production_order
-                job_type_display = "صباغة"
-                start_date = job.sent_date
-                detail_url = reverse('production:dyeing_detail', kwargs={'pk': job.pk})
+                production_order, job_type_display, start_date, detail_url = job.assembly_process.production_order, "صباغة", job.sent_date, reverse('production:dyeing_detail', kwargs={'pk': job.pk})
             elif isinstance(job, FinishingProcess):
-                production_order = job.dyeing_process.assembly_process.production_order
-                job_type_display = "تشطيب"
-                start_date = job.start_date
-                detail_url = reverse('production:finishing_detail', kwargs={'pk': job.pk})
-
+                production_order, job_type_display, start_date, detail_url = job.dyeing_process.assembly_process.production_order, "تشطيب", job.start_date, reverse('production:finishing_detail', kwargs={'pk': job.pk})
             if production_order:
-                active_jobs_list.append({
-                    'job_object': job, # Pass original object for filters like 'class_name'
-                    'order': production_order,
-                    'job_type': job_type_display,
-                    'start_date': start_date,
-                    'detail_url': detail_url,
-                })
+                active_jobs_list.append({'job_object': job, 'order': production_order, 'job_type': job_type_display, 'start_date': start_date, 'detail_url': detail_url})
         context['active_jobs'] = sorted(active_jobs_list, key=lambda x: x['start_date'] or default_date, reverse=True)
 
-        # --- Standardize the Job History list ---
         job_history_list = []
         for job in completed_jobs_raw:
             cost, completion_date, detail_url, production_order, job_type_display = 0, None, "#", None, "غير محدد"
@@ -2451,26 +2433,66 @@ class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
                 cost, completion_date, production_order, job_type_display, detail_url = job.total_dyeing_cost, job.actual_return_date, job.assembly_process.production_order, "صباغة", reverse('production:dyeing_detail', kwargs={'pk': job.pk})
             elif isinstance(job, FinishingProcess):
                 cost, completion_date, production_order, job_type_display, detail_url = job.total_finishing_cost, job.actual_completion_date, job.dyeing_process.assembly_process.production_order, "تشطيب", reverse('production:finishing_detail', kwargs={'pk': job.pk})
-
             if production_order:
-                job_history_list.append({'order_number': production_order.order_number, 'product_name': production_order.product.name, 'cost': cost or 0, 'completion_date': completion_date, 'job_type': job_type_display, 'detail_url': detail_url})
-        
+                job_history_list.append({'order': production_order, 'cost': cost or 0, 'completion_date': completion_date, 'job_type': job_type_display, 'detail_url': detail_url})
         context['job_history'] = sorted(job_history_list, key=lambda x: x['completion_date'] or default_date, reverse=True)
         
-        # --- Calculate summary metrics ---
         context['product_prices'] = manufacturer.product_prices.all()
         context['total_value_of_completed_jobs'] = sum(item['cost'] for item in job_history_list)
-        context['total_pieces_completed'] = sum(getattr(job, 'quantity_received', getattr(job, 'quantity_output', 0)) or 0 for job in completed_jobs_raw)
-        
-        # This is an estimate as active jobs may not have a final cost yet.
-        context['total_value_of_active_jobs'] = sum(
-            getattr(job, 'assembly_cost', 0) or 0 + 
-            getattr(job, 'total_dyeing_cost', 0) or 0 + 
-            getattr(job, 'total_finishing_cost', 0) or 0 
-            for job in active_jobs_raw
-        )
+
+        # --- NEW LOGIC: Calculate Piece Totals and Category Breakdowns ---
+        total_pieces_completed = 0
+        completed_pieces_by_category = defaultdict(int)
+        for job in completed_jobs_raw:
+            quantity = 0
+            product = None
+            if isinstance(job, (AssemblyProcess, DyeingProcess)):
+                quantity = job.quantity_received or 0
+                product = job.production_order.product if hasattr(job, 'production_order') else job.assembly_process.production_order.product
+            elif isinstance(job, FinishingProcess):
+                quantity = job.quantity_output or 0
+                product = job.dyeing_process.assembly_process.production_order.product
+            
+            total_pieces_completed += quantity
+            if product and product.category:
+                completed_pieces_by_category[product.category.name] += quantity
+
+        total_pieces_active = 0
+        active_pieces_by_category = defaultdict(int)
+        for job in active_jobs_raw:
+            quantity = 0
+            product = None
+            if isinstance(job, (AssemblyProcess, DyeingProcess)):
+                quantity = job.quantity_sent or 0
+                product = job.production_order.product if hasattr(job, 'production_order') else job.assembly_process.production_order.product
+            elif isinstance(job, FinishingProcess):
+                quantity = job.quantity_input or 0
+                product = job.dyeing_process.assembly_process.production_order.product
+            
+            total_pieces_active += quantity
+            if product and product.category:
+                active_pieces_by_category[product.category.name] += quantity
+
+        context['total_pieces_completed'] = total_pieces_completed
+        context['total_pieces_active'] = total_pieces_active
+        context['grand_total_pieces'] = total_pieces_completed + total_pieces_active
+        context['completed_pieces_by_category'] = dict(sorted(completed_pieces_by_category.items()))
+        context['active_pieces_by_category'] = dict(sorted(active_pieces_by_category.items()))
+
+        # --- Existing Materials Logic ---
+        materials_by_order = defaultdict(list)
+        assembly_components = AssemblyComponent.objects.filter(assembly_process__external_manufacturer=manufacturer).select_related('assembly_process__production_order__product', 'material__unit_new', 'source_warehouse').order_by('assembly_process__start_date')
+        for comp in assembly_components:
+            order = comp.assembly_process.production_order
+            materials_by_order[order].append({'material': comp.material, 'quantity': comp.quantity_sent, 'warehouse': comp.source_warehouse.name if comp.source_warehouse else 'N/A', 'stage': 'تجميع / إضافي', 'date': comp.assembly_process.start_date, 'process_url': reverse('production:assembly_detail', kwargs={'pk': comp.assembly_process.pk})})
+        finishing_components = FinishingComponent.objects.filter(finishing_process__external_manufacturer=manufacturer).select_related('finishing_process__dyeing_process__assembly_process__production_order__product', 'material__unit_new', 'source_warehouse').order_by('finishing_process__start_date')
+        for comp in finishing_components:
+            order = comp.finishing_process.dyeing_process.assembly_process.production_order
+            materials_by_order[order].append({'material': comp.material, 'quantity': comp.quantity_sent, 'warehouse': comp.source_warehouse.name if comp.source_warehouse else 'N/A', 'stage': 'تشطيب', 'date': comp.finishing_process.start_date, 'process_url': reverse('production:finishing_detail', kwargs={'pk': comp.finishing_process.pk})})
+        context['materials_by_order'] = dict(sorted(materials_by_order.items(), key=lambda item: item[0].created_at, reverse=True))
 
         return context
+
 
 
 
@@ -2493,14 +2515,15 @@ class ExternalManufacturerUpdateView(LoginRequiredMixin, UpdateView):
         return reverse_lazy('production:manufacturers:manufacturer_detail', kwargs={'pk': self.object.pk})
 
     def get_context_data(self, **kwargs):
-            context = super().get_context_data(**kwargs)
-            if self.request.POST:
-                context['product_price_formset'] = ManufacturerProductPriceFormSet(self.request.POST, instance=self.object, prefix='prices')
-            else:
-                context['product_price_formset'] = ManufacturerProductPriceFormSet(instance=self.object, prefix='prices')
-            return context
+        context = super().get_context_data(**kwargs)
+        if self.request.POST:
+            context['product_price_formset'] = ManufacturerProductPriceFormSet(self.request.POST, instance=self.object, prefix='prices')
+        else:
+            context['product_price_formset'] = ManufacturerProductPriceFormSet(instance=self.object, prefix='prices')
+        
+        context['product_categories'] = Category.objects.filter(is_active=True)
+        return context
 
-    # ADDED: Method to validate and save formset
     def form_valid(self, form):
         context = self.get_context_data()
         formset = context['product_price_formset']
@@ -2512,7 +2535,6 @@ class ExternalManufacturerUpdateView(LoginRequiredMixin, UpdateView):
             messages.success(self.request, 'تم تحديث بيانات المصنع والأسعار بنجاح.')
             return redirect(self.get_success_url())
         else:
-            # Add formset errors to messages if invalid
             for fs_form in formset:
                 for field, error_list in fs_form.errors.items():
                     for error in error_list:
@@ -3211,39 +3233,76 @@ class CostAnalysisDetailView(LoginRequiredMixin, DetailView):
         for assembly in order.assembly_processes.all():
             duration = (assembly.actual_completion_date - assembly.start_date) if assembly.start_date and assembly.actual_completion_date else None
             handler = assembly.external_manufacturer.name if assembly.assembly_type == 'outsourced' and assembly.external_manufacturer else (assembly.assembler.get_full_name() if assembly.assembler else 'داخلي')
-            cost_per_piece = assembly.external_manufacturer.price_per_piece if assembly.assembly_type == 'outsourced' and assembly.external_manufacturer else None
+            
+            # --- FIX: Look up the price from the correct model ---
+            cost_per_piece_assembly = None
+            if assembly.assembly_type == 'outsourced' and assembly.external_manufacturer:
+                try:
+                    price_obj = ManufacturerProductPrice.objects.get(
+                        manufacturer=assembly.external_manufacturer,
+                        product=order.product
+                    )
+                    cost_per_piece_assembly = price_obj.price
+                except ManufacturerProductPrice.DoesNotExist:
+                    cost_per_piece_assembly = None
+            
             timeline.append({
                 'stage': f'التجميع ({assembly.get_assembly_type_display()})',
                 'start': assembly.start_date,
                 'end': assembly.actual_completion_date,
                 'duration': duration,
                 'handler': handler,
-                'cost_per_piece': cost_per_piece
+                'cost_per_piece': cost_per_piece_assembly
             })
 
             for dyeing in assembly.dyeing_processes.all():
                 duration = (dyeing.actual_return_date - dyeing.sent_date) if dyeing.sent_date and dyeing.actual_return_date else None
                 handler = dyeing.dyeing_facility.name if dyeing.dyeing_facility else 'غير محدد'
-                cost_per_piece = dyeing.dyeing_cost_per_piece
+                
+                # --- FIX: Look up the price for the dyeing facility ---
+                cost_per_piece_dyeing = None
+                if dyeing.dyeing_facility:
+                    try:
+                        price_obj = ManufacturerProductPrice.objects.get(
+                            manufacturer=dyeing.dyeing_facility,
+                            product=order.product
+                        )
+                        cost_per_piece_dyeing = price_obj.price
+                    except ManufacturerProductPrice.DoesNotExist:
+                        cost_per_piece_dyeing = None
+                
                 timeline.append({
                     'stage': f'الصباغة ({dyeing.color_specification})',
                     'start': dyeing.sent_date,
                     'end': dyeing.actual_return_date,
                     'duration': duration,
                     'handler': handler,
-                    'cost_per_piece': cost_per_piece
+                    'cost_per_piece': cost_per_piece_dyeing
                 })
+                
                 if finishing_process := getattr(dyeing, 'finishing_process', None):
                     duration = (finishing_process.actual_completion_date - finishing_process.start_date) if finishing_process.start_date and finishing_process.actual_completion_date else None
                     handler = finishing_process.external_manufacturer.name if finishing_process.finishing_type == 'outsourced' and finishing_process.external_manufacturer else (finishing_process.finisher.get_full_name() if finishing_process.finisher else 'داخلي')
-                    cost_per_piece = finishing_process.external_manufacturer.price_per_piece if finishing_process.finishing_type == 'outsourced' and finishing_process.external_manufacturer else None
+                    
+                    # --- FIX: Look up the price for the finishing facility ---
+                    cost_per_piece_finishing = None
+                    if finishing_process.finishing_type == 'outsourced' and finishing_process.external_manufacturer:
+                        try:
+                            price_obj = ManufacturerProductPrice.objects.get(
+                                manufacturer=finishing_process.external_manufacturer,
+                                product=order.product
+                            )
+                            cost_per_piece_finishing = price_obj.price
+                        except ManufacturerProductPrice.DoesNotExist:
+                            cost_per_piece_finishing = None
+                    
                     timeline.append({
                         'stage': 'التشطيب',
                         'start': finishing_process.start_date,
                         'end': finishing_process.actual_completion_date,
                         'duration': duration,
                         'handler': handler,
-                        'cost_per_piece': cost_per_piece
+                        'cost_per_piece': cost_per_piece_finishing
                     })
         
         context['timeline'] = timeline
@@ -3278,18 +3337,15 @@ class CostAnalysisDetailView(LoginRequiredMixin, DetailView):
             'order': order,
             'cutting_process': cutting_process,
             'colors': list(set(DyeingProcess.objects.filter(assembly_process__production_order=order).values_list('color_specification', flat=True))),
-            # --- FIX: Query ProductBatch for storage locations ---
             'storage_locations': list(set(ProductBatch.objects.filter(
                 stock__product=order.product, 
                 batch_number=order.batch_number
             ).values_list('stock__warehouse__name', flat=True)))
         }
         
-        # --- FIX: Correctly reference the product on the stock item ---
         fabric_bom_quantity = None
         if bom and order.textile_stock:
             try:
-                # The material is the product associated with the stock item
                 fabric_material = order.textile_stock.product
                 fabric_bom_item = BOMItem.objects.get(bom=bom, material=fabric_material)
                 fabric_bom_quantity = fabric_bom_item.quantity
@@ -5552,3 +5608,25 @@ def public_order_detail_view(request, order_number):
     except ProductionOrder.DoesNotExist:
         return HttpResponse("Order not found.", status=404)
 
+@login_required
+def get_products_for_category_ajax(request):
+    """
+    AJAX view that takes a category ID and returns a list of all active,
+    finished products in that category, including their ID and name.
+    """
+    category_id = request.GET.get('category_id')
+    if not category_id:
+        return JsonResponse({'error': 'Category ID is required.'}, status=400)
+    
+    try:
+        # Fetches a list of product dicts, e.g., [{'id': 10, 'name': 'Product A'}, ...]
+        products = list(Product.objects.filter(
+            category_id=category_id,
+            product_type='finished',
+            is_active=True
+        ).values('id', 'name'))
+        
+        return JsonResponse({'success': True, 'products': products})
+    except Exception as e:
+        logger.error(f"Error in get_products_for_category_ajax: {e}")
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)

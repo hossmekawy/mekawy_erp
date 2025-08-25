@@ -2784,3 +2784,91 @@ def download_product_import_template(request, template_type):
     
     return response
 
+
+@login_required
+def export_products_excel(request):
+    """
+    تصدير قائمة المنتجات الكاملة إلى ملف Excel.
+    """
+    products = Product.objects.all().select_related('category').prefetch_related('size_groups')
+    
+    data = []
+    for product in products:
+        data.append({
+            'كود المنتج': product.code,
+            'اسم المنتج': product.name,
+            'الباركود': product.barcode,
+            'الفئة': product.category.name if product.category else '-',
+            'نوع المنتج': product.get_product_type_display(),
+            'سعر التكلفة': product.cost_price,
+            'سعر البيع': product.selling_price if product.product_type == 'finished' else '-',
+            'الوحدة': product.get_unit_display(),
+            'الحد الأدنى للمخزون': product.min_stock_level,
+            'نشط': 'نعم' if product.is_active else 'لا',
+            'الألوان المتاحة': product.colors if product.product_type == 'finished' else '-',
+            'العرض (سم)': product.width if product.product_type == 'fabric' else '-',
+            'درجة الجودة': product.get_quality_grade_display() if product.product_type == 'fabric' else '-',
+            'مجموعات المقاسات': ', '.join([sg.name for sg in product.size_groups.all()]) if PRODUCTION_APP_AVAILABLE and product.product_type == 'finished' else '-',
+            'كمية القماش للقطعة': product.fabric_quantity_per_piece if product.product_type == 'finished' else '-',
+            'تاريخ الإنشاء': product.created_at.strftime('%Y-%m-%d'),
+        })
+        
+    df = pd.DataFrame(data)
+    
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='المنتجات')
+    output.seek(0)
+    
+    response = HttpResponse(
+        output,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="mekawy_products_export.xlsx"'
+    
+    return response
+
+
+@login_required
+def export_warehouses_stock_excel(request):
+    """
+    تصدير مخزون كل مخزن في شيت منفصل داخل ملف Excel واحد.
+    """
+    warehouses = Warehouse.objects.filter(is_active=True)
+    
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        for warehouse in warehouses:
+            stock_items = StockItem.objects.filter(warehouse=warehouse).select_related('product')
+            
+            if not stock_items.exists():
+                continue
+
+            data = []
+            for item in stock_items:
+                data.append({
+                    'كود المنتج': item.product.code,
+                    'اسم المنتج': item.product.name,
+                    'الكمية الإجمالية': item.quantity,
+                    'الكمية المحجوزة': item.reserved_quantity,
+                    'الكمية المتاحة': item.available_quantity,
+                    'الوحدة': item.product.get_unit_display(),
+                    'الموقع في المخزن': item.location,
+                    'سعر التكلفة للوحدة': item.product.cost_price,
+                    'القيمة الإجمالية للمخزون': item.total_value,
+                })
+            
+            df = pd.DataFrame(data)
+            # Use a sanitized version of the warehouse name for the sheet name
+            sheet_name = ''.join(e for e in warehouse.name if e.isalnum())[:31]
+            df.to_excel(writer, index=False, sheet_name=sheet_name)
+            
+    output.seek(0)
+    
+    response = HttpResponse(
+        output,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="mekawy_warehouses_stock.xlsx"'
+    
+    return response

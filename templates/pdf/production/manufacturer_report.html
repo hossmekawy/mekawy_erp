@@ -1,0 +1,133 @@
+{% extends "pdf/base_pdf.html" %}
+{% load static humanize production_extras %}
+
+{% block pdf_title %}تقرير المصنع - {{ manufacturer.name }}{% endblock %}
+
+{% block pdf_extra_css %}
+<style>
+    body {
+        font-family: 'DejaVu Sans', sans-serif;
+        direction: rtl;
+        text-align: right;
+        font-size: 10px;
+    }
+    .header-table, .details-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+    }
+    .header-table td {
+        padding: 8px;
+        vertical-align: top;
+    }
+    .details-table th, .details-table td {
+        border: 1px solid #dee2e6;
+        padding: 6px 8px;
+        text-align: right;
+    }
+    .details-table thead th {
+        background-color: #f8f9fa;
+        font-weight: bold;
+    }
+    .section-title {
+        background-color: #e9ecef;
+        font-weight: bold;
+        padding: 8px;
+        font-size: 1.2em;
+        margin-top: 15px;
+        margin-bottom: 5px;
+        border: 1px solid #dee2e6;
+        border-bottom: 2px solid #ccc;
+    }
+</style>
+{% endblock %}
+
+{% block pdf_header %}
+    <table class="header-table">
+        <tr>
+            <td>
+                <h1>تقرير المصنع: {{ manufacturer.name }}</h1>
+                <p>
+                    <strong>الشخص المسؤول:</strong> {{ manufacturer.contact_person }}<br>
+                    <strong>الهاتف:</strong> {{ manufacturer.phone }}<br>
+                    <strong>العنوان:</strong> {{ manufacturer.address }}
+                </p>
+            </td>
+            <td style="text-align: left;">
+                <p><strong>تاريخ التقرير:</strong> {% now "d M Y" %}</p>
+            </td>
+        </tr>
+    </table>
+{% endblock %}
+
+{% block pdf_content %}
+    <h3 class="section-title">الملخص المالي والتشغيلي</h3>
+    <table class="details-table">
+        <tr>
+            <td style="width: 25%;"><strong>الرصيد المالي</strong></td>
+            <td>{{ manufacturer.finance_account.balance|default:0|floatformat:2|intcomma }} جنيه</td>
+            <td style="width: 25%;"><strong>قيمة الأعمال النشطة</strong></td>
+            <td>{{ manufacturer.total_value_of_active_jobs|floatformat:2|intcomma }} جنيه</td>
+        </tr>
+        <tr>
+            <td><strong>قيمة الأعمال المكتملة</strong></td>
+            <td>{{ total_value_of_completed_jobs|floatformat:2|intcomma }} جنيه</td>
+            <td><strong>تقييم الجودة</strong></td>
+            <td>{{ manufacturer.quality_rating }} / 5.0</td>
+        </tr>
+    </table>
+
+    <h3 class="section-title">المهام النشطة ({{ active_jobs|length }})</h3>
+    <table class="details-table">
+        <thead>
+            <tr>
+                <th>أمر الإنتاج</th>
+                <th>المنتج</th>
+                <th class="text-center">الكمية</th>
+                <th>نوع المهمة</th>
+                <th>تاريخ الإرسال</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for job in active_jobs %}
+            <tr>
+                <td>{{ job.order.order_number }}</td>
+                <td>{{ job.order.product.name }}</td>
+                <td class="text-center">{{ job.quantity|intcomma }}</td>
+                <td>{{ job.job_type }}</td>
+                <td>{{ job.start_date|date:"Y-m-d" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center">لا توجد مهام نشطة.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3 class="section-title">سجل المهام المكتملة ({{ job_history|length }})</h3>
+    <table class="details-table">
+        <thead>
+            <tr>
+                <th>أمر الإنتاج</th>
+                <th>المنتج</th>
+                <th class="text-center">الكمية</th>
+                <th>نوع المهمة</th>
+                <th class="text-end">التكلفة (جنيه)</th>
+                <th>تاريخ الإكمال</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for job in job_history %}
+            <tr>
+                <td>{{ job.order.order_number }}</td>
+                <td>{{ job.order.product.name }}</td>
+                <td class="text-center">{{ job.quantity|intcomma }}</td>
+                <td>{{ job.job_type }}</td>
+                <td class="text-end">{{ job.cost|floatformat:2|intcomma }}</td>
+                <td>{{ job.completion_date|date:"Y-m-d" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-center">لا يوجد سجل للمهام المكتملة.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

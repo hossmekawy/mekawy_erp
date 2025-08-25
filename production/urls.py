@@ -1,6 +1,6 @@
 from django.urls import path, include
 from . import views
-from .blueprints import bom_exports_blueprint, draw_blueprint, category_size_blueprint, cost_analysis_exports_blueprint
+from .blueprints import bom_exports_blueprint, draw_blueprint, category_size_blueprint, cost_analysis_exports_blueprint , manufacturer_exports_blueprint
 
 app_name = 'production'
 
@@ -24,6 +24,8 @@ manufacturer_patterns = [
     path('<int:pk>/update/', views.ExternalManufacturerUpdateView.as_view(), name='manufacturer_update'),
     path('<int:pk>/delete/', views.ExternalManufacturerDeleteView.as_view(), name='manufacturer_delete'),
     path('<int:pk>/create-account/', views.create_manufacturer_account_view, name='manufacturer_create_account'),
+    path('<int:pk>/export/', include((manufacturer_exports_blueprint.urlpatterns, 'exports'))),
+
 
 ]
 
@@ -152,6 +154,9 @@ urlpatterns = [
     path('ajax/calculate-fabric-requirement/', views.calculate_fabric_requirement_ajax, name='calculate_fabric_requirement_ajax'),
     path('ajax/get-draws-for-order/', views.get_draws_for_order_ajax, name='ajax_get_draws_for_order'),
     path('ajax/exit-permits/create/', views.create_exit_permit_ajax, name='ajax_create_exit_permit'),
+    path('ajax/get-products-for-category/', views.get_products_for_category_ajax, name='ajax_get_products_for_category'),
+    path('ajax/update-bom-from-cutting/', views.update_bom_from_cutting_ajax, name='update_bom_from_cutting_ajax'),
+
 
     # =============================================================================
     #  FIX: ADD THE MISSING AJAX URL PATTERNS HERE

@@ -399,6 +399,15 @@
                     
                     <div class="row g-3">
                         <div class="col-12">
+                            <label for="{{ receive_form.actual_return_date.id_for_label }}" class="form-label fw-semibold">
+                                <i class="fas fa-calendar-check me-1"></i>{{ receive_form.actual_return_date.label }}
+                            </label>
+                            {% render_field receive_form.actual_return_date class+="form-control form-control-lg" %}
+                            {% for error in receive_form.actual_return_date.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-12">
                             <label for="{{ receive_form.quantity_received.id_for_label }}" class="form-label fw-semibold">
                                 <i class="fas fa-inbox me-1"></i>{{ receive_form.quantity_received.label }}
                             </label>
@@ -458,18 +467,24 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    showSuccessToast(data.message || 'تم إنشاء التصريح بنجاح.');
+                    if (typeof showSuccessToast === 'function') {
+                        showSuccessToast(data.message || 'تم إنشاء التصريح بنجاح.');
+                    }
                     setTimeout(() => { window.location.reload(); }, 1500);
                 } else {
                     const errorMessage = data.error || Object.values(data.errors).flat().join('\\n');
-                    showErrorToast('فشل الإنشاء: ' + errorMessage);
+                    if (typeof showErrorToast === 'function') {
+                        showErrorToast('فشل الإنشاء: ' + errorMessage);
+                    }
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = originalBtnHtml;
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                showErrorToast('حدث خطأ غير متوقع في الشبكة.');
+                if (typeof showErrorToast === 'function') {
+                    showErrorToast('حدث خطأ غير متوقع في الشبكة.');
+                }
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalBtnHtml;
             });

@@ -28,7 +28,7 @@
             "roles": ["*"]
         }
     },
-    "crm": {
+    "العملاء": {
     "title": "إدارة علاقات العملاء",
     "icon": "fas fa-users",
     "roles": ["admin", "manager", "employee"],
@@ -45,7 +45,33 @@
         }
     }
 },
-
+"المبيعات": {
+    "title": "المبيعات",
+    "icon": "fas fa-cash-register",
+    "roles": ["admin", "manager", "salesperson"],
+    "submenu": {
+        "فواتير_المبيعات": {
+            "url_name": "sales:invoice_list",
+            "icon": "fas fa-file-invoice-dollar",
+            "roles": ["admin", "manager", "salesperson"]
+        },
+        "إضافة_فاتورة_جديدة": {
+            "url_name": "sales:invoice_create",
+            "icon": "fas fa-plus-circle",
+            "roles": ["admin", "manager", "salesperson"]
+        },
+        "قوائم_الأسعار": {
+            "url_name": "sales:pricelist_list",
+            "icon": "fas fa-tags",
+            "roles": ["admin", "manager"]
+        },
+        "إضافة_قائمة_أسعار": {
+            "url_name": "sales:pricelist_create",
+            "icon": "fas fa-tag",
+            "roles": ["admin", "manager"]
+        }
+    }
+},
     "الموردين": {
         "title": "الموردين",
         "icon": "fas fa-truck",
@@ -288,26 +314,6 @@
             },
             "إنشاء أمر إنتاج": {
                 "url_name": "production:order_create",
-                "icon": "fas fa-plus",
-                "roles": ["admin", "manager", "employee"]
-            },
-            "مخزون الأقمشة": {
-                "url_name": "production:textile_stock_list",
-                "icon": "fas fa-scroll",
-                "roles": ["admin", "manager", "employee"]
-            },
-            "إضافة مخزون قماش": {
-                "url_name": "production:textile_stock_create",
-                "icon": "fas fa-plus",
-                "roles": ["admin", "manager", "employee"]
-            },
-            "قائمة المنتجات النهائية": {
-                "url_name": "production:finished_product_list",
-                "icon": "fas fa-tshirt",
-                "roles": ["admin", "manager", "employee"]
-            },
-            "إضافة منتج جديد": {
-                "url_name": "production:finished_product_create",
                 "icon": "fas fa-plus",
                 "roles": ["admin", "manager", "employee"]
             },

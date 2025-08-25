@@ -10,6 +10,13 @@
                 <a href="{% url 'warehouses:product_import' %}" class="btn btn-sm btn-outline-secondary">
                     <i class="fas fa-file-import"></i> استيراد
                 </a>
+                <button type="button" class="btn btn-sm btn-outline-success dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-file-excel"></i> تصدير Excel
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{% url 'warehouses:product_list_excel' %}">تصدير كل المنتجات</a></li>
+                    <li><a class="dropdown-item" href="{% url 'warehouses:warehouses_stock_excel' %}">تصدير مخزون المخازن</a></li>
+                </ul>
                 <a href="{% url 'warehouses:product_list_pdf' %}?{{ request.GET.urlencode }}" class="btn btn-sm btn-outline-danger" target="_blank">
                     <i class="fas fa-print"></i> طباعة PDF
                 </a>

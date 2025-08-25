@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     'hr',
     'settings',
     'api',
+    'sales',
 ]
 
 MIDDLEWARE = [

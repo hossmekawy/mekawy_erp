@@ -16,6 +16,9 @@
 
 {% block extra_css %}
     {{ block.super }}
+    <!-- Add Select2 CSS for searchable dropdowns -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
     <style>
         .card-header-icon {
             font-size: 1.1rem;
@@ -38,10 +41,19 @@
         }
         .price-form {
             background-color: #f8f9fa;
-            transition: background-color 0.3s;
+            transition: background-color 0.3s, border-color 0.3s;
+            border: 1px solid #dee2e6;
         }
         .price-form:hover {
             background-color: #f1f3f5;
+            border-color: #adb5bd;
+        }
+        .price-form.new-row {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .remove-price-form-btn {
             opacity: 0.5;
@@ -49,6 +61,15 @@
         }
         .price-form:hover .remove-price-form-btn {
             opacity: 1;
+        }
+        /* Style for Select2 dropdowns */
+        .select2-container--bootstrap-5 .select2-selection {
+            min-height: calc(1.5em + 1rem + 2px);
+            padding: 0.5rem 1rem;
+            font-size: 1rem;
+        }
+        .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+            padding-left: 0;
         }
     </style>
 {% endblock %}
@@ -137,18 +158,51 @@
             </button>
         </div>
         <div class="card-body p-4">
+            <!-- Bulk Price Applicator -->
+            <div class="p-3 mb-4 bg-primary-subtle border border-primary-subtle rounded">
+                <h6 class="mb-3 text-primary-emphasis"><i class="fas fa-bolt me-2"></i>تحديد سعر مجمع حسب الفئة</h6>
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-5">
+                        <label for="category-select" class="form-label">اختر الفئة</label>
+                        <select id="category-select" class="form-select">
+                            <option value="">--- كل الفئات ---</option>
+                            {% for category in product_categories %}
+                                <option value="{{ category.pk }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="bulk-price-input" class="form-label">السعر الجديد</label>
+                        <div class="input-group">
+                            <input type="number" id="bulk-price-input" class="form-control" placeholder="أدخل السعر" step="0.01" min="0">
+                            <span class="input-group-text">جنيه</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="button" id="apply-category-price-btn" class="btn btn-info w-100">
+                            <i class="fas fa-check-double me-2"></i>تطبيق السعر
+                        </button>
+                    </div>
+                </div>
+                <div id="bulk-price-feedback" class="mt-2 small"></div>
+            </div>
+
+            <!-- Formset Management -->
             {{ product_price_formset.management_form }}
             {% for error in product_price_formset.non_form_errors %}
                 <div class="alert alert-danger">{{ error }}</div>
             {% endfor %}
             
-            <div id="price-form-list">
+            <hr>
+
+            <!-- Price Form List -->
+            <div id="price-form-list" class="vstack gap-3">
                 {% for price_form in product_price_formset %}
-                <div class="row price-form align-items-center mb-3 p-2 border rounded" id="price-row-{{ forloop.counter0 }}">
+                <div class="row price-form align-items-center p-2 rounded" id="price-row-{{ forloop.counter0 }}">
                     <div style="display:none;">{{ price_form.id }}</div>
                     <div class="col-md-6">
                         <label class="form-label visually-hidden">المنتج</label>
-                        {% render_field price_form.product class="form-select" %}
+                        {% render_field price_form.product class="form-select product-select" %}
                         {% for error in price_form.product.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
                     </div>
                     <div class="col-md-5">
@@ -175,12 +229,12 @@
                 {% endfor %}
             </div>
 
-            <!-- This is the template for new forms added by JavaScript -->
+            <!-- Empty Form Template -->
             <div id="empty-price-form" style="display: none;">
-                <div class="row price-form align-items-center mb-3 p-2 border rounded" id="price-row-__prefix__">
+                <div class="row price-form align-items-center p-2 rounded" id="price-row-__prefix__">
                     <div class="col-md-6">
                         <label class="form-label visually-hidden">المنتج</label>
-                        {% render_field product_price_formset.empty_form.product class="form-select" %}
+                        {% render_field product_price_formset.empty_form.product class="form-select product-select" %}
                     </div>
                     <div class="col-md-5">
                         <label class="form-label visually-hidden">السعر</label>
@@ -216,33 +270,148 @@
 
 {% block extra_js %}
 {{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const addFormBtn = document.getElementById('add-price-form');
     const formList = document.getElementById('price-form-list');
     const emptyFormHtml = document.getElementById('empty-price-form').innerHTML;
     const totalFormsInput = document.getElementById('id_prices-TOTAL_FORMS');
 
-    addFormBtn.addEventListener('click', function() {
+    function initializeSelect2(context = document) {
+        $(context).find('.product-select').select2({
+            theme: 'bootstrap-5',
+            placeholder: '--- اختر منتج ---',
+            width: '100%'
+        });
+    }
+    initializeSelect2();
+
+    function addNewPriceRow(product = null, price = '') {
         let formIdx = parseInt(totalFormsInput.value);
-        const newForm = emptyFormHtml.replace(/__prefix__/g, formIdx);
+        const newFormHtml = emptyFormHtml.replace(/__prefix__/g, formIdx);
         
-        // Use insertAdjacentHTML to add the new form row
-        formList.insertAdjacentHTML('beforeend', newForm);
-        
+        const newFormElement = document.createElement('div');
+        newFormElement.innerHTML = newFormHtml;
+        const newRow = newFormElement.firstElementChild;
+        newRow.classList.add('new-row'); // For animation
+
+        formList.appendChild(newRow);
         totalFormsInput.value = formIdx + 1;
-    });
+
+        const productDropdown = newRow.querySelector('.product-select');
+        const priceInput = newRow.querySelector('input[type="number"][name$="-price"]');
+        
+        if (product) {
+            // Create a new option and append it
+            const newOption = new Option(product.name, product.id, true, true);
+            productDropdown.appendChild(newOption);
+        }
+        
+        if (price) {
+            priceInput.value = price;
+        }
+
+        // Initialize Select2 on the newly added dropdown
+        initializeSelect2(newRow);
+        
+        // Trigger change to make sure Select2 renders the new option
+        $(productDropdown).trigger('change');
+        
+        return newRow;
+    }
+
+    document.getElementById('add-price-form').addEventListener('click', () => addNewPriceRow());
 
     formList.addEventListener('click', function(e) {
-        // Use .closest to find the button, making it work even if the icon is clicked
         const removeBtn = e.target.closest('.remove-price-form-btn');
         if (removeBtn) {
-            // Find the parent form row and remove it
             removeBtn.closest('.price-form').remove();
-            
-            // Note: We don't decrement totalFormsInput.value. Django's formset processing
-            // on the backend can handle gaps in the form indices, so it's safer
-            // to just let it manage the count upon submission.
+        }
+    });
+
+    const applyPriceBtn = document.getElementById('apply-category-price-btn');
+    const categorySelect = document.getElementById('category-select');
+    const bulkPriceInput = document.getElementById('bulk-price-input');
+    const feedbackDiv = document.getElementById('bulk-price-feedback');
+
+    applyPriceBtn.addEventListener('click', async function() {
+        const categoryId = categorySelect.value;
+        const price = bulkPriceInput.value;
+
+        if (!categoryId) {
+            feedbackDiv.className = 'mt-2 small text-warning';
+            feedbackDiv.textContent = 'الرجاء اختيار فئة أولاً.';
+            return;
+        }
+        if (price === '' || parseFloat(price) < 0) {
+            feedbackDiv.className = 'mt-2 small text-warning';
+            feedbackDiv.textContent = 'الرجاء إدخال سعر صحيح.';
+            return;
+        }
+
+        feedbackDiv.className = 'mt-2 small text-info';
+        feedbackDiv.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>جاري جلب المنتجات...';
+
+        try {
+            const response = await fetch(`{% url 'production:ajax_get_products_for_category' %}?category_id=${categoryId}`);
+            const data = await response.json();
+
+            if (data.success) {
+                const productsFromServer = data.products;
+                if (productsFromServer.length === 0) {
+                    feedbackDiv.className = 'mt-2 small text-muted';
+                    feedbackDiv.textContent = 'لا توجد منتجات في هذه الفئة.';
+                    return;
+                }
+
+                let productsUpdated = 0;
+                let productsAdded = 0;
+                
+                // Get a set of product IDs already on the page for quick lookup
+                const existingProductIds = new Set();
+                document.querySelectorAll('#price-form-list .product-select').forEach(select => {
+                    if(select.value) {
+                       existingProductIds.add(parseInt(select.value));
+                    }
+                });
+
+                productsFromServer.forEach(product => {
+                    let rowFound = false;
+                    // Check if a row for this product already exists and update it
+                    document.querySelectorAll('#price-form-list .price-form').forEach(formRow => {
+                        const productDropdown = formRow.querySelector('.product-select');
+                        if (productDropdown && parseInt(productDropdown.value) === product.id) {
+                            const priceInput = formRow.querySelector('input[type="number"][name$="-price"]');
+                            priceInput.value = price;
+                            priceInput.classList.add('is-valid');
+                            setTimeout(() => priceInput.classList.remove('is-valid'), 2000);
+                            productsUpdated++;
+                            rowFound = true;
+                        }
+                    });
+
+                    // If no row was found, add a new one
+                    if (!rowFound) {
+                        const newRow = addNewPriceRow(product, price);
+                        const priceInput = newRow.querySelector('input[type="number"][name$="-price"]');
+                        priceInput.classList.add('is-valid');
+                        setTimeout(() => priceInput.classList.remove('is-valid'), 2000);
+                        productsAdded++;
+                    }
+                });
+
+                feedbackDiv.className = 'mt-2 small text-success';
+                feedbackDiv.textContent = `اكتمل: تم تحديث ${productsUpdated} منتج وإضافة ${productsAdded} منتج جديد. يرجى مراجعة الأسعار ثم الضغط على "حفظ البيانات".`;
+
+            } else {
+                feedbackDiv.className = 'mt-2 small text-danger';
+                feedbackDiv.textContent = 'حدث خطأ: ' + data.error;
+            }
+        } catch (error) {
+            feedbackDiv.className = 'mt-2 small text-danger';
+            feedbackDiv.textContent = 'فشل الاتصال بالخادم.';
+            console.error('Fetch error:', error);
         }
     });
 });

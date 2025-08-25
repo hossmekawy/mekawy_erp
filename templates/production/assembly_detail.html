@@ -297,6 +297,12 @@
                         </div>
                     {% endif %}
 
+                    <div class="mb-3">
+                        <label for="{{ receive_form.actual_completion_date.id_for_label }}" class="form-label fw-bold">{{ receive_form.actual_completion_date.label }}</label>
+                        {% render_field receive_form.actual_completion_date class+="form-control" %}
+                        {% for error in receive_form.actual_completion_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label for="{{ receive_form.quantity_received.id_for_label }}" class="form-label fw-bold">{{ receive_form.quantity_received.label }}</label>
@@ -354,14 +360,13 @@
 
 
 {% block production_extra_js %}
-{{ block.super }} {# This includes scripts from parent templates #}
-
+{{ block.super }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const permitForm = document.getElementById('createExitPermitForm');
     if (permitForm) {
         permitForm.addEventListener('submit', function(e) {
-            e.preventDefault(); // Prevent normal page refresh
+            e.preventDefault();
 
             const submitBtn = document.getElementById('submitExitPermitBtn');
             const originalBtnHtml = submitBtn.innerHTML;
@@ -370,7 +375,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const formData = new FormData(permitForm);
             
-            // The URL for our AJAX view
             const url = "{% url 'production:ajax_create_exit_permit' %}";
 
             fetch(url, {
@@ -383,24 +387,19 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Using the existing toast function to show success
                     if (typeof showSuccessToast === 'function') {
                         showSuccessToast(data.message || 'تم إنشاء التصريح بنجاح.');
                     }
-                    // Reload the page to show the new permit status
-                    // A short delay allows the user to see the success toast
                     setTimeout(() => {
                         window.location.reload();
                     }, 1500);
                 } else {
-                    // Show error toast
                     const errorMessage = data.error || Object.values(data.errors).flat().join('\\n');
                      if (typeof showErrorToast === 'function') {
                         showErrorToast('فشل الإنشاء: ' + errorMessage);
                     } else {
                         alert('Error: ' + errorMessage);
                     }
-                    // Re-enable the button
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = originalBtnHtml;
                 }
@@ -410,7 +409,6 @@ document.addEventListener('DOMContentLoaded', function() {
                  if (typeof showErrorToast === 'function') {
                     showErrorToast('حدث خطأ غير متوقع في الشبكة.');
                 }
-                // Re-enable the button
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalBtnHtml;
             });

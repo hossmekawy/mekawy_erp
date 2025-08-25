@@ -70,6 +70,14 @@
         .select2-container--default .select2-selection--single .select2-selection__arrow {
             height: calc(1.5em + .75rem);
         }
+        .accordion-button:not(.collapsed) {
+            background-color: var(--bs-primary-bg-subtle);
+            color: var(--bs-primary-emphasis);
+        }
+        .category-summary-card .list-group-item {
+            border-left: 0;
+            border-right: 0;
+        }
     </style>
 {% endblock %}
 
@@ -122,30 +130,89 @@
                             <div class="metric-label">قيمة الأعمال المكتملة (جنيه)</div>
                         </div>
                     </div>
-                    <!-- Active Jobs Value -->
-                    <div class="col-lg-6 col-md-6 mb-3">
-                        <div class="metric-box">
-                             <div class="metric-value text-warning">{{ total_value_of_active_jobs|intcomma }}</div>
-                            <div class="metric-label">قيمة الأعمال النشطة (جنيه)</div>
-                        </div>
-                    </div>
-                    <!-- Total Pieces Completed -->
-                    <div class="col-lg-6 col-md-6 mb-3">
-                        <div class="metric-box">
-                            <div class="metric-value text-info">{{ total_pieces_completed|intcomma }}</div>
-                            <div class="metric-label">إجمالي القطع المنجزة</div>
-                        </div>
-                    </div>
                 </div>
                 <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
                      <a href="{% url 'production:manufacturers:manufacturer_update' manufacturer.pk %}" class="btn btn-primary">
                          <i class="fas fa-edit me-2"></i>تعديل بيانات المصنع
                      </a>
+                     <div class="btn-group">
+                        <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-print me-2"></i>تصدير
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{% url 'production:manufacturers:exports:pdf' manufacturer.pk %}" target="_blank">تصدير PDF</a></li>
+                            <li><a class="dropdown-item" href="{% url 'production:manufacturers:exports:excel' manufacturer.pk %}">تصدير Excel</a></li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- NEW: Piece Summary Metrics -->
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="metric-box">
+            <div class="metric-value text-success">{{ total_pieces_completed|intcomma }}</div>
+            <div class="metric-label">إجمالي القطع المنجزة</div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="metric-box">
+            <div class="metric-value text-warning">{{ total_pieces_active|intcomma }}</div>
+            <div class="metric-label">إجمالي القطع النشطة</div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="metric-box">
+            <div class="metric-value text-primary">{{ grand_total_pieces|intcomma }}</div>
+            <div class="metric-label">الإجمالي الكلي للقطع</div>
+        </div>
+    </div>
+</div>
+
+<!-- NEW: Category Summary Card -->
+<div class="card shadow-sm mb-4 category-summary-card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>ملخص القطع حسب التصنيف</h5>
+    </div>
+    <div class="card-body p-4">
+        <div class="row">
+            <div class="col-md-6">
+                <h6 class="text-center text-warning mb-3">القطع النشطة</h6>
+                {% if active_pieces_by_category %}
+                <ul class="list-group list-group-flush">
+                    {% for category, count in active_pieces_by_category.items %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ category }}
+                        <span class="badge bg-warning text-dark rounded-pill">{{ count|intcomma }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-center text-muted">لا توجد قطع نشطة.</p>
+                {% endif %}
+            </div>
+            <div class="col-md-6">
+                <h6 class="text-center text-success mb-3">القطع المنجزة</h6>
+                {% if completed_pieces_by_category %}
+                <ul class="list-group list-group-flush">
+                    {% for category, count in completed_pieces_by_category.items %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ category }}
+                        <span class="badge bg-success rounded-pill">{{ count|intcomma }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-center text-muted">لا توجد قطع منجزة.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <ul class="nav nav-tabs nav-tabs-underlined mb-0" id="manufacturerTabs" role="tablist">
     <li class="nav-item" role="presentation">
@@ -156,6 +223,11 @@
     <li class="nav-item" role="presentation">
         <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab">
             <i class="fas fa-history me-2"></i>سجل المهام <span class="badge bg-secondary rounded-pill ms-1">{{ job_history|length }}</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="materials-tab" data-bs-toggle="tab" data-bs-target="#materials-pane" type="button" role="tab">
+            <i class="fas fa-boxes-stacked me-2"></i>سجل المواد
         </button>
     </li>
     <li class="nav-item" role="presentation">
@@ -173,7 +245,6 @@
 <div class="tab-content bg-white border border-top-0" id="manufacturerTabsContent">
     <div class="tab-pane fade show active" id="active-jobs-pane" role="tabpanel">
         <div class="list-group list-group-flush">
-            {# --- THIS IS THE UPDATED SECTION --- #}
             {% for job_data in active_jobs %}
                 <div class="list-group-item p-3">
                     <div class="d-flex w-100 justify-content-between">
@@ -184,7 +255,7 @@
                     </div>
                     <p class="mb-2 text-muted">
                         <strong>المنتج:</strong> {{ job_data.order.product.name }} | 
-                        <strong>الكمية:</strong> {{ job_data.job_object.quantity_sent }} قطعة |
+                        <strong>الكمية:</strong> {% if job_data.job_object|class_name == 'FinishingProcess' %}{{ job_data.job_object.quantity_input }}{% else %}{{ job_data.job_object.quantity_sent }}{% endif %} قطعة |
                         <strong>النوع:</strong> {{ job_data.job_type }}
                     </p>
                     {% if job_data.job_object|class_name == 'AssemblyProcess' %}
@@ -221,10 +292,10 @@
                     {% for job in job_history %}
                         <tr>
                             <td>
-                                <strong>{{ job.order_number }}</strong>
+                                <strong>{{ job.order.order_number }}</strong>
                                 <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">{{ job.job_type }}</span>
                             </td>
-                            <td>{{ job.product_name }}</td>
+                            <td>{{ job.order.product.name }}</td>
                             <td class="text-center text-success fw-bold">{{ job.cost|intcomma }} جنيه</td>
                             <td class="text-center">{{ job.completion_date|date:"d M Y" }}</td>
                             <td class="text-end">
@@ -244,6 +315,61 @@
                 </tbody>
             </table>
         </div>
+    </div>
+
+    <div class="tab-pane fade p-3" id="materials-pane" role="tabpanel">
+        {% if materials_by_order %}
+            <div class="accordion" id="materialsAccordion">
+                {% for order, materials in materials_by_order.items %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="heading-{{ order.pk }}">
+                            <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ order.pk }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse-{{ order.pk }}">
+                                <div class="d-flex justify-content-between w-100 pe-3">
+                                    <span>
+                                        <i class="fas fa-receipt me-2"></i>
+                                        <strong>{{ order.order_number }}</strong> - {{ order.product.name }}
+                                    </span>
+                                    <span class="badge bg-info-subtle text-info-emphasis rounded-pill">
+                                        {{ materials|length }} {% if materials|length > 1 %}مواد{% else %}مادة{% endif %}
+                                    </span>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="collapse-{{ order.pk }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading-{{ order.pk }}" data-bs-parent="#materialsAccordion">
+                            <div class="accordion-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped table-hover mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>المادة</th>
+                                                <th class="text-center">الكمية</th>
+                                                <th>المرحلة</th>
+                                                <th>التاريخ</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for material_data in materials|dictsortreversed:"date" %}
+                                            <tr>
+                                                <td>{{ material_data.material.name }}</td>
+                                                <td class="text-center fw-bold">{{ material_data.quantity|floatformat:"-2" }} <small class="text-muted">{{ material_data.material.unit_new.symbol }}</small></td>
+                                                <td><span class="badge bg-secondary-subtle text-secondary-emphasis">{{ material_data.stage }}</span></td>
+                                                <td>{{ material_data.date|date:"Y-m-d" }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center text-muted p-5">
+                <i class="fas fa-box-open fa-2x mb-2"></i>
+                <p>لم يتم إرسال أي مواد خام لهذا المصنع بعد.</p>
+            </div>
+        {% endif %}
     </div>
 
     <div class="tab-pane fade" id="prices-pane" role="tabpanel">
@@ -371,6 +497,7 @@
 
 <script>
 $(document).ready(function() {
+    // --- [Existing Modal Script - Unchanged] ---
     const modalForm = $('#sendMaterialsForm');
     const selectedMaterialsList = $('#selected-materials-list');
     const formsetManagementContainer = $('#formset-management');
@@ -380,7 +507,6 @@ $(document).ready(function() {
     let materialIndex = 0;
 
     $('#sendMaterialsModal').on('show.bs.modal', async function(event) {
-        // Reset state
         selectedMaterialsList.html('');
         materialIndex = 0;
         updateFormsetManagement();

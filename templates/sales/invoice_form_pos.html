@@ -1,0 +1,371 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block title %}POS كاشير{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --pos-bg: #111827;
+        --pos-panel-bg: #1f2937;
+        --pos-border: #374151;
+        --pos-text-primary: #f9fafb;
+        --pos-text-secondary: #9ca3af;
+        --pos-input-bg: #374151;
+        --pos-brand: #3b82f6;
+    }
+    body {
+        background-color: var(--pos-bg);
+        color: var(--pos-text-primary);
+        font-family: "Cairo", system-ui, sans-serif;
+    }
+    .pos-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+        height: calc(100vh - 120px);
+    }
+    .panel {
+        background: var(--pos-panel-bg);
+        border: 1px solid var(--pos-border);
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+    }
+    .panel-header {
+        padding: 1rem;
+        border-bottom: 1px solid var(--pos-border);
+        font-weight: 600;
+    }
+    .panel-body {
+        padding: 1rem;
+        overflow-y: auto;
+        flex-grow: 1;
+    }
+    .panel-footer {
+        padding: 1rem;
+        border-top: 1px solid var(--pos-border);
+    }
+    .product-card {
+        background: var(--pos-input-bg);
+        border: 1px solid var(--pos-border);
+        border-radius: 8px;
+        padding: 0.75rem;
+        color: var(--pos-text-primary);
+    }
+    .warehouse-btn {
+        margin: 0 4px;
+        border-color: var(--pos-border);
+        color: var(--pos-text-secondary);
+    }
+    .warehouse-btn.active {
+        background-color: var(--pos-brand);
+        color: white;
+        border-color: var(--pos-brand);
+    }
+    .form-control, .form-select {
+        background-color: var(--pos-input-bg);
+        border-color: var(--pos-border);
+        color: var(--pos-text-primary);
+    }
+    .form-control:focus, .form-select:focus {
+        background-color: #4b5563;
+        border-color: var(--pos-brand);
+        box-shadow: none;
+        color: #fff;
+    }
+    .table> :not(caption)>*>*{
+        background: transparent;
+        color: var(--pos-text-primary);
+        border-color: var(--pos-border);
+    }
+    .table thead th { color: var(--pos-text-secondary); }
+    .dropdown-menu {
+        background: #0f172a;
+        border-color: var(--pos-border);
+    }
+    .dropdown-item { color: var(--pos-text-primary); }
+    .dropdown-item:hover { background: var(--pos-input-bg); }
+    .btn-primary { background-color: var(--pos-brand); border-color: var(--pos-brand); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3">
+    <form method="post" id="invoice-form">
+        {% csrf_token %}
+        <div class="pos-grid">
+
+            <!-- Customer & Actions Panel (Left) -->
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-user-tag me-2"></i>العميل وطرق السداد</div>
+                <div class="panel-body">
+                    <div class="mb-3">
+                        <label class="form-label">بحث عن عميل</label>
+                        <div class="input-group">
+                            <span class="input-group-text" style="background-color: var(--pos-input-bg); border-color: var(--pos-border);"><i class="fas fa-search"></i></span>
+                            <input id="customerSearchInput" type="text" class="form-control" placeholder="اكتب اسم/شركة/موبايل…">
+                        </div>
+                        {{ form.customer.as_hidden }}
+                        <div class="dropdown w-100 mt-1" id="customerDropdown" style="display:none;">
+                            <div class="dropdown-menu w-100 show" id="customerMenu"></div>
+                        </div>
+                    </div>
+                    <hr style="border-color: var(--pos-border);">
+                    <!-- Placeholder for payments -->
+                    <div class="fw-semibold mb-2"><i class="fas fa-money-check-dollar me-2"></i>المدفوعات</div>
+                    <p class="text-muted small">سيتم إضافة قسم المدفوعات هنا.</p>
+                </div>
+                <div class="panel-footer d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-save me-2"></i>حفظ وإصدار</button>
+                </div>
+            </div>
+
+            <!-- Cart Panel (Middle) -->
+            <div class="panel">
+                <div class="panel-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-shopping-cart me-2"></i>السلة</span>
+                    <button id="clearCart" type="button" class="btn btn-sm" style="color: var(--pos-text-secondary);"><i class="fas fa-trash-can"></i> مسح</button>
+                </div>
+                <div class="panel-body" style="padding: 0;">
+                    <div class="table-responsive">
+                        {{ items.management_form }}
+                        <table class="table align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>المنتج</th>
+                                    <th class="text-center">الكمية</th>
+                                    <th class="text-end">الإجمالي</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="cartBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="panel-footer">
+                    <div class="row g-2">
+                        <div class="col-6"><label class="form-label mb-1 small">خصم (جنيه)</label>{% render_field form.discount_amount class="form-control" id="discount-input" value="0" %}</div>
+                        <div class="col-6"><label class="form-label mb-1 small">ضريبة (%)</label>{% render_field form.tax_amount class="form-control" id="tax-input" value="0" %}</div>
+                    </div>
+                    <hr style="border-color: var(--pos-border);">
+                    <div class="d-flex justify-content-between"><span>المجموع الفرعي</span><span class="fw-bold" id="subtotal">0.00</span></div>
+                    <div class="d-flex justify-content-between text-danger"><span>الخصم</span><span class="fw-bold" id="discountTotal">0.00</span></div>
+                    <div class="d-flex justify-content-between text-info"><span>الضريبة</span><span class="fw-bold" id="taxTotal">0.00</span></div>
+                    <hr style="border-color: var(--pos-border);">
+                    <div class="d-flex justify-content-between fs-4"><span>الإجمالي</span><span class="fw-bold" id="grandTotal">0.00</span></div>
+                </div>
+            </div>
+
+            <!-- Products Panel (Right) -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div id="warehouse-buttons" class="text-center">
+                        {% for wh in warehouses %}
+                        <button type="button" class="btn warehouse-btn" data-id="{{ wh.pk }}">{{ wh.name }}</button>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div id="productsGrid" class="panel-body">
+                   <p class="text-muted text-center mt-5">الرجاء اختيار مخزن لعرض المنتجات.</p>
+                </div>
+            </div>
+
+        </div>
+    </form>
+</div>
+
+<!-- Hidden template for new cart items -->
+<div id="empty-form" style="display: none;">
+    <tr class="item-row" data-product-id="__PRODUCT_ID__">
+        {% for field in items.empty_form.hidden_fields %}{{ field }}{% endfor %}
+        <td><div class="fw-semibold small">__PRODUCT_NAME__</div>{% render_field items.empty_form.product class="d-none" %}</td>
+        <td class="text-center"><input class="form-control form-control-sm text-center quantity-input" style="width:70px; margin: auto;" type="number" min="1" step="1" value="1" name="items-__prefix__-quantity"></td>
+        <td class="text-end small">__ITEM_TOTAL__</td>
+        <td class="text-center"><button type="button" class="btn btn-sm py-0 px-1 remove-item-btn" style="color: var(--pos-text-secondary);"><i class="fas fa-times"></i></button></td>
+        <input type="hidden" class="price-input" value="__PRODUCT_PRICE__" name="items-__prefix__-unit_price">
+        {% render_field items.empty_form.discount_percentage class="d-none" value="0" %}
+    </tr>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const warehouseButtons = document.getElementById('warehouse-buttons');
+    const productsGrid = document.getElementById('productsGrid');
+    const cartBody = document.getElementById('cartBody');
+    const emptyFormTemplate = document.getElementById('empty-form').innerHTML;
+    const totalFormsInput = document.getElementById('id_items-TOTAL_FORMS');
+    const customerSearchInput = document.getElementById('customerSearchInput');
+    const customerDropdown = document.getElementById('customerDropdown');
+    const customerMenu = document.getElementById('customerMenu');
+    const hiddenCustomerInput = document.getElementById('id_customer');
+
+    // --- Warehouse & Product Loading ---
+    warehouseButtons.addEventListener('click', function(e) {
+        if (e.target.classList.contains('warehouse-btn')) {
+            document.querySelectorAll('.warehouse-btn').forEach(btn => btn.classList.remove('active'));
+            e.target.classList.add('active');
+            loadProductsForWarehouse(e.target.dataset.id);
+        }
+    });
+
+    function loadProductsForWarehouse(warehouseId) {
+        if (!warehouseId) return;
+        productsGrid.innerHTML = '<p class="text-muted text-center mt-5">جاري تحميل المنتجات...</p>';
+        // IMPORTANT: Ensure this API endpoint returns 'selling_price' for each product.
+        fetch(`/warehouses/api/warehouse/${warehouseId}/products/`)
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.json();
+            })
+            .then(data => renderProducts(data.products))
+            .catch(error => {
+                console.error('Error fetching products:', error);
+                productsGrid.innerHTML = '<p class="text-danger text-center mt-5">حدث خطأ أثناء تحميل المنتجات.</p>';
+            });
+    }
+
+    function renderProducts(products) {
+        productsGrid.innerHTML = '';
+        if (!products || products.length === 0) {
+            productsGrid.innerHTML = '<p class="text-muted text-center mt-5">لا توجد منتجات في هذا المخزن.</p>';
+            return;
+        }
+        products.forEach(p => {
+            const price = parseFloat(p.selling_price || 0).toFixed(2);
+            const col = document.createElement('div');
+            col.className = 'col-12 col-md-6 mb-2';
+            col.innerHTML = `
+                <div class="product-card">
+                    <div class="fw-semibold small">${p.name}</div>
+                    <div class="small text-muted">المتاح: ${p.available_quantity}</div>
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <div class="fw-bold">${price}</div>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-sm btn-outline-secondary add-item-btn" data-product-id="${p.id}" data-product-name="${p.name}" data-product-price="${price}"><i class="fas fa-plus"></i></button>
+                            <button type="button" class="btn btn-primary btn-sm add-sariya-btn" data-product-id="${p.id}" data-product-name="${p.name}" data-product-price="${price}">ساريه</button>
+                        </div>
+                    </div>
+                </div>`;
+            productsGrid.appendChild(col);
+        });
+    }
+    
+    // --- Customer Smart Search ---
+    customerSearchInput.addEventListener('input', function() {
+        const query = this.value;
+        if (query.length < 2) {
+            customerDropdown.style.display = 'none';
+            return;
+        }
+        fetch(`{% url 'sales:api_customer_search' %}?q=${query}`)
+            .then(response => response.json())
+            .then(data => {
+                customerMenu.innerHTML = '';
+                if (data.length > 0) {
+                    data.forEach(c => {
+                        const item = document.createElement('button');
+                        item.type = 'button';
+                        item.className = 'dropdown-item';
+                        item.innerHTML = `<div>${c.name}</div><div class="small text-muted">${c.phone}</div>`;
+                        item.addEventListener('click', () => selectCustomer(c));
+                        customerMenu.appendChild(item);
+                    });
+                    customerDropdown.style.display = 'block';
+                } else {
+                    customerDropdown.style.display = 'none';
+                }
+            });
+    });
+
+    function selectCustomer(customer) {
+        customerSearchInput.value = `${customer.name} (${customer.phone})`;
+        hiddenCustomerInput.value = customer.id;
+        customerDropdown.style.display = 'none';
+    }
+
+    // --- Cart Logic ---
+    productsGrid.addEventListener('click', e => {
+        const addBtn = e.target.closest('.add-item-btn');
+        const sariyaBtn = e.target.closest('.add-sariya-btn');
+        if (addBtn) addItemToCart(addBtn.dataset, 1);
+        if (sariyaBtn) addItemToCart(sariyaBtn.dataset, 6);
+    });
+
+    function addItemToCart(productData, quantity) {
+        const existingRow = cartBody.querySelector(`tr[data-product-id="${productData.productId}"]`);
+        if (existingRow) {
+            const qtyInput = existingRow.querySelector('.quantity-input');
+            qtyInput.value = parseInt(qtyInput.value) + quantity;
+            qtyInput.dispatchEvent(new Event('input'));
+            return;
+        }
+
+        const newIndex = parseInt(totalFormsInput.value);
+        const price = parseFloat(productData.productPrice);
+        let newFormHtml = emptyFormTemplate
+            .replace(/__prefix__/g, newIndex)
+            .replace(/__PRODUCT_ID__/g, productData.productId)
+            .replace(/__PRODUCT_NAME__/g, productData.productName)
+            .replace(/__PRODUCT_PRICE__/g, price.toFixed(2))
+            .replace(/__ITEM_TOTAL__/g, (price * quantity).toFixed(2));
+        
+        cartBody.insertAdjacentHTML('beforeend', newFormHtml);
+        
+        const newRow = cartBody.lastElementChild;
+        newRow.querySelector('input[id$="-product"]').value = productData.productId;
+        newRow.querySelector('.quantity-input').value = quantity;
+
+        totalFormsInput.value = newIndex + 1;
+        updateTotals();
+    }
+
+    cartBody.addEventListener('click', e => {
+        if (e.target.closest('.remove-item-btn')) {
+            e.target.closest('.item-row').remove();
+            updateTotals();
+        }
+    });
+
+    cartBody.addEventListener('input', e => {
+        if (e.target.classList.contains('quantity-input')) {
+            updateTotals();
+        }
+    });
+
+    document.getElementById('discount-input').addEventListener('input', updateTotals);
+    document.getElementById('tax-input').addEventListener('input', updateTotals);
+    document.getElementById('clearCart').addEventListener('click', () => {
+        cartBody.innerHTML = '';
+        totalFormsInput.value = 0;
+        updateTotals();
+    });
+    
+    function updateTotals() {
+        let subtotal = 0;
+        cartBody.querySelectorAll('.item-row').forEach(row => {
+            const quantity = parseFloat(row.querySelector('.quantity-input').value) || 0;
+            const price = parseFloat(row.querySelector('.price-input').value) || 0;
+            const itemTotal = quantity * price;
+            row.querySelector('.item-total').textContent = itemTotal.toFixed(2);
+            subtotal += itemTotal;
+        });
+
+        document.getElementById('subtotal').textContent = subtotal.toFixed(2);
+        
+        const discount = parseFloat(document.getElementById('discount-input').value) || 0;
+        const taxPercent = parseFloat(document.getElementById('tax-input').value) || 0;
+        const taxAmount = (subtotal - discount) * (taxPercent / 100);
+        
+        document.getElementById('discountTotal').textContent = discount.toFixed(2);
+        document.getElementById('taxTotal').textContent = taxAmount.toFixed(2);
+        
+        const grandTotal = subtotal - discount + taxAmount;
+        document.getElementById('grandTotal').textContent = grandTotal.toFixed(2);
+    }
+});
+</script>
+{% endblock %}

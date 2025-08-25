@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block title %}تفاصيل الفاتورة{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-2 text-gray-800">فاتورة #{{ invoice.invoice_number }}</h1>
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">تفاصيل الفاتورة</h6>
+            <a href="{% url 'sales:invoice_update' invoice.pk %}" class="btn btn-warning btn-sm float-right">تعديل</a>
+        </div>
+        <div class="card-body">
+            <p><strong>العميل:</strong> {{ invoice.customer }}</p>
+            <p><strong>تاريخ الإصدار:</strong> {{ invoice.issue_date }}</p>
+            <p><strong>تاريخ الاستحقاق:</strong> {{ invoice.due_date }}</p>
+            <p><strong>الحالة:</strong> {{ invoice.get_status_display }}</p>
+            
+            <hr>
+            <h5>البنود</h5>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>المنتج</th>
+                        <th>الكمية</th>
+                        <th>سعر الوحدة</th>
+                        <th>الإجمالي</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in invoice.items.all %}
+                    <tr>
+                        <td>{{ item.product.name }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>{{ item.unit_price }}</td>
+                        <td>{{ item.total }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <hr>
+            <p><strong>المجموع الفرعي:</strong> {{ invoice.subtotal }}</p>
+            <p><strong>الخصم:</strong> {{ invoice.discount_amount }}</p>
+            <p><strong>الضريبة:</strong> {{ invoice.tax_amount }}</p>
+            <h4><strong>الإجمالي:</strong> {{ invoice.total }}</h4>
+        </div>
+    </div>
+</div>
+{% endblock %}

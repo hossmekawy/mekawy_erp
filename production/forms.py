@@ -675,6 +675,13 @@ class AssemblySendForm(forms.ModelForm):
     """
     Form for creating an AssemblyProcess or updating its 'sending' details.
     """
+    # FIX: Add start_date to the form fields to allow user input.
+    start_date = forms.DateTimeField(
+        label="تاريخ ووقت الإرسال",
+        widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
+        required=True
+    )
+
     class Meta:
         model = AssemblyProcess
         fields = [
@@ -682,10 +689,9 @@ class AssemblySendForm(forms.ModelForm):
             'quantity_sent', 'start_date', 'expected_completion_date', 'notes',
         ]
         widgets = {
-            # MODIFICATION: Changed the widget to RadioSelect for easier custom rendering
             'assembly_type': forms.RadioSelect,
-            'start_date': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
-            'expected_completion_date': forms.DateInput(attrs={'type': 'date'}),
+            # The start_date widget is now defined above for better control.
+            'expected_completion_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -697,7 +703,11 @@ class AssemblySendForm(forms.ModelForm):
 
         self.fields['external_manufacturer'].required = False
         self.fields['external_manufacturer'].queryset = ExternalManufacturer.objects.filter(is_active=True)
-        self.fields['start_date'].required = False
+        
+        # Set a default value for start_date to now if creating a new instance
+        if not self.instance.pk:
+            self.fields['start_date'].initial = timezone.now().strftime('%Y-%m-%dT%H:%M')
+
 
         if not self.fields['external_manufacturer'].queryset.exists():
             add_url = reverse('production:manufacturers:manufacturer_create')
@@ -718,17 +728,32 @@ class AssemblySendForm(forms.ModelForm):
             cleaned_data['external_manufacturer'] = None
 
         return cleaned_data
+
+
 class AssemblyReceiveForm(forms.ModelForm):
     """
     Form used in the modal on the detail page to receive items and complete the process.
-    (No changes needed here)
     """
+    # FIX: Add actual_completion_date to allow user to set the receive date.
+    actual_completion_date = forms.DateTimeField(
+        label="تاريخ ووقت الاستلام الفعلي",
+        widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
+        required=True
+    )
+    
     class Meta:
         model = AssemblyProcess
         fields = [
             'quantity_received', 'defects_count', 'losses_count',
-            'thread_consumption', 'thread_cost', 'defect_notes'
+            'thread_consumption', 'thread_cost', 'defect_notes',
+            'actual_completion_date' # FIX: Add the field to the list
         ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set the initial value to the current time for convenience
+        self.fields['actual_completion_date'].initial = timezone.now().strftime('%Y-%m-%dT%H:%M')
+
 
     def clean_quantity_received(self):
         quantity_received = self.cleaned_data.get('quantity_received')
@@ -739,7 +764,7 @@ class AssemblyReceiveForm(forms.ModelForm):
                 f"الكمية المستلمة ({quantity_received}) لا يمكن أن تكون أكبر من الكمية المرسلة ({quantity_sent})."
             )
         return quantity_received
-    
+
 class AssemblyComponentForm(forms.ModelForm):
     class Meta:
         model = AssemblyComponent
@@ -841,9 +866,25 @@ class DyeingSendForm(forms.ModelForm):
             self.fields['dyeing_facility'].widget.attrs['disabled'] = True
 
 class DyeingReceiveForm(forms.ModelForm):
+    """
+    Form used in the modal on the detail page to receive items from dyeing.
+    """
+    # FIX: Add actual_return_date to allow user to set the receive date.
+    actual_return_date = forms.DateTimeField(
+        label="تاريخ ووقت الاستلام الفعلي",
+        widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
+        required=True
+    )
+
     class Meta:
         model = DyeingProcess
-        fields = ['quantity_received', 'losses_count']
+        # FIX: Add the new date field to the list of fields.
+        fields = ['quantity_received', 'losses_count', 'actual_return_date']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set the initial value to the current time for convenience.
+        self.fields['actual_return_date'].initial = timezone.now().strftime('%Y-%m-%dT%H:%M')
 
     def clean_quantity_received(self):
         quantity_received = self.cleaned_data.get('quantity_received')

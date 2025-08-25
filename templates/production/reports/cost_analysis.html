@@ -1,94 +1,268 @@
 {% extends 'production/production_base.html' %}
-{% load i18n %}
+{% load static i18n humanize %}
 
-{% block production_title %}تقرير تحليل التكلفة{% endblock %}
+{% block production_title %}
+    تحليل تكلفة: {{ cost_analysis.production_order.order_number }}
+{% endblock %}
 
-{% block production_page_title %}
-    <i class="fas fa-dollar-sign me-2"></i>
-    {% trans "تقرير تحليل التكلفة" %}
+{% block production_breadcrumb_items %}
+    <li class="breadcrumb-item"><a href="{% url 'production:cost_analysis_list' %}">تحليل التكاليف</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ cost_analysis.production_order.order_number }}</li>
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .metric-card {
+        background-color: #fff;
+        border: 1px solid #e3e6f0;
+        border-radius: .35rem;
+        padding: 1.25rem;
+        text-align: center;
+        height: 100%;
+    }
+    .metric-card .metric-value {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .metric-card .metric-label {
+        font-size: 0.9rem;
+        color: #858796;
+        margin-bottom: 0;
+    }
+    .metric-card .metric-icon {
+        font-size: 2.5rem;
+        color: #dddfeb;
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        opacity: 0.5;
+    }
+    .nav-tabs-underlined .nav-link {
+        border: 0;
+        border-bottom: 3px solid transparent;
+        font-weight: 500;
+    }
+    .nav-tabs-underlined .nav-link.active,
+    .nav-tabs-underlined .nav-link:hover {
+        border-bottom-color: var(--bs-primary);
+        color: var(--bs-primary);
+    }
+    .timeline-table td {
+        vertical-align: middle;
+    }
+    .variance-positive { color: var(--bs-danger); }
+    .variance-negative { color: var(--bs-success); }
+</style>
 {% endblock %}
 
 {% block production_content %}
-<div class="production-card mb-4">
-    <div class="card-header">
-        <h6 class="m-0 font-weight-bold text-primary">{% trans "تصفية حسب التاريخ" %}</h6>
+<!-- Header Card -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <h2 class="mb-1">تحليل تكلفة لأمر الإنتاج: <a href="{% url 'production:order_detail' cost_analysis.production_order.pk %}">{{ cost_analysis.production_order.order_number }}</a></h2>
+                <p class="text-muted mb-2"><strong>المنتج:</strong> {{ cost_analysis.production_order.product.name }} | <strong>الكمية:</strong> {{ cost_analysis.production_order.quantity_ordered }} قطعة</p>
+                <p class="text-muted small"><strong>تاريخ التحليل:</strong> {{ cost_analysis.analysis_date|date:"d M Y, H:i" }} | <strong>بواسطة:</strong> {{ cost_analysis.analyzed_by.get_full_name|default:cost_analysis.analyzed_by.username }}</p>
+            </div>
+            <div class="btn-group">
+                <a href="{% url 'production:cost_analysis_update' cost_analysis.pk %}" class="btn btn-outline-primary"><i class="fas fa-edit me-2"></i>تعديل التكاليف اليدوية</a>
+                <a href="#" class="btn btn-outline-secondary"><i class="fas fa-print me-2"></i>طباعة</a>
+            </div>
+        </div>
     </div>
-    <div class="card-body">
-        <form method="get">
-            <div class="row g-3 align-items-end">
-                <div class="col-md-4">
-                    <label for="start_date" class="form-label">{% trans "من تاريخ" %}</label>
-                    <input type="date" name="start_date" id="start_date" value="{{ start_date|date:'Y-m-d' }}" class="form-control">
-                </div>
-                <div class="col-md-4">
-                    <label for="end_date" class="form-label">{% trans "إلى تاريخ" %}</label>
-                    <input type="date" name="end_date" id="end_date" value="{{ end_date|date:'Y-m-d' }}" class="form-control">
-                </div>
-                <div class="col-md-4">
-                    <button type="submit" class="btn btn-production w-100">{% trans "تطبيق" %}</button>
+</div>
+
+<!-- Metrics Row -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="metric-card position-relative">
+            <i class="fas fa-wallet metric-icon"></i>
+            <div class="metric-value text-primary">{{ cost_analysis.total_production_cost|floatformat:2|intcomma }}</div>
+            <p class="metric-label">إجمالي تكلفة الإنتاج (جنيه)</p>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="metric-card position-relative">
+            <i class="fas fa-tag metric-icon"></i>
+            <div class="metric-value text-info">{{ cost_analysis.cost_per_piece|floatformat:2|intcomma }}</div>
+            <p class="metric-label">متوسط تكلفة القطعة (جنيه)</p>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="metric-card position-relative">
+            <i class="fas fa-boxes-stacked metric-icon"></i>
+            <div class="metric-value text-success">{{ cost_analysis.material_cost_percentage|floatformat:1 }}%</div>
+            <p class="metric-label">نسبة تكلفة المواد</p>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="metric-card position-relative">
+            <i class="fas fa-cogs metric-icon"></i>
+            <div class="metric-value text-warning">{{ cost_analysis.process_cost_percentage|floatformat:1 }}%</div>
+            <p class="metric-label">نسبة تكلفة العمليات</p>
+        </div>
+    </div>
+</div>
+
+<!-- Details Tabs -->
+<div class="card shadow-sm">
+    <div class="card-header p-0">
+        <ul class="nav nav-tabs nav-tabs-underlined" id="costAnalysisTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="breakdown-tab" data-bs-toggle="tab" data-bs-target="#breakdown-pane" type="button" role="tab">
+                    <i class="fas fa-chart-pie me-2"></i>ملخص التكاليف
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="timeline-tab" data-bs-toggle="tab" data-bs-target="#timeline-pane" type="button" role="tab">
+                    <i class="fas fa-clock me-2"></i>الجدول الزمني للإنتاج
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="bom-tab" data-bs-toggle="tab" data-bs-target="#bom-pane" type="button" role="tab">
+                    <i class="fas fa-clipboard-list me-2"></i>مقارنة قائمة المواد بالفعلي
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="batch-tab" data-bs-toggle="tab" data-bs-target="#batch-pane" type="button" role="tab">
+                    <i class="fas fa-barcode me-2"></i>بيانات الدفعة
+                </button>
+            </li>
+        </ul>
+    </div>
+    <div class="card-body p-0">
+        <div class="tab-content" id="costAnalysisTabsContent">
+            <!-- Cost Breakdown Tab -->
+            <div class="tab-pane fade show active" id="breakdown-pane" role="tabpanel">
+                <table class="table table-striped table-hover mb-0">
+                    <tbody>
+                        <tr><td class="fw-bold bg-light" colspan="2">تكاليف المواد الخام</td></tr>
+                        <tr><td>تكلفة القماش</td><td class="text-end">{{ cost_analysis.fabric_cost|floatformat:2|intcomma }} جنيه</td></tr>
+                        <tr><td>تكلفة الخيوط</td><td class="text-end">{{ cost_analysis.thread_cost|floatformat:2|intcomma }} جنيه</td></tr>
+                        <tr><td>تكلفة الإكسسوارات</td><td class="text-end">{{ cost_analysis.accessories_cost|floatformat:2|intcomma }} جنيه</td></tr>
+                        <tr class="table-secondary"><td><strong>إجمالي تكلفة المواد</strong></td><td class="text-end fw-bold">{{ cost_analysis.total_material_cost|floatformat:2|intcomma }} جنيه</td></tr>
+
+                        <tr><td class="fw-bold bg-light" colspan="2">تكاليف العمليات</td></tr>
+                        <tr><td>تكلفة القص</td><td class="text-end">{{ cost_analysis.cutting_cost|floatformat:2|intcomma }} جنيه</td></tr>
+                        <tr><td>تكلفة التجميع</td><td class="text-end">{{ cost_analysis.assembly_cost|floatformat:2|intcomma }} جنيه</td></tr>
+                        <tr><td>تكلفة الصباغة</td><td class="text-end">{{ cost_analysis.dyeing_cost|floatformat:2|intcomma }} جنيه</td></tr>
+                        <tr><td>تكلفة التشطيب</td><td class="text-end">{{ cost_analysis.finishing_cost|floatformat:2|intcomma }} جنيه</td></tr>
+                        <tr class="table-secondary"><td><strong>إجمالي تكلفة العمليات</strong></td><td class="text-end fw-bold">{{ cost_analysis.total_process_cost|floatformat:2|intcomma }} جنيه</td></tr>
+
+                        <tr><td class="fw-bold bg-light" colspan="2">تكاليف إضافية</td></tr>
+                        <tr><td>تكلفة النقل</td><td class="text-end">{{ cost_analysis.transportation_cost|floatformat:2|intcomma }} جنيه</td></tr>
+                        <tr><td>التكاليف العامة</td><td class="text-end">{{ cost_analysis.overhead_cost|floatformat:2|intcomma }} جنيه</td></tr>
+                        <tr><td>تكلفة مراقبة الجودة</td><td class="text-end">{{ cost_analysis.quality_control_cost|floatformat:2|intcomma }} جنيه</td></tr>
+                        <tr><td>تكلفة الفاقد والعيوب</td><td class="text-end">{{ cost_analysis.waste_cost|add:cost_analysis.defect_cost|floatformat:2|intcomma }} جنيه</td></tr>
+                        <tr class="table-secondary"><td><strong>إجمالي التكاليف الإضافية</strong></td><td class="text-end fw-bold">{{ cost_analysis.total_additional_cost|floatformat:2|intcomma }} جنيه</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Timeline Tab -->
+            <div class="tab-pane fade" id="timeline-pane" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table timeline-table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>المرحلة</th>
+                                <th>المسؤول</th>
+                                <th class="text-center">تاريخ البدء</th>
+                                <th class="text-center">تاريخ الانتهاء</th>
+                                <th class="text-center">المدة</th>
+                                <th class="text-end">تكلفة القطعة (جنيه)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in timeline %}
+                            <tr>
+                                <td><strong>{{ item.stage }}</strong></td>
+                                <td>{{ item.handler }}</td>
+                                <td class="text-center">{{ item.start|date:"d M Y, H:i" }}</td>
+                                <td class="text-center">{{ item.end|date:"d M Y, H:i" }}</td>
+                                <td class="text-center">{{ item.duration|humanize_duration }}</td>
+                                <td class="text-end fw-bold">{{ item.cost_per_piece|floatformat:2|default:"--" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="6" class="text-center p-4 text-muted">لا يوجد بيانات للجدول الزمني.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
-        </form>
-    </div>
-</div>
 
-<div class="row mb-4">
-    <div class="col-md-4 mb-3">
-        <div class="production-metric">
-            <div class="production-metric-icon primary"><i class="fas fa-wallet"></i></div>
-            <div class="production-metric-value">{{ total_production_cost|floatformat:2 }}</div>
-            <div class="production-metric-label">{% trans "إجمالي تكلفة الإنتاج" %}</div>
-        </div>
-    </div>
-    <div class="col-md-4 mb-3">
-        <div class="production-metric">
-            <div class="production-metric-icon success"><i class="fas fa-boxes"></i></div>
-            <div class="production-metric-value">{{ total_material_cost|floatformat:2 }}</div>
-            <div class="production-metric-label">{% trans "إجمالي تكلفة المواد" %}</div>
-        </div>
-    </div>
-    <div class="col-md-4 mb-3">
-        <div class="production-metric">
-            <div class="production-metric-icon warning"><i class="fas fa-cogs"></i></div>
-            <div class="production-metric-value">{{ total_process_cost|floatformat:2 }}</div>
-            <div class="production-metric-label">{% trans "إجمالي تكلفة العمليات" %}</div>
-        </div>
-    </div>
-</div>
+            <!-- BOM Comparison Tab -->
+            <div class="tab-pane fade" id="bom-pane" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>المادة الخام</th>
+                                <th class="text-center">الكمية حسب الـBOM</th>
+                                <th class="text-center">الكمية الفعلية المستخدمة</th>
+                                <th class="text-center">الفرق</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in bom_comparison %}
+                            <tr>
+                                <td>{{ item.material }}</td>
+                                <td class="text-center">{{ item.bom_quantity|floatformat:2 }}</td>
+                                <td class="text-center">{{ item.actual_quantity|floatformat:2 }}</td>
+                                <td class="text-center fw-bold {% if item.variance > 0 %}variance-positive{% elif item.variance < 0 %}variance-negative{% endif %}">
+                                    {{ item.variance|floatformat:2 }}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="text-center p-4 text-muted">لا توجد بيانات للمقارنة.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
-<div class="production-card">
-    <div class="card-header">
-        <h6 class="m-0 font-weight-bold text-primary">{% trans "تفاصيل تحليل التكلفة" %}</h6>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table production-table">
-                <thead>
-                    <tr>
-                        <th>{% trans "أمر الإنتاج" %}</th>
-                        <th>{% trans "المنتج" %}</th>
-                        <th class="text-center">{% trans "تكلفة الإنتاج الإجمالية" %}</th>
-                        <th class="text-center">{% trans "تكلفة القطعة" %}</th>
-                        <th>{% trans "تاريخ التحليل" %}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for analysis in cost_analyses %}
-                    <tr>
-                        <td><a href="{% url 'production:cost_analysis_detail' analysis.pk %}">{{ analysis.production_order.order_number }}</a></td>
-                        <td>{{ analysis.production_order.product.name }}</td>
-                        <td class="text-center fw-bold">{{ analysis.total_production_cost|floatformat:2 }}</td>
-                        <td class="text-center">{{ analysis.cost_per_piece|floatformat:2 }}</td>
-                        <td>{{ analysis.analysis_date|date:"Y-m-d" }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="5" class="text-center py-4">{% trans "لا توجد بيانات تحليل تكلفة للفترة المحددة." %}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <!-- Batch Data Tab -->
+            <div class="tab-pane fade p-4" id="batch-pane" role="tabpanel">
+                <h5 class="mb-3">بيانات الدفعة: {{ batch_data.order.batch_number }}</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <ul class="list-group">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                الألوان
+                                <span class="badge bg-primary rounded-pill">{{ batch_data.colors|join:", " }}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                أماكن التخزين
+                                <span class="badge bg-info rounded-pill">{{ batch_data.storage_locations|join:", "|default:"غير محدد" }}</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <ul class="list-group">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                متراج القماش (BOM)
+                                <span>{{ batch_data.fabric_bom_quantity|floatformat:3|default:"N/A" }} متر</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                متراج القماش (القص الفعلي)
+                                <span>{{ batch_data.fabric_cutting_quantity|floatformat:3|default:"N/A" }} متر</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+// Optional: Add JS for any interactive elements if needed in the future.
+</script>
 {% endblock %}

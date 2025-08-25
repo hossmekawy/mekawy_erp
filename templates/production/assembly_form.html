@@ -38,7 +38,7 @@
         align-items: center;
         justify-content: center;
         font-size: 1rem;
-        margin-left: 0.75rem;
+        margin-right: 0.75rem;
     }
     .assembly-type-selector .btn-check + .btn {
         transition: all 0.3s ease;
@@ -116,7 +116,6 @@
         border-color: var(--bs-danger);
         box-shadow: 0 0 0 0.25rem rgba(var(--bs-danger-rgb), .25);
     }
-    /* MODIFIED STYLE for product details card */
     .production-card-subtle {
         background-color: #f8f9fa;
         border: 1px solid #e9ecef;
@@ -154,7 +153,7 @@
                         <div id="order-selection-error" class="text-danger mt-2" style="display: none;"></div>
                     </div>
 
-                    <!-- MODIFIED: Product Details Display -->
+                    <!-- Product Details Display -->
                     <div id="product-details-card" class="production-card-subtle mb-4" style="display: none;">
                         <div class="row align-items-center">
                             <div class="col-md-8">
@@ -205,7 +204,6 @@
                     <div class="mt-4">
                         <h5 class="form-step-header"><span class="step-number">3</span>حدد المكونات المرسلة</h5>
                     
-                        <!-- Action Buttons -->
                         <div class="d-flex flex-wrap gap-2 mb-3">
                             <button type="button" class="btn btn-production-outline" id="load-bom-btn" disabled>
                                 <i class="fas fa-list-alt me-2"></i>تحميل المكونات من قائمة المواد (BOM)
@@ -215,13 +213,11 @@
                             </button>
                         </div>
                     
-                        <!-- Manual Add Search Box (Initially Hidden) -->
                         <div id="manual-add-section" class="mb-3" style="display: none;">
                             <label for="manual-component-search" class="form-label">ابحث عن المادة الخام لإضافتها:</label>
                             <select id="manual-component-search" class="form-select"></select>
                         </div>
                     
-                        <!-- Loader -->
                         <div id="components-loader" class="text-center py-4" style="display: none;">
                             <div class="spinner-border text-primary" role="status">
                                 <span class="visually-hidden">Loading...</span>
@@ -229,7 +225,6 @@
                             <p class="mt-2">جاري جلب المكونات...</p>
                         </div>
                     
-                        <!-- Components Table -->
                         <div id="components-section">
                             <div id="global-components-warning" class="alert alert-warning" style="display: none;"></div>
                             {{ component_formset.management_form }}
@@ -261,7 +256,7 @@
                     <div class="mt-4">
                         <h5 class="form-step-header"><span class="step-number">4</span>أدخل تفاصيل الإرسال</h5>
                         <div class="row">
-                            <div class="col-md-6 mb-4">
+                            <div class="col-md-4 mb-4">
                                 <label for="{{ form.quantity_sent.id_for_label }}" class="form-label">{{ form.quantity_sent.label }}</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-box"></i></span>
@@ -270,10 +265,20 @@
                                 {% for error in form.quantity_sent.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
                                 <div class="form-text">هذه هي كمية القطع الرئيسية الجاهزة للتجميع (تأتي من مرحلة القص).</div>
                             </div>
-                            <div class="col-md-6 mb-4">
-                                <label for="{{ form.expected_completion_date.id_for_label }}" class="form-label">{{ form.expected_completion_date.label }}</label>
+                            
+                            <div class="col-md-4 mb-4">
+                                <label for="{{ form.start_date.id_for_label }}" class="form-label fw-bold">{{ form.start_date.label }}</label>
                                 <div class="input-group">
                                      <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                                    {% render_field form.start_date class+="form-control" %}
+                                </div>
+                                {% for error in form.start_date.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
+                            </div>
+                    
+                            <div class="col-md-4 mb-4">
+                                <label for="{{ form.expected_completion_date.id_for_label }}" class="form-label">{{ form.expected_completion_date.label }}</label>
+                                <div class="input-group">
+                                     <span class="input-group-text"><i class="fas fa-calendar-check"></i></span>
                                     {% render_field form.expected_completion_date class+="form-control" %}
                                 </div>
                                 {% for error in form.expected_completion_date.errors %}<div class="invalid-feedback d-block mt-1">{{ error }}</div>{% endfor %}
@@ -352,6 +357,7 @@ document.addEventListener('DOMContentLoaded', function() {
             assembly_type: document.querySelector("input[name='{{ form.assembly_type.html_name }}']:checked")?.value,
             external_manufacturer: document.getElementById('{{ form.external_manufacturer.id_for_label }}')?.value,
             quantity_sent: document.getElementById('{{ form.quantity_sent.id_for_label }}')?.value,
+            start_date: document.getElementById('{{ form.start_date.id_for_label }}')?.value,
             expected_completion_date: document.getElementById('{{ form.expected_completion_date.id_for_label }}')?.value,
             notes: document.getElementById('{{ form.notes.id_for_label }}')?.value,
             components: components
@@ -378,8 +384,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const qtySentInput = document.getElementById('{{ form.quantity_sent.id_for_label }}');
         if(qtySentInput) qtySentInput.value = state.quantity_sent || '';
         
-        const dateInput = document.getElementById('{{ form.expected_completion_date.id_for_label }}');
-        if(dateInput) dateInput.value = state.expected_completion_date || '';
+        const startDateInput = document.getElementById('{{ form.start_date.id_for_label }}');
+        if(startDateInput) startDateInput.value = state.start_date || '';
+
+        const expectedDateInput = document.getElementById('{{ form.expected_completion_date.id_for_label }}');
+        if(expectedDateInput) expectedDateInput.value = state.expected_completion_date || '';
 
         const notesInput = document.getElementById('{{ form.notes.id_for_label }}');
         if(notesInput) notesInput.value = state.notes || '';
@@ -653,7 +662,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (quantitySentInput) {
                     quantitySentInput.value = data.quantity_ordered;
                 }
-                // MODIFIED: Populate and show simplified product card
                 if (productCard) {
                     document.getElementById('product-name-display').textContent = data.product_name || 'N/A';
                     document.getElementById('product-quantity-display').textContent = data.quantity_ordered || '0';
@@ -711,7 +719,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Event listeners for state saving
     assemblyForm.addEventListener('change', saveState);
     assemblyForm.addEventListener('input', saveState);
     assemblyForm.addEventListener('submit', clearState);
@@ -722,12 +729,9 @@ document.addEventListener('DOMContentLoaded', function() {
     $('#{{ form.external_manufacturer.id_for_label }}').select2({ placeholder: '--- اختر مصنعاً ---', allowClear: true, language: "ar" });
     initializeManualAddComponent();
 
-    // MODIFIED: This is the main fix for the loading issue.
-    // It checks if an order is already selected when the page loads.
     if (orderSelect.val()) {
         orderSelect.trigger('change');
     } else {
-        // If no order is pre-selected, then try to load from session storage.
         loadState();
     }
 

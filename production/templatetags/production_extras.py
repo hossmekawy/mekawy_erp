@@ -1,5 +1,5 @@
 from django import template
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 from decimal import Decimal
@@ -110,3 +110,29 @@ def mul(value, arg):
         return float(value) * float(arg)
     except (ValueError, TypeError):
         return ''
+    
+@register.filter
+def humanize_duration(duration):
+    """
+    Converts a timedelta object into a human-readable string like "3 days, 4 hours".
+    """
+    if not isinstance(duration, timedelta):
+        return duration
+
+    days = duration.days
+    seconds = duration.seconds
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+
+    parts = []
+    if days > 0:
+        parts.append(f"{days} يوم" if days == 1 else f"{days} أيام")
+    if hours > 0:
+        parts.append(f"{hours} ساعة" if hours == 1 else f"{hours} ساعات")
+    if minutes > 0 and days == 0: # Only show minutes if the duration is less than a day
+        parts.append(f"{minutes} دقيقة" if minutes == 1 else f"{minutes} دقائق")
+    
+    if not parts:
+        return "أقل من دقيقة"
+        
+    return "، ".join(parts)

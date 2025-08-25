@@ -11,7 +11,35 @@
 {% endblock %}
 
 {% block pdf_content %}
+    <style>
+        /* This style prevents a page break inside the signature block */
+        .signature-block {
+            page-break-inside: avoid !important;
+            margin-top: 25px; /* Reduced margin to save vertical space */
+        }
+        .signature-table {
+            width: 100%;
+            border: none;
+            text-align: center;
+        }
+        .signature-table td {
+            border: none;
+            width: 33.33%;
+            padding-top: 10px;
+        }
+        /* Style for the separator row in the merged table */
+        .section-header td {
+            background-color: #f0f0f0;
+            font-weight: bold;
+            text-align: center;
+            padding: 6px;
+            border-top: 1px solid #ccc;
+            border-bottom: 1px solid #ccc;
+        }
+    </style>
+
     <h2>بيانات التصريح</h2>
+    <!-- MODIFICATION: Merged both tables into one to save space -->
     <table class="info-table">
         <tr>
             <td style="width: 20%;"><strong>رقم التصريح:</strong></td>
@@ -25,14 +53,12 @@
             <td><strong>الكمية:</strong></td>
             <td>{{ permit.quantity }}</td>
         </tr>
-        <!-- MODIFICATION START: Moved product name to its own row for clarity -->
         <tr>
             <td><strong>اسم المنتج:</strong></td>
             <td colspan="3">{{ permit.production_order.product.name }}</td>
         </tr>
-        <!-- MODIFICATION END -->
         <tr>
-            <td><strong >الوجهة:</strong></td>
+            <td><strong>الوجهة:</strong></td>
             <td colspan="3"><span style="font-weight: bold; font-size: 1.2em;">{{ permit.destination }}</span></td>
         </tr>
         <tr>
@@ -49,12 +75,12 @@
             <td><strong>ملاحظات:</strong></td>
             <td colspan="3">{{ permit.notes|default:"لا يوجد" }}</td>
         </tr>
-    </table>
+        
+        <!-- Section for Approvals -->
+        <tr class="section-header">
+            <td colspan="4">الموافقات والتواريخ</td>
+        </tr>
 
-    <hr style="margin: 30px 0;">
-
-    <h2>الموافقات والتواريخ</h2>
-    <table class="info-table">
         <tr>
             <td><strong>طلب بواسطة:</strong></td>
             <td>{{ permit.requested_by.username }}</td>
@@ -73,12 +99,14 @@
         </tr>
     </table>
 
-    <div style="margin-top: 60px; text-align: center;">
-        <table style="border: none;">
-            <tr style="border: none;">
-                <td style="border: none; width: 33%;"><strong>توقيع مسؤول المصنع:</strong><br><br>...........................</td>
-                <td style="border: none; width: 33%;"><strong>توقيع السائق/المستلم:</strong><br><br>...........................</td>
-                <td style="border: none; width: 33%;"><strong>توقيع المدير:</strong><br><br>...........................</td>
+    <!-- The signature block is now wrapped in a div with the 'signature-block' class -->
+    <div class="signature-block">
+        <table class="signature-table">
+            <tr>
+                <!-- MODIFICATION: Reduced line breaks from <br><br> to <br> -->
+                <td><strong>توقيع مسؤول المصنع:</strong><br>...........................</td>
+                <td><strong>توقيع السائق/المستلم:</strong><br>...........................</td>
+                <td><strong>توقيع المحاسب:</strong><br>...........................</td>
             </tr>
         </table>
     </div>

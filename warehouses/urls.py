@@ -44,7 +44,8 @@ urlpatterns = [
     path('products/<int:pk>/delete/', views.ProductDeleteView.as_view(), name='product_delete'),
     path('products/<int:pk>/export/pdf/', views.ProductDetailPDFView.as_view(), name='product_detail_pdf'),
     path('products/export/pdf/', views.ProductListPDFView.as_view(), name='product_list_pdf'), # <-- ADD THIS LINE
-
+    path('products/export/excel/', views.export_products_excel, name='product_list_excel'), # <-- NEW EXCEL EXPORT URL
+    
     # Stock
     path('stock/movement/', views.StockMovementListView.as_view(), name='movement_list'),
     path('stock/movement/add/', views.StockMovementCreateView.as_view(), name='movement_add'),
@@ -79,6 +80,8 @@ urlpatterns = [
     path('export/movements/', views.export_movements_csv, name='export_movements_csv'),
     path('export/warehouse/<int:warehouse_id>/', views.export_warehouse_csv, name='export_warehouse_csv'),
     path('export/warehouses/', views.export_warehouses_csv, name='export_warehouses_csv'),
+    path('warehouses/export/stock/excel/', views.export_warehouses_stock_excel, name='warehouses_stock_excel'), # <-- NEW EXCEL EXPORT URL
+
 
     # API endpoints
     path('api/products/search/', views.ProductSearchView.as_view(), name='product_search'),

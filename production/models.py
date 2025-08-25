@@ -431,22 +431,55 @@ class ExternalManufacturer(models.Model):
 
     @property
     def total_value_of_active_jobs(self):
-        """Calculates the potential total value of all active jobs."""
-        # MODIFIED: This calculation now requires iterating through active jobs
-        # and looking up the specific price for each product.
-        active_processes = self.assembly_processes.filter(is_completed=False).select_related('production_order__product')
+        """
+        CORRECTED: Calculates the potential total value of all active (uncompleted) jobs
+        across assembly, dyeing, and finishing stages by using the quantity sent and the
+        product price, which is the correct way to estimate value before completion.
+        """
         total_value = Decimal('0.0')
-        for process in active_processes:
+
+        # 1. Active Assembly Jobs
+        active_assembly_jobs = self.assembly_processes.filter(is_completed=False).select_related('production_order__product')
+        for job in active_assembly_jobs:
             try:
                 price_obj = ManufacturerProductPrice.objects.get(
                     manufacturer=self,
-                    product=process.production_order.product
+                    product=job.production_order.product
                 )
-                total_value += process.quantity_sent * price_obj.price
+                # Use quantity_sent for active jobs
+                total_value += job.quantity_sent * price_obj.price
             except ManufacturerProductPrice.DoesNotExist:
-                # If a price isn't set for an active job's product, it's not included in the total value.
+                # If no price is set for this product, it's not included in the total value.
                 pass
+
+        # 2. Active Dyeing Jobs
+        active_dyeing_jobs = self.dyeing_jobs.filter(is_completed=False).select_related('assembly_process__production_order__product')
+        for job in active_dyeing_jobs:
+            try:
+                price_obj = ManufacturerProductPrice.objects.get(
+                    manufacturer=self,
+                    product=job.assembly_process.production_order.product
+                )
+                # Use quantity_sent for active jobs
+                total_value += job.quantity_sent * price_obj.price
+            except ManufacturerProductPrice.DoesNotExist:
+                pass
+
+        # 3. Active Finishing Jobs
+        active_finishing_jobs = self.finishing_jobs.filter(is_completed=False).select_related('dyeing_process__assembly_process__production_order__product')
+        for job in active_finishing_jobs:
+            try:
+                price_obj = ManufacturerProductPrice.objects.get(
+                    manufacturer=self,
+                    product=job.dyeing_process.assembly_process.production_order.product
+                )
+                # Use quantity_input for active finishing jobs
+                total_value += job.quantity_input * price_obj.price
+            except ManufacturerProductPrice.DoesNotExist:
+                pass
+
         return total_value
+
     @property
     def financial_account(self):
         """
