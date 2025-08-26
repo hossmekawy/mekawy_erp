@@ -1,34 +1,74 @@
-{% extends 'base.html' %}
-
-{% block content %}
-<div class="container-fluid">
-    <!-- Action Buttons -->
-    <div class="d-flex justify-content-end mb-4 d-print-none">
-        <a href="{% url 'sales:invoice_pdf' invoice.pk %}" target="_blank" class="btn btn-secondary">
-            <i class="fas fa-print"></i> طباعة PDF
-        </a>
-        {% if user.is_staff %}
-        <a href="{% url 'sales:invoice_update' invoice.pk %}" class="btn btn-warning mx-2">
-            <i class="fas fa-edit"></i> تعديل
-        </a>
-        <a href="{% url 'sales:invoice_delete' invoice.pk %}" class="btn btn-danger">
-            <i class="fas fa-trash"></i> حذف
-        </a>
-        {% endif %}
-    </div>
-
-    <!-- A4 Invoice Wrapper -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice {{ invoice.invoice_number }}</title>
+    <style>
+        body {
+            font-family: 'DejaVu Sans', sans-serif; /* Use a font that supports Arabic */
+            font-size: 12px;
+            direction: rtl;
+            text-align: right;
+        }
+        .invoice-wrapper {
+            width: 100%;
+            margin: 0 auto;
+        }
+        .invoice-header, .invoice-parties, .invoice-body, .invoice-summary, .invoice-footer {
+            margin-bottom: 20px;
+        }
+        .row {
+            display: -webkit-box;
+            -webkit-box-orient: horizontal;
+            width: 100%;
+        }
+        .col-6 {
+            width: 50%;
+        }
+        .text-right {
+            text-align: left; /* Flipped for RTL in wkhtmltopdf */
+        }
+        .qr-code {
+            width: 100px;
+            height: 100px;
+        }
+        .party-box {
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: right;
+        }
+        thead {
+            background-color: #f2f2f2;
+        }
+        .total-row {
+            font-weight: bold;
+        }
+        .invoice-footer {
+            text-align: center;
+            padding-top: 15px;
+            border-top: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
     <div class="invoice-wrapper">
         <div class="invoice-header">
             <div class="row">
                 <div class="col-6">
-                    <h1 class="invoice-title">فاتورة ضريبية</h1>
+                    <h1>فاتورة ضريبية</h1>
                     <p><strong>رقم الفاتورة:</strong> {{ invoice.invoice_number }}</p>
                     <p><strong>UUID:</strong> {{ invoice.uuid }}</p>
                     <p><strong>تاريخ الإصدار:</strong> {{ invoice.issue_date }}</p>
                 </div>
                 <div class="col-6 text-right">
-                    <!-- QR Code -->
                     {% if qr_code_image %}
                     <img src="data:image/png;base64,{{ qr_code_image }}" alt="QR Code" class="qr-code">
                     {% endif %}
@@ -58,8 +98,8 @@
         </div>
 
         <div class="invoice-body">
-            <table class="table table-bordered">
-                <thead class="thead-dark">
+            <table>
+                <thead>
                     <tr>
                         <th>#</th>
                         <th>الصنف</th>
@@ -87,74 +127,29 @@
         </div>
 
         <div class="invoice-summary">
-            <div class="row">
-                <div class="col-6">
-                    <p><strong>ملاحظات:</strong> {{ invoice.notes|default:"لا توجد ملاحظات." }}</p>
-                </div>
-                <div class="col-6">
-                    <table class="table">
-                        <tr>
-                            <th>الإجمالي الفرعي:</th>
-                            <td>{{ invoice.subtotal|floatformat:2 }}</td>
-                        </tr>
-                        <tr>
-                            <th>الخصم:</th>
-                            <td>{{ invoice.discount_amount|floatformat:2 }}</td>
-                        </tr>
-                        <tr>
-                            <th>إجمالي الضريبة:</th>
-                            <td>{{ invoice.tax_amount|floatformat:2 }}</td>
-                        </tr>
-                        <tr class="total-row">
-                            <th>المبلغ الإجمالي:</th>
-                            <td>{{ invoice.total|floatformat:2 }}</td>
-                        </tr>
-                    </table>
-                </div>
-            </div>
+             <table style="width: 50%; float: left;">
+                <tr>
+                    <th>الإجمالي الفرعي:</th>
+                    <td>{{ invoice.subtotal|floatformat:2 }}</td>
+                </tr>
+                <tr>
+                    <th>الخصم:</th>
+                    <td>{{ invoice.discount_amount|floatformat:2 }}</td>
+                </tr>
+                <tr>
+                    <th>إجمالي الضريبة:</th>
+                    <td>{{ invoice.tax_amount|floatformat:2 }}</td>
+                </tr>
+                <tr class="total-row">
+                    <th>المبلغ الإجمالي:</th>
+                    <td>{{ invoice.total|floatformat:2 }}</td>
+                </tr>
+            </table>
         </div>
 
         <div class="invoice-footer">
             <p>شكراً لتعاملكم معنا!</p>
         </div>
     </div>
-</div>
-
-<style>
-    .invoice-wrapper {
-        background: #fff;
-        padding: 40px;
-        border: 1px solid #dee2e6;
-        margin: 0 auto;
-        width: 210mm; /* A4 width */
-        min-height: 297mm; /* A4 height */
-    }
-    .invoice-header h1 {
-        font-weight: 700;
-        color: #333;
-    }
-    .qr-code {
-        width: 120px;
-        height: 120px;
-    }
-    .party-box {
-        padding: 15px;
-        border: 1px solid #eee;
-        margin-bottom: 20px;
-    }
-    .invoice-summary .table {
-        text-align: right;
-    }
-    .total-row th, .total-row td {
-        font-size: 1.2rem;
-        font-weight: bold;
-        border-top: 2px solid #333 !important;
-    }
-    .invoice-footer {
-        text-align: center;
-        margin-top: 40px;
-        padding-top: 20px;
-        border-top: 1px solid #eee;
-    }
-</style>
-{% endblock %}
+</body>
+</html>

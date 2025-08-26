@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block title %}Confirm Delete{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-2 text-gray-800">Delete Invoice</h1>
+    <p class="mb-4">Are you sure you want to delete invoice <strong>#{{ object.invoice_number }}</strong>? This action cannot be undone. Deleting the invoice will also restore the sold item quantities back to the inventory.</p>
+
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <a href="{% url 'sales:invoice_detail' object.pk %}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-danger">Yes, Delete</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

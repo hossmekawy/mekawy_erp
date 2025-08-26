@@ -1,4 +1,5 @@
 # Django imports
+import uuid
 from django.db import models
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
@@ -53,6 +54,9 @@ class SalesInvoice(models.Model):
         ('CANCELLED', 'ملغاة'),
     ]
     
+    # New field for official e-invoicing
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, verbose_name="UUID")
+    
     invoice_number = models.CharField(max_length=20, unique=True, editable=False, verbose_name="رقم الفاتورة")
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT, verbose_name="العميل")
     warehouse = models.ForeignKey(Warehouse, on_delete=models.PROTECT, verbose_name="المخزن")
@@ -93,8 +97,10 @@ class SalesInvoice(models.Model):
 
     def calculate_totals(self):
         items = self.items.all()
-        self.subtotal = sum(item.total for item in items)
-        self.total = self.subtotal - self.discount_amount + self.tax_amount
+        self.subtotal = sum(item.total for item in items if item.total is not None)
+        discount = self.discount_amount or Decimal('0.0')
+        tax = self.tax_amount or Decimal('0.0')
+        self.total = self.subtotal - discount + tax
         self.save()
 
 class InvoiceItem(models.Model):
@@ -113,8 +119,9 @@ class InvoiceItem(models.Model):
         verbose_name_plural = "بنود الفواتير"
 
     def save(self, *args, **kwargs):
-        discount_amount = (self.unit_price * self.quantity) * (self.discount_percentage / 100)
-        self.total = (self.unit_price * self.quantity) - discount_amount
+        base_price = self.unit_price * self.quantity
+        discount_amount = base_price * (self.discount_percentage / Decimal('100'))
+        self.total = base_price - discount_amount
         super().save(*args, **kwargs)
 
 class Payment(models.Model):
