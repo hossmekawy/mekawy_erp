@@ -2219,20 +2219,22 @@ def receive_finishing_batch(request, pk):
                     process.is_completed = True
                     process.actual_completion_date = timezone.now()
                     
-                    # --- FIX START: Create the ProductBatch record ONLY ONCE upon completion ---
-                    # This ensures the OneToOneField constraint is respected.
+                    # --- FIX START: Use update_or_create to prevent duplicate key errors ---
+                    # This will update the existing ProductBatch if the process is re-completed,
+                    # or create a new one if it doesn't exist.
                     if process.quantity_output > 0:
                         stock_item, _ = StockItem.objects.get_or_create(
                             product=production_order.product,
                             warehouse=process.destination_warehouse
                         )
-                        ProductBatch.objects.create(
-                            stock=stock_item,
-                            batch_number=production_order.batch_number,
-                            # The quantity is the TOTAL output of the process, not just this batch.
-                            quantity=process.quantity_output, 
-                            production_finishing_source=process,
-                            cost_per_piece=production_order.cost_analysis.cost_per_piece if hasattr(production_order, 'cost_analysis') else 0
+                        ProductBatch.objects.update_or_create(
+                            production_finishing_source=process,  # The unique key to look for
+                            defaults={
+                                'stock': stock_item,
+                                'batch_number': production_order.batch_number,
+                                'quantity': process.quantity_output, # Update with the latest total quantity
+                                'cost_per_piece': production_order.cost_analysis.cost_per_piece if hasattr(production_order, 'cost_analysis') else 0
+                            }
                         )
                     # --- FIX END ---
                     
@@ -2386,9 +2388,9 @@ class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
         """
         return super().get_queryset().select_related('finance_account').prefetch_related(
             # Prefetching deep relationships to get all necessary data in fewer queries
-            'assembly_processes__production_order__product',
-            'dyeing_jobs__assembly_process__production_order__product',
-            'finishing_jobs__dyeing_process__assembly_process__production_order__product',
+            'assembly_processes__production_order__product__category',
+            'dyeing_jobs__assembly_process__production_order__product__category',
+            'finishing_jobs__dyeing_process__assembly_process__production_order__product__category',
             'product_prices__product'
         )
 
@@ -2401,9 +2403,9 @@ class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
         manufacturer = self.get_object()
         
         # --- Prefetch related data for efficiency ---
-        assembly_jobs = manufacturer.assembly_processes.all().select_related('production_order__product__category')
-        dyeing_jobs = manufacturer.dyeing_jobs.all().select_related('assembly_process__production_order__product__category')
-        finishing_jobs = manufacturer.finishing_jobs.all().select_related('dyeing_process__assembly_process__production_order__product__category')
+        assembly_jobs = manufacturer.assembly_processes.all()
+        dyeing_jobs = manufacturer.dyeing_jobs.all()
+        finishing_jobs = manufacturer.finishing_jobs.all()
         
         all_jobs = list(chain(assembly_jobs, dyeing_jobs, finishing_jobs))
         active_jobs_raw = [job for job in all_jobs if not job.is_completed]
@@ -2420,8 +2422,28 @@ class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
                 production_order, job_type_display, start_date, detail_url = job.assembly_process.production_order, "صباغة", job.sent_date, reverse('production:dyeing_detail', kwargs={'pk': job.pk})
             elif isinstance(job, FinishingProcess):
                 production_order, job_type_display, start_date, detail_url = job.dyeing_process.assembly_process.production_order, "تشطيب", job.start_date, reverse('production:finishing_detail', kwargs={'pk': job.pk})
+            
             if production_order:
-                active_jobs_list.append({'job_object': job, 'order': production_order, 'job_type': job_type_display, 'start_date': start_date, 'detail_url': detail_url})
+                quantity_sent = 0
+                quantity_received = 0
+
+                if isinstance(job, (AssemblyProcess, DyeingProcess)):
+                    quantity_sent = job.quantity_sent
+                    quantity_received = job.quantity_received
+                elif isinstance(job, FinishingProcess):
+                    quantity_sent = job.quantity_input
+                    quantity_received = job.quantity_output
+                
+                remaining_quantity = (quantity_sent or 0) - (quantity_received or 0)
+
+                active_jobs_list.append({
+                    'job_object': job, 
+                    'order': production_order, 
+                    'job_type': job_type_display, 
+                    'start_date': start_date, 
+                    'detail_url': detail_url,
+                    'remaining_quantity': remaining_quantity
+                })
         context['active_jobs'] = sorted(active_jobs_list, key=lambda x: x['start_date'] or default_date, reverse=True)
 
         job_history_list = []
@@ -2433,8 +2455,30 @@ class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
                 cost, completion_date, production_order, job_type_display, detail_url = job.total_dyeing_cost, job.actual_return_date, job.assembly_process.production_order, "صباغة", reverse('production:dyeing_detail', kwargs={'pk': job.pk})
             elif isinstance(job, FinishingProcess):
                 cost, completion_date, production_order, job_type_display, detail_url = job.total_finishing_cost, job.actual_completion_date, job.dyeing_process.assembly_process.production_order, "تشطيب", reverse('production:finishing_detail', kwargs={'pk': job.pk})
+            
             if production_order:
-                job_history_list.append({'order': production_order, 'cost': cost or 0, 'completion_date': completion_date, 'job_type': job_type_display, 'detail_url': detail_url})
+                quantity_sent = 0
+                quantity_received = 0
+                
+                if isinstance(job, (AssemblyProcess, DyeingProcess)):
+                    quantity_sent = job.quantity_sent
+                    quantity_received = job.quantity_received
+                elif isinstance(job, FinishingProcess):
+                    quantity_sent = job.quantity_input
+                    quantity_received = job.quantity_output
+                
+                deficit = (quantity_sent or 0) - (quantity_received or 0)
+
+                job_history_list.append({
+                    'order': production_order, 
+                    'cost': cost or 0, 
+                    'completion_date': completion_date, 
+                    'job_type': job_type_display, 
+                    'detail_url': detail_url,
+                    'quantity_sent': quantity_sent or 0,
+                    'quantity_received': quantity_received or 0,
+                    'deficit': deficit
+                })
         context['job_history'] = sorted(job_history_list, key=lambda x: x['completion_date'] or default_date, reverse=True)
         
         context['product_prices'] = manufacturer.product_prices.all()
@@ -2446,9 +2490,12 @@ class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
         for job in completed_jobs_raw:
             quantity = 0
             product = None
-            if isinstance(job, (AssemblyProcess, DyeingProcess)):
+            if isinstance(job, AssemblyProcess):
                 quantity = job.quantity_received or 0
-                product = job.production_order.product if hasattr(job, 'production_order') else job.assembly_process.production_order.product
+                product = job.production_order.product
+            elif isinstance(job, DyeingProcess):
+                 quantity = job.quantity_received or 0
+                 product = job.assembly_process.production_order.product
             elif isinstance(job, FinishingProcess):
                 quantity = job.quantity_output or 0
                 product = job.dyeing_process.assembly_process.production_order.product
@@ -2462,9 +2509,12 @@ class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
         for job in active_jobs_raw:
             quantity = 0
             product = None
-            if isinstance(job, (AssemblyProcess, DyeingProcess)):
+            if isinstance(job, AssemblyProcess):
                 quantity = job.quantity_sent or 0
-                product = job.production_order.product if hasattr(job, 'production_order') else job.assembly_process.production_order.product
+                product = job.production_order.product
+            elif isinstance(job, DyeingProcess):
+                quantity = job.quantity_sent or 0
+                product = job.assembly_process.production_order.product
             elif isinstance(job, FinishingProcess):
                 quantity = job.quantity_input or 0
                 product = job.dyeing_process.assembly_process.production_order.product
@@ -2493,6 +2543,90 @@ class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
 
         return context
 
+
+
+class ManufacturerActiveJobsPDFView(LoginRequiredMixin, View):
+    """
+    Generates a PDF report of active jobs for a specific manufacturer.
+    """
+    def get(self, request, *args, **kwargs):
+        manufacturer = get_object_or_404(ExternalManufacturer, pk=self.kwargs['pk'])
+
+        # --- Re-use the logic from ExternalManufacturerDetailView to get active jobs ---
+        assembly_jobs = manufacturer.assembly_processes.filter(is_completed=False).select_related('production_order__product')
+        dyeing_jobs = manufacturer.dyeing_jobs.filter(is_completed=False).select_related('assembly_process__production_order__product')
+        finishing_jobs = manufacturer.finishing_jobs.filter(is_completed=False).select_related('dyeing_process__assembly_process__production_order__product')
+
+        active_jobs_raw = list(chain(assembly_jobs, dyeing_jobs, finishing_jobs))
+        default_date = timezone.now()
+
+        active_jobs_list = []
+        for job in active_jobs_raw:
+            production_order, job_type_display, start_date = None, "غير محدد", None
+            if isinstance(job, AssemblyProcess):
+                production_order, job_type_display, start_date = job.production_order, "تجميع", job.start_date
+            elif isinstance(job, DyeingProcess):
+                production_order, job_type_display, start_date = job.assembly_process.production_order, "صباغة", job.sent_date
+            elif isinstance(job, FinishingProcess):
+                production_order, job_type_display, start_date = job.dyeing_process.assembly_process.production_order, "تشطيب", job.start_date
+            
+            if production_order:
+                quantity_sent = 0
+                quantity_received = 0
+                if isinstance(job, (AssemblyProcess, DyeingProcess)):
+                    quantity_sent = job.quantity_sent
+                    quantity_received = job.quantity_received
+                elif isinstance(job, FinishingProcess):
+                    quantity_sent = job.quantity_input
+                    quantity_received = job.quantity_output
+                
+                remaining_quantity = (quantity_sent or 0) - (quantity_received or 0)
+
+                active_jobs_list.append({
+                    'order': production_order, 
+                    'job_type': job_type_display, 
+                    'start_date': start_date, 
+                    'quantity_sent': quantity_sent or 0,
+                    'remaining_quantity': remaining_quantity
+                })
+        
+        active_jobs = sorted(active_jobs_list, key=lambda x: x['start_date'] or default_date, reverse=True)
+
+        context = {
+            'manufacturer': manufacturer,
+            'active_jobs': active_jobs,
+            'timestamp': timezone.now()
+        }
+        
+        # Render HTML template to a string
+        html_string = render_to_string('pdf/production/active_jobs_report.html', context)
+
+        try:
+            # Configure PDF options for A5 Landscape
+            options = {
+                'page-size': 'A5',
+                'orientation': 'Landscape',
+                'margin-top': '0.5in',
+                'margin-right': '0.5in',
+                'margin-bottom': '0.5in',
+                'margin-left': '0.5in',
+                'encoding': "UTF-8",
+            }
+            
+            if hasattr(settings, 'WKHTMLTOPDF_PATH') and settings.WKHTMLTOPDF_PATH:
+                config = pdfkit.configuration(wkhtmltopdf=settings.WKHTMLTOPDF_PATH)
+                pdf = pdfkit.from_string(html_string, False, configuration=config, options=options)
+            else:
+                pdf = pdfkit.from_string(html_string, False, options=options)
+
+            response = HttpResponse(pdf, content_type='application/pdf')
+            filename = f"Active_Jobs_{manufacturer.name}_{timezone.now().strftime('%Y%m%d')}.pdf"
+            response['Content-Disposition'] = f'inline; filename="{filename}"'
+            return response
+        except Exception as e:
+            logger.error(f"PDF generation failed for manufacturer {manufacturer.pk}: {e}")
+            messages.error(request, f"حدث خطأ أثناء إنشاء ملف PDF: {e}")
+            return redirect('production:manufacturers:manufacturer_detail', pk=manufacturer.pk)
 
 
 

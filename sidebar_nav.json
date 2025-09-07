@@ -69,6 +69,12 @@
             "url_name": "sales:pricelist_create",
             "icon": "fas fa-tag",
             "roles": ["admin", "manager"]
+        },
+        
+        "تعديل_أسعار_البيع": {
+            "url_name": "sales:product_price_list",
+            "icon": "fas fa-dollar-sign",
+            "roles": ["admin", "manager"]
         }
     }
 },

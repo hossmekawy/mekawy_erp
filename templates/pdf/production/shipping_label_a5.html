@@ -49,10 +49,17 @@
         }
         .content {
             display: flex;
+            flex-direction: column; /* Changed to column to stack content */
             justify-content: space-between;
-            align-items: flex-start;
+            align-items: stretch; /* Stretch children to full width */
             flex-grow: 1;
             padding-top: 10px;
+        }
+        .main-content {
+             display: flex;
+             justify-content: space-between;
+             align-items: flex-start;
+             width: 100%;
         }
         .details {
             flex-grow: 1;
@@ -89,6 +96,37 @@
             display: inline-block;
             width: 120px;
         }
+
+        /* --- NEW STYLES FOR THE CHECKLIST --- */
+        .checklist-table {
+            width: 100%;
+            margin-top: 15px;
+            border-collapse: collapse;
+            font-size: 11pt;
+        }
+        .checklist-table td {
+            border: 1px solid #777;
+            padding: 4px 6px;
+        }
+        .checkbox {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 1px solid black;
+            vertical-align: middle;
+        }
+        .full-check {
+            margin-top: 10px;
+            text-align: center;
+            font-size: 14pt;
+            font-weight: bold;
+        }
+        .zipper-details {
+            font-size: 9pt;
+            color: #555;
+        }
+        /* --- END OF NEW STYLES --- */
+
     </style>
 </head>
 <body>
@@ -97,36 +135,77 @@
             <h1>بوليصة القصه</h1>
         </div>
         <div class="content">
-            <div class="details">
-                <div class="detail-item">
-                    <span class="label">كود أمر الإنتاج:</span>
-                    <strong>{{ order.order_number }}</strong>
+            <div class="main-content">
+                <div class="details">
+                    <div class="detail-item">
+                        <span class="label">كود أمر الإنتاج:</span>
+                        <strong>{{ order.order_number }}</strong>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">تاريخ بدء الإنتاج:</span>
+                        <strong>{{ order.start_date|date:"Y-m-d" }}</strong>
+                    </div>
+                    <hr>
+                    <div class="detail-item">
+                        <span class="label">اسم المنتج:</span>
+                        <strong>{{ order.product.name }}</strong>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">الكمية:</span>
+                        <strong>{{ order.quantity_ordered }} قطعة</strong>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">المقاسات:</span>
+                        <strong>{{ sizes_str|default:"غير محددة" }}</strong>
+                    </div>
                 </div>
-                <div class="detail-item">
-                    <span class="label">تاريخ بدء الإنتاج:</span>
-                    <strong>{{ order.start_date|date:"Y-m-d" }}</strong>
-                </div>
-                <hr>
-                <div class="detail-item">
-                    <span class="label">اسم المنتج:</span>
-                    <strong>{{ order.product.name }}</strong>
-                </div>
-                <div class="detail-item">
-                    <span class="label">الكمية:</span>
-                    <strong>{{ order.quantity_ordered }} قطعة</strong>
-                </div>
-                <div class="detail-item">
-                    <span class="label">المقاسات:</span>
-                    <strong>{{ sizes_str|default:"غير محددة" }}</strong>
+                <div class="qr-code">
+                    <img src="data:image/png;base64,{{ qr_code_base64 }}" alt="QR Code">
+                    <p>امسح الكود للتفاصيل</p>
                 </div>
             </div>
-            <div class="qr-code">
-                <img src="data:image/png;base64,{{ qr_code_base64 }}" alt="QR Code">
-                <p>امسح الكود للتفاصيل</p>
+
+            <div class="checklist-section">
+                <table class="checklist-table">
+                    <tr>
+                        <td>1- صدر</td>
+                        <td style="width: 30px;"><span class="checkbox"></span></td>
+                        <td>5- مساريف</td>
+                        <td style="width: 30px;"><span class="checkbox"></span></td>
+                    </tr>
+                    <tr>
+                        <td>2- ضهر</td>
+                        <td style="width: 30px;"><span class="checkbox"></span></td>
+                        <td>6- سوستة <span class="zipper-details">(مقاس: ........ لون: ........)</span></td>
+                        <td style="width: 30px;"><span class="checkbox"></span></td>
+                    </tr>
+                     <tr>
+                        <td>3- كمر</td>
+                        <td style="width: 30px;"><span class="checkbox"></span></td>
+                        <td>   &nbsp;&nbsp;&nbsp;&nbsp;سوستة <span class="zipper-details">(مقاس: ........ لون: ........)</span></td>
+                        <td style="width: 30px;"><span class="checkbox"></span></td>
+                    </tr>
+                    <tr>
+                        <td>4- لوكسات</td>
+                        <td style="width: 30px;"><span class="checkbox"></span></td>
+                        <td>7- الدبلان</td>
+                        <td style="width: 30px;"><span class="checkbox"></span></td>
+                    </tr>
+                    <tr>
+                         <td>8- البييه</td>
+                        <td style="width: 30px;"><span class="checkbox"></span></td>
+                        <td>9- التيكت</td>
+                        <td style="width: 30px;"><span class="checkbox"></span></td>
+                    </tr>
+                </table>
+                <div class="full-check">
+                    <span>كاملة</span>
+                    <span class="checkbox"></span>
+                </div>
             </div>
-        </div>
+            </div>
         <div class="footer">
-            <span>تمت الطباعة في: {% now "Y-m-d H:i" %}</span>
+            <span>تمت الطباعة في: {% now "Y-m-d H:i" %} مع تحيات المهندس : حسين المكاوي</span>
         </div>
     </div>
 </body>

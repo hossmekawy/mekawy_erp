@@ -11,6 +11,8 @@ urlpatterns = [
     path('manufacturers/<int:pk>/statement/', views.ManufacturerStatementDetailView.as_view(), name='manufacturer_statement_detail'),
     path('manufacturers/<int:pk>/pay/', views.CreateManufacturerPaymentView.as_view(), name='manufacturer_payment_create'),
     path('manufacturers/<int:pk>/recalculate/', views.recalculate_and_create_transactions, name='manufacturer_recalculate'),
+    path('manufacturers/<int:pk>/statement/pdf/', views.PrintManufacturerStatementView.as_view(), name='manufacturer_statement_pdf'),
+
 
     # Existing Account URLs
     path('accounts/', views.AccountListView.as_view(), name='account_list'),

@@ -137,6 +137,12 @@ class ManufacturerPaymentForm(forms.Form):
         self.manufacturer_account = self.manufacturer.finance_account
         if not self.manufacturer_account:
             raise ValueError("Critical: Manufacturer does not have a linked finance account.")
+        
+        # --- FIX: Set initial value if only one asset account exists ---
+        asset_accounts = self.fields['payment_account'].queryset
+        if asset_accounts.count() == 1:
+            self.fields['payment_account'].initial = asset_accounts.first()
+
 
     def clean(self):
         """

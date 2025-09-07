@@ -1,0 +1,66 @@
+{% extends "pdf/base_pdf.html" %}
+{% load static finance_tags %}
+
+{% block pdf_title %}كشف حساب المصنع: {{ manufacturer.name }}{% endblock %}
+
+{% block document_main_title %}
+    كشف حساب المصنع: {{ manufacturer.name }}
+{% endblock %}
+
+{% block pdf_content %}
+    <p>
+        <strong>الفترة:</strong> 
+        {% if start_date and end_date %}
+            من {{ start_date }} إلى {{ end_date }}
+        {% else %}
+            كل الحركات
+        {% endif %}
+    </p>
+    <p>
+        <strong>الرصيد الحالي:</strong> {{ account.balance|neg_currency }}
+    </p>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>التاريخ</th>
+                <th>البيان</th>
+                <th>أمر الإنتاج</th>
+                <th>المنتج</th>
+                <th>مدين (له)</th>
+                <th>دائن (عليه)</th>
+                <th>الرصيد</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if start_date %}
+            <tr>
+                <td colspan="6" style="text-align:right; font-weight: bold;">رصيد افتتاحي</td>
+                <td style="font-weight: bold;">{{ opening_balance|neg_currency }}</td>
+            </tr>
+            {% endif %}
+            
+            {% for item in statement_items %}
+            <tr>
+                <td>{{ item.transaction.timestamp|date:"Y-m-d H:i" }}</td>
+                <td>{{ item.transaction.description }}</td>
+                <td>{{ item.production_order.order_number|default:"--" }}</td>
+                <td>{{ item.product_name|default:"--" }}</td>
+                <td>{{ item.debit|currency }}</td>
+                <td>{{ item.credit|currency }}</td>
+                <td style="font-weight: bold;">{{ item.running_balance|neg_currency }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" style="text-align:center;">لا توجد حركات مالية لهذه الفترة.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr style="background-color: #292b2e; color: rgb(255, 255, 255);">
+                <th colspan="6" style="text-align:right;">الرصيد الختامي</th>
+                <th>{{ closing_balance|neg_currency }}</th>
+            </tr>
+        </tfoot>
+    </table>
+{% endblock %}

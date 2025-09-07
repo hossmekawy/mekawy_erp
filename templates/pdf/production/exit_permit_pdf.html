@@ -2,9 +2,13 @@
 
 {% block pdf_title %}تصريح خروج - {{ permit.permit_number }}{% endblock %}
 
+{% block document_main_title %}
+    تصريح خروج بضاعة
+{% endblock %}
+
 {% block pdf_header %}
-    <h1>تصريح خروج بضاعة</h1>
-    <div class="meta-info">
+    {{ block.super }}
+    <div style="text-align: center; font-size: 12pt; margin-top: -15px; margin-bottom: 15px;">
         <strong>رقم التصريح:</strong> {{ permit.permit_number }} | 
         <strong>تاريخ الطباعة:</strong> {{ timestamp|date:"Y-m-d H:i" }}
     </div>

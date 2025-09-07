@@ -25,8 +25,8 @@ manufacturer_patterns = [
     path('<int:pk>/delete/', views.ExternalManufacturerDeleteView.as_view(), name='manufacturer_delete'),
     path('<int:pk>/create-account/', views.create_manufacturer_account_view, name='manufacturer_create_account'),
     path('<int:pk>/export/', include((manufacturer_exports_blueprint.urlpatterns, 'exports'))),
-
-
+    # MOVED THE PDF URL HERE
+    path('<int:pk>/pdf/active-jobs/', views.ManufacturerActiveJobsPDFView.as_view(), name='export_active_jobs_pdf'),
 ]
 
 exit_permit_patterns = [
@@ -58,7 +58,7 @@ urlpatterns = [
     path('manufacturers/', include((manufacturer_patterns, 'manufacturers'))),
     path('exit-permits/', include((exit_permit_patterns, 'exit_permits'))),
     path('quality/', include((quality_patterns, 'quality'))),
-
+    
     # --- CORRECTED: Category & Size Group Management ---
     path('settings/management/', category_size_blueprint.category_size_management_view, name='category_size_management'),
     path('ajax/categories/create/', category_size_blueprint.create_category_ajax, name='create_category_ajax'),
@@ -138,7 +138,7 @@ urlpatterns = [
     path('cost-analysis/<int:pk>/update/', views.CostAnalysisUpdateView.as_view(), name='cost_analysis_update'),
     path('cost-analysis/select-order/', views.CostAnalysisSelectOrderView.as_view(), name='cost_analysis_select_order'), 
     path('cost-analysis/<int:pk>/export/', include((cost_analysis_exports_blueprint.urlpatterns, 'cost_analysis_exports'))),
-       # --- NEW: Order Data and Shipping Label URLs ---
+        # --- NEW: Order Data and Shipping Label URLs ---
     path('order-data/', views.OrderDataListView.as_view(), name='order_data_list'),
     path('order-data/<int:pk>/print-shipping-label/', views.print_shipping_label_pdf, name='print_shipping_label'),
     # --- CORRECTED AJAX URLS ---
@@ -165,4 +165,3 @@ urlpatterns = [
     path('ajax/get-stock-for-material-in-warehouse/', views.get_stock_for_material_in_warehouse_ajax, name='ajax_get_stock_for_material_in_warehouse'),
     # =============================================================================
 ]
-

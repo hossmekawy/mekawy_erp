@@ -95,3 +95,9 @@ class PriceListItemForm(forms.ModelForm):
             'price': forms.NumberInput(attrs={'class': 'form-control'}),
         }
 
+class UploadFileForm(forms.Form):
+    """
+    A simple form for uploading a file.
+    """
+    file = forms.FileField(label="اختر ملف إكسل")
+

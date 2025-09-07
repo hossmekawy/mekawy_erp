@@ -1,10 +1,15 @@
 {% extends "pdf/base_pdf.html" %}
+{% load static humanize production_extras %}
 
 {% block pdf_title %}ورقة قص - أمر {{ cutting_process.production_order.order_number }}{% endblock %}
 
+{% block document_main_title %}
+    ورقة عملية القص
+{% endblock %}
+
 {% block pdf_header %}
-    <h1>ورقة عملية القص</h1>
-    <div class="meta-info">
+    {{ block.super }}
+    <div style="text-align: center; font-size: 12pt; margin-top: -15px; margin-bottom: 15px;">
         <strong>أمر الإنتاج:</strong> {{ cutting_process.production_order.order_number }} |
         <strong>تاريخ الطباعة:</strong> {{ timestamp|date:"Y-m-d" }}
     </div>

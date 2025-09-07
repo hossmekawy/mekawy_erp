@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}تعديل أسعار بيع المنتجات{% endblock %}
+
+{% block page_title %}تعديل أسعار بيع المنتجات النهائية{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">قائمة المنتجات</h3>
+        <div class="card-tools">
+            <!-- Search Form -->
+            <form method="get" class="input-group input-group-sm" style="width: 250px;">
+                <input type="text" name="q" class="form-control float-right" placeholder="بحث بالاسم أو الكود..." value="{{ search_query|default:'' }}">
+                <div class="input-group-append">
+                    <button type="submit" class="btn btn-default"><i class="fas fa-search"></i></button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="card-body">
+        <!-- Action Buttons -->
+        <div class="mb-3 d-flex justify-content-between">
+            <div>
+                <a href="{% url 'sales:export_prices_excel' %}" class="btn btn-success">
+                    <i class="fas fa-file-excel"></i> تصدير إلى Excel
+                </a>
+                <a href="{% url 'sales:export_prices_pdf' %}" class="btn btn-danger">
+                    <i class="fas fa-file-pdf"></i> تصدير إلى PDF
+                </a>
+            </div>
+            <div>
+                <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#importModal">
+                    <i class="fas fa-file-import"></i> استيراد من Excel
+                </button>
+            </div>
+        </div>
+
+        <!-- Products Table -->
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+                <thead class="thead-light">
+                    <tr>
+                        <th>كود المنتج</th>
+                        <th>اسم المنتج</th>
+                        <th>سعر البيع الحالي</th>
+                        <th style="width: 150px;">السعر الجديد</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products %}
+                    <tr id="product-row-{{ product.id }}">
+                        <td>{{ product.code }}</td>
+                        <td>{{ product.name }}</td>
+                        <td id="current-price-{{ product.id }}">{{ product.selling_price|default:"0.00" }}</td>
+                        <td>
+                            <input type="number" 
+                                   class="form-control price-input" 
+                                   data-product-id="{{ product.id }}" 
+                                   value="{{ product.selling_price|default:'' }}"
+                                   step="0.01"
+                                   min="0">
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center">لا توجد منتجات لعرضها.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer clearfix">
+        <!-- Pagination -->
+        {% if products.has_other_pages %}
+        <ul class="pagination pagination-sm m-0 float-right">
+            {% if products.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page=1{% if search_query %}&q={{ search_query }}{% endif %}">&laquo; أول صفحة</a></li>
+                <li class="page-item"><a class="page-link" href="?page={{ products.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">السابق</a></li>
+            {% endif %}
+            
+            <li class="page-item disabled"><span class="page-link">صفحة {{ products.number }} من {{ products.paginator.num_pages }}</span></li>
+
+            {% if products.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ products.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">التالي</a></li>
+                <li class="page-item"><a class="page-link" href="?page={{ products.paginator.num_pages }}{% if search_query %}&q={{ search_query }}{% endif %}">آخر صفحة &raquo;</a></li>
+            {% endif %}
+        </ul>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal fade" id="importModal" tabindex="-1" role="dialog" aria-labelledby="importModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="importModalLabel">استيراد أسعار من ملف Excel</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <form action="{% url 'sales:import_prices_excel' %}" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-body">
+            <p>يجب أن يحتوي الملف على الأعمدة التالية بالترتيب: <strong>كود المنتج، اسم المنتج، سعر البيع</strong>. سيتم تجاهل اسم المنتج واستخدام الكود لتحديث السعر.</p>
+            <hr>
+            {{ upload_form|crispy }}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">إغلاق</button>
+          <button type="submit" class="btn btn-primary">رفع واستيراد</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+$(document).ready(function() {
+    let debounceTimer;
+
+    $('.price-input').on('input', function() {
+        clearTimeout(debounceTimer);
+        const input = $(this);
+        const productId = input.data('productId');
+        const newPrice = input.val();
+        
+        // Add a visual indicator that typing is happening
+        input.css('border-color', '#ffc107'); // Yellow border
+
+        debounceTimer = setTimeout(function() {
+            updatePrice(productId, newPrice, input);
+        }, 800); // Wait for 800ms of inactivity before sending
+    });
+
+    function updatePrice(productId, newPrice, inputElement) {
+        // Show loading state
+        inputElement.css('border-color', '#007bff'); // Blue for processing
+
+        $.ajax({
+            url: "{% url 'sales:update_product_price_ajax' %}",
+            type: "POST",
+            data: {
+                'product_id': productId,
+                'new_price': newPrice,
+                'csrfmiddlewaretoken': '{{ csrf_token }}'
+            },
+            success: function(response) {
+                if (response.status === 'success') {
+                    // Update current price cell
+                    $('#current-price-' + productId).text(parseFloat(newPrice).toFixed(2));
+                    // Visual feedback for success
+                    inputElement.css('border-color', '#28a745'); // Green border
+                    
+                    // Optional: Show a toast notification
+                    const Toast = Swal.mixin({
+                      toast: true,
+                      position: 'top-end',
+                      showConfirmButton: false,
+                      timer: 3000,
+                      timerProgressBar: true,
+                    });
+                    Toast.fire({
+                      icon: 'success',
+                      title: response.message
+                    });
+
+                } else {
+                    handleAjaxError(inputElement, response.message);
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = 'حدث خطأ غير متوقع.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                handleAjaxError(inputElement, errorMsg);
+            },
+            complete: function() {
+                // After 1.5 seconds, revert border to normal
+                setTimeout(function() {
+                    inputElement.css('border-color', ''); 
+                }, 1500);
+            }
+        });
+    }
+
+    function handleAjaxError(inputElement, message) {
+        inputElement.css('border-color', '#dc3545'); // Red border for error
+        Swal.fire({
+          icon: 'error',
+          title: 'خطأ في التحديث',
+          text: message,
+        });
+    }
+});
+</script>
+{% endblock %}

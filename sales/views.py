@@ -1,5 +1,8 @@
 import base64
 from io import BytesIO
+
+import openpyxl
+
 import pdfkit
 from django.template.loader import render_to_string
 from django.http import HttpResponse
@@ -13,16 +16,20 @@ from django.http import JsonResponse
 from django.db.models import Q, Sum
 from django.db import transaction
 from decimal import Decimal
-
+from django.template.loader import get_template
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.paginator import Paginator
 import qrcode
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
 from .models import SalesInvoice, InvoiceItem, PriceList, Payment
-from .forms import SalesInvoiceForm, InvoiceItemFormSet, PriceListForm
+from .forms import SalesInvoiceForm, InvoiceItemFormSet, PriceListForm, UploadFileForm, PriceListItemForm , PriceListForm
 from warehouses.models import Product, Warehouse, Category, StockItem
 from crm.models import Customer
+from Mekawy_ERP.settings import WKHTMLTOPDF_PATH
+import pdfkit
 
 # --- Standalone Page Views ---
 
@@ -345,6 +352,174 @@ class PriceListCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     def form_valid(self, form):
         messages.success(self.request, "تم إنشاء قائمة الأسعار بنجاح.")
         return super().form_valid(form)
+
+class ProductPriceListView(LoginRequiredMixin, View):
+    """
+    Displays a list of finished products for price editing.
+    Handles search and pagination.
+    """
+    template_name = 'sales/product_price_list.html'
+    
+    def get(self, request, *args, **kwargs):
+        query = request.GET.get('q', '')
+        product_list = Product.objects.filter(product_type='finished').order_by('name')
+        if query:
+            product_list = product_list.filter(
+                Q(name__icontains=query) | Q(code__icontains=query)
+            )
+
+        paginator = Paginator(product_list, 25) # Show 25 products per page
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+        
+        upload_form = UploadFileForm()
+
+        context = {
+            'products': page_obj,
+            'upload_form': upload_form,
+            'search_query': query
+        }
+        return render(request, self.template_name, context)
+
+class UpdateProductPriceAJAXView(LoginRequiredMixin, View):
+    """
+    Handles AJAX requests to update a product's selling price.
+    """
+    def post(self, request, *args, **kwargs):
+        product_id = request.POST.get('product_id')
+        new_price_str = request.POST.get('new_price')
+
+        if not product_id or new_price_str is None:
+            return JsonResponse({'status': 'error', 'message': 'بيانات غير كاملة.'}, status=400)
+
+        try:
+            product = Product.objects.get(id=product_id, product_type='finished')
+            new_price = Decimal(new_price_str)
+            
+            if new_price < 0:
+                 return JsonResponse({'status': 'error', 'message': 'السعر لا يمكن أن يكون سالباً.'}, status=400)
+
+            product.selling_price = new_price
+            product.save()
+            return JsonResponse({'status': 'success', 'message': 'تم تحديث السعر بنجاح.'})
+
+        except Product.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'المنتج غير موجود.'}, status=404)
+        except (ValueError, TypeError):
+            return JsonResponse({'status': 'error', 'message': 'قيمة السعر غير صالحة.'}, status=400)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': f'حدث خطأ: {e}'}, status=500)
+
+class ExportPricesExcelView(LoginRequiredMixin, View):
+    """
+    Exports product prices to an Excel file.
+    """
+    def get(self, request, *args, **kwargs):
+        products = Product.objects.filter(product_type='finished').order_by('name')
+        
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.title = 'أسعار المنتجات'
+        
+        # Set headers
+        headers = ['كود المنتج', 'اسم المنتج', 'سعر البيع']
+        sheet.append(headers)
+        
+        # Add data
+        for product in products:
+            sheet.append([product.code, product.name, product.selling_price])
+            
+        # Create response
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="product_prices.xlsx"'
+        virtual_workbook = BytesIO()
+        workbook.save(virtual_workbook)
+        response.write(virtual_workbook.getvalue())
+        
+        return response
+
+class ImportPricesExcelView(LoginRequiredMixin, View):
+    """
+    Imports product prices from an Excel file.
+    """
+    def post(self, request, *args, **kwargs):
+        form = UploadFileForm(request.POST, request.FILES)
+        if form.is_valid():
+            excel_file = request.FILES['file']
+            try:
+                workbook = openpyxl.load_workbook(excel_file)
+                sheet = workbook.active
+                
+                updated_count = 0
+                errors = []
+
+                # Skip header row
+                for row in sheet.iter_rows(min_row=2, values_only=True):
+                    product_code, _, new_price = row[0], row[1], row[2]
+                    
+                    if not product_code or new_price is None:
+                        continue
+                        
+                    try:
+                        product = Product.objects.get(code=product_code, product_type='finished')
+                        product.selling_price = Decimal(new_price)
+                        product.save()
+                        updated_count += 1
+                    except Product.DoesNotExist:
+                        errors.append(f"المنتج بالكود '{product_code}' غير موجود.")
+                    except (ValueError, TypeError):
+                        errors.append(f"قيمة السعر غير صالحة للمنتج بالكود '{product_code}'.")
+
+                if errors:
+                    messages.warning(request, f"تم تحديث {updated_count} منتج مع وجود الأخطاء التالية: {', '.join(errors)}")
+                else:
+                    messages.success(request, f"تم تحديث أسعار {updated_count} منتج بنجاح.")
+
+            except Exception as e:
+                messages.error(request, f"حدث خطأ أثناء معالجة الملف: {e}")
+        else:
+            messages.error(request, "لم يتم رفع ملف أو أن الملف غير صالح.")
+            
+        return redirect('sales:product_price_list')
+
+class ExportPricesPDFView(LoginRequiredMixin, View):
+    """
+    Exports product prices to a PDF file using wkhtmltopdf.
+    """
+    def get(self, request, *args, **kwargs):
+        products = Product.objects.filter(product_type='finished').order_by('name')
+        
+        context = {
+            'products': products,
+            'company_name': 'Mekawy Group'
+        }
+        
+        template = get_template('pdf/sales/price_list_pdf.html')
+        html = template.render(context)
+        
+        try:
+            config = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_PATH)
+            pdf = pdfkit.from_string(html, False, configuration=config, options={
+                'encoding': "UTF-8",
+                'page-size': 'A4',
+                'margin-top': '0.75in',
+                'margin-right': '0.75in',
+                'margin-bottom': '0.75in',
+                'margin-left': '0.75in',
+            })
+            
+            response = HttpResponse(pdf, content_type='application/pdf')
+            response['Content-Disposition'] = 'attachment; filename="product_prices.pdf"'
+            
+            return response
+            
+        except FileNotFoundError:
+            messages.error(request, "خطأ: لم يتم العثور على wkhtmltopdf. يرجى التأكد من تثبيته وتعيين المسار الصحيح في الإعدادات.")
+            return redirect('sales:product_price_list')
+        except Exception as e:
+            messages.error(request, f"حدث خطأ أثناء إنشاء ملف PDF: {e}")
+            return redirect('sales:product_price_list')
+
 class SalesInvoiceDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     model = SalesInvoice
     success_url = reverse_lazy('sales:invoice_list')

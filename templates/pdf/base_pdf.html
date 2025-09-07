@@ -7,7 +7,7 @@
         @page {
             size: A5;
             margin: 1.5cm;
-	
+        
             @top-center {
                 content: "{% block pdf_header_title %}Mekawy Group{% endblock %}";
                 font-family: 'Tajawal', sans-serif;
@@ -24,8 +24,7 @@
         }
         
         body {
-                font-family: 'Tajawal', sans-serif;
-
+            font-family: 'Tajawal', sans-serif;
             font-size: 16pt;
             direction: rtl;
             text-align: right;
@@ -34,20 +33,19 @@
         }
 
         .header {
-            text-align: center;
             border-bottom: 2px solid #004a99;
             padding-bottom: 12px;
             margin-bottom: 24px;
         }
         
         .header h1 {
-            font-size: 26pt;
+            font-size: 22pt; /* Adjusted font size */
             color: #004a99;
             margin: 0;
         }
         
         .header .meta-info {
-            font-size: 15pt;
+            font-size: 12pt; /* Adjusted font size */
             color: #777;
         }
 
@@ -93,8 +91,23 @@
 <body>
     <div class="header">
         {% block pdf_header %}
-            <h1>{% block document_main_title %}تقرير النظام{% endblock %}</h1>
-            <div class="meta-info">{% now "j F Y, g:i A" %}</div>
+            <table style="width: 100%; border-collapse: collapse;">
+                <tbody>
+                    <tr>
+                        <td style="width: 33.33%; text-align: right; border: none; vertical-align: middle;">
+                            <h1>{% block document_main_title %}تقرير النظام{% endblock %}</h1>
+                            <div class="meta-info">{% now "j F Y" %}</div>
+                        </td>
+                        <td style="width: 33.33%; text-align: center; border: none; vertical-align: middle;">
+                            <img src="https://scontent.fcai1-2.fna.fbcdn.net/v/t39.30808-6/541307868_122102932718995870_983360905977004517_n.jpg?_nc_cat=105&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=qc9FOJUA-FcQ7kNvwG6oXZb&_nc_oc=AdlX_LR4U8h5JOC5H6pV3lCuoZPMZ9r62s8qvsDDJbhJrrAVyiA65uvcH8VIbeK_zJE&_nc_zt=23&_nc_ht=scontent.fcai1-2.fna&_nc_gid=AQqoWPCQZ64fBk_iJQW1ig&oh=00_Afbt1raeEDrXielgmo1yRiA8Cx7lZ3h-5mhb_UWx1SM5qg&oe=68C33D52" alt="Mekawy Group Logo" style="max-height: 80px; width: auto;">
+                        </td>
+                        <td style="width: 33.33%; text-align: left; border: none; vertical-align: middle;">
+                            <h2 style="margin:0; padding:0; font-size: 16pt; text-align: left;">مصنع المكاوي</h2>
+                            <p style="margin:0; padding:0; font-size: 10pt; text-align: left;">للتواصل : 0502384597</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         {% endblock %}
     </div>
 
@@ -103,3 +116,4 @@
     </div>
 </body>
 </html>
+

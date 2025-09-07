@@ -1,0 +1,59 @@
+{% extends "pdf/base_pdf.html" %}
+{% load static humanize production_extras %}
+
+{% block pdf_title %}تقرير المهام النشطة - {{ manufacturer.name }}{% endblock %}
+
+{% block extra_styles %}
+<style>
+    @page {
+        size: A5 landscape; /* Set page to A5 landscape */
+        margin: 1cm;
+    }
+    body {
+        font-size: 10pt; /* Adjust font size for more content */
+    }
+    th, td {
+        padding: 6px; /* Adjust padding */
+    }
+    .text-center {
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block pdf_content %}
+    <div class="header">
+        <h1>تقرير المهام النشطة للمصنع: {{ manufacturer.name }}</h1>
+        <div class="meta-info">تاريخ الطباعة: {{ timestamp|date:"d M Y, h:i A" }}</div>
+    </div>
+
+    {% if active_jobs %}
+        <table>
+            <thead>
+                <tr>
+                    <th>أمر الإنتاج</th>
+                    <th>المنتج</th>
+                    <th>نوع المهمة</th>
+                    <th class="text-center">الكمية المرسلة</th>
+                    <th class="text-center">الكمية المتبقية</th>
+                    <th>تاريخ الإرسال</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for job in active_jobs %}
+                <tr>
+                    <td>{{ job.order.order_number }}</td>
+                    <td>{{ job.order.product.name }}</td>
+                    <td>{{ job.job_type }}</td>
+                    <td class="text-center">{{ job.quantity_sent|intcomma }}</td>
+                    <td class="text-center">{{ job.remaining_quantity|intcomma }}</td>
+                    <td>{{ job.start_date|date:"Y-m-d" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p style="text-align: center; margin-top: 30px;">لا توجد مهام نشطة حالياً لهذا المصنع.</p>
+    {% endif %}
+{% endblock %}
+

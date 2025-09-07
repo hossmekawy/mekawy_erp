@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}قوائم الأسعار{% endblock %}
+
+{% block page_title %}قوائم الأسعار{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">جميع قوائم الأسعار</h3>
+        <div class="card-tools">
+            <a href="{% url 'sales:pricelist_create' %}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus"></i> إضافة قائمة أسعار جديدة
+            </a>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>اسم القائمة</th>
+                        <th>الحالة</th>
+                        <th>تاريخ البدء</th>
+                        <th>تاريخ الانتهاء</th>
+                        <th>إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pricelist in pricelists %}
+                    <tr>
+                        <td>{{ pricelist.name }}</td>
+                        <td>
+                            {% if pricelist.is_active %}
+                                <span class="badge badge-success">نشطة</span>
+                            {% else %}
+                                <span class="badge badge-secondary">غير نشطة</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ pricelist.start_date|default:"--" }}</td>
+                        <td>{{ pricelist.end_date|default:"--" }}</td>
+                        <td>
+                            {# Add links to detail, edit, delete views when you create them #}
+                            <a href="#" class="btn btn-info btn-xs"><i class="fas fa-eye"></i></a>
+                            <a href="#" class="btn btn-warning btn-xs"><i class="fas fa-edit"></i></a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center">لم يتم العثور على قوائم أسعار.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer clearfix">
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <ul class="pagination pagination-sm m-0 float-right">
+            {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page=1">&laquo; أول صفحة</a></li>
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">السابق</a></li>
+            {% endif %}
+            
+            <li class="page-item disabled"><span class="page-link">صفحة {{ page_obj.number }} من {{ page_obj.paginator.num_pages }}</span></li>
+
+            {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">التالي</a></li>
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">آخر صفحة &raquo;</a></li>
+            {% endif %}
+        </ul>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

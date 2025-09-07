@@ -22,4 +22,13 @@ urlpatterns = [
     
     # New URL for generating PDF invoices
     path('invoices/<int:pk>/pdf/', views.GenerateInvoicePDF.as_view(), name='invoice_pdf'),
+    path('prices/', views.ProductPriceListView.as_view(), name='product_price_list'),
+    path('prices/update/', views.UpdateProductPriceAJAXView.as_view(), name='update_product_price_ajax'),
+    path('prices/export/excel/', views.ExportPricesExcelView.as_view(), name='export_prices_excel'),
+    path('prices/import/excel/', views.ImportPricesExcelView.as_view(), name='import_prices_excel'),
+    path('prices/export/pdf/', views.ExportPricesPDFView.as_view(), name='export_prices_pdf'),
+
+    # Price Lists
+    path('pricelists/', views.PriceListView.as_view(), name='pricelist_list'),
+    path('pricelists/create/', views.PriceListCreateView.as_view(), name='pricelist_create'),
 ]

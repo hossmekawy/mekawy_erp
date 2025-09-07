@@ -1,34 +1,73 @@
 {% extends "base.html" %}
-{% load static humanize %}
+{% load static finance_tags %}
 
 {% block title %}كشف حساب المصنع: {{ manufacturer.name }}{% endblock title %}
 
 {% block content %}
-<div class="container-fluid">
+<div class="container-fluid" dir="rtl">
+    <!-- Page Heading -->
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">كشف حساب المصنع: {{ manufacturer.name }}</h1>
         <div>
-            <h1 class="h3 mb-1 text-gray-800">كشف حساب المصنع: {{ manufacturer.name }}</h1>
-            <p class="mb-0 text-muted">
-                الرصيد الحالي: 
-                <strong class="{% if account.balance > 0 %}text-danger{% elif account.balance < 0 %}text-success{% endif %}">
-                    {{ account.balance|floatformat:2|intcomma }} EGP
-                </strong>
-            </p>
-        </div>
-        <div>
-            {# --- ADD THIS NEW FORM AND BUTTON --- #}
-            <form action="{% url 'finance:manufacturer_recalculate' pk=manufacturer.pk %}" method="post" class="d-inline-block me-2">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-warning" title="Finds completed jobs with zero cost, recalculates their cost based on current prices, and creates missing financial transactions.">
-                    <i class="fas fa-calculator fa-sm text-white-50"></i> إعادة حساب وإنشاء الحركات الناقصة
-                </button>
-            </form>
-            <a href="{% url 'finance:manufacturer_payment_create' pk=manufacturer.pk %}" class="btn btn-success d-inline-block">
-                <i class="fas fa-money-bill-wave fa-sm text-white-50"></i> تسجيل دفعة جديدة
+            <a href="{% url 'production:manufacturers:manufacturer_detail' pk=manufacturer.pk %}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-right"></i> العودة لتفاصيل المصنع
+            </a>
+            <a href="{% url 'finance:manufacturer_statement_pdf' pk=manufacturer.pk %}{% if request.GET.start_date %}?start_date={{ request.GET.start_date }}&end_date={{ request.GET.end_date }}{% endif %}" target="_blank" class="btn btn-primary btn-sm">
+                <i class="fas fa-print"></i> طباعة
             </a>
         </div>
     </div>
 
+    <!-- Balance Info Cards -->
+    <div class="row">
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">الرصيد الافتتاحي</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ opening_balance|neg_currency }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calendar-alt fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">الرصيد الختامي</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ closing_balance|neg_currency }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-file-invoice-dollar fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">الرصيد الحالي الإجمالي</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ account.balance|neg_currency }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-wallet fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Filter Form -->
     <div class="card shadow mb-4">
         <div class="card-header py-3">
             <h6 class="m-0 font-weight-bold text-primary">تصفية حسب التاريخ</h6>
@@ -44,30 +83,39 @@
                     <input type="date" name="end_date" id="end_date" value="{{ end_date|default:'' }}" class="form-control">
                 </div>
                 <div class="col-md-2 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary w-100">بحث</button>
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> بحث</button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- Transactions Table -->
     <div class="card shadow mb-4">
-        <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">الحركات المالية التفصيلية</h6>
+        <div class="card-header py-3 d-flex flex-wrap justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">الحركات المالية</h6>
+            <div class="mt-2 mt-md-0">
+                <form method="post" action="{% url 'finance:manufacturer_recalculate' pk=manufacturer.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-info btn-sm btn-icon-split">
+                        <span class="icon text-white-50"><i class="fas fa-sync-alt"></i></span>
+                        <span class="text">اعاده حساب و انشاء الحركات الناقصه</span>
+                    </button>
+                </form>
+                <a href="{% url 'finance:manufacturer_payment_create' pk=manufacturer.pk %}" class="btn btn-success btn-sm btn-icon-split">
+                    <span class="icon text-white-50"><i class="fas fa-plus"></i></span>
+                    <span class="text">تسجيل دفعة جديدة</span>
+                </a>
+            </div>
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                <table class="table table-bordered table-hover" id="dataTable" width="100%" cellspacing="0">
                     <thead class="table-light">
                         <tr>
                             <th>التاريخ</th>
                             <th>البيان</th>
                             <th>أمر الإنتاج</th>
                             <th>المنتج</th>
-                            <th>مرسل</th>
-                            <th>مستلم</th>
-                            <th>عيوب</th>
-                            <th>فاقد</th>
-                            <th>السعر</th>
                             <th>مدين (له)</th>
                             <th>دائن (عليه)</th>
                             <th>الرصيد</th>
@@ -76,39 +124,47 @@
                     <tbody>
                         {% if start_date %}
                         <tr>
-                            <td colspan="11" class="text-end fw-bold">رصيد افتتاحي...</td>
-                            <td class="fw-bold">{{ opening_balance|floatformat:2|intcomma }}</td>
+                            <td colspan="6" class="text-end fw-bold">رصيد افتتاحي</td>
+                            <td class="fw-bold">{{ opening_balance|neg_currency }}</td>
                         </tr>
                         {% endif %}
+                        
                         {% for item in statement_items %}
-                        <tr class="{% if item.is_payment %}table-success{% endif %}">
-                            <td>{{ item.date|date:"Y-m-d H:i" }}</td>
-                            <td>{{ item.notes }}</td>
-                            {% if item.is_payment %}
-                                <td colspan="7" class="text-center fst-italic">-- دفعة مالية --</td>
-                            {% else %}
-                                <td>{{ item.order_code }}</td>
-                                <td>{{ item.product_name }}</td>
-                                <td class="text-center">{{ item.qty_sent }}</td>
-                                <td class="text-center">{{ item.qty_received }}</td>
-                                <td class="text-center text-warning">{{ item.defects }}</td>
-                                <td class="text-center text-danger">{{ item.lost }}</td>
-                                <td class="text-end">{{ item.price|floatformat:2|intcomma }}</td>
-                            {% endif %}
-                            <td class="text-end text-danger">{{ item.debit|floatformat:2|intcomma }}</td>
-                            <td class="text-end text-success">{{ item.credit|floatformat:2|intcomma }}</td>
-                            <td class="text-end fw-bold">{{ item.balance|floatformat:2|intcomma }}</td>
+                        <tr class="{% if item.transaction.type == 'MANUFACTURER_PAYMENT' %}table-success-light{% endif %}">
+                            <td>{{ item.transaction.timestamp|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                {% if item.production_order and item.transaction.content_object.get_absolute_url %}
+                                    <a href="{{ item.transaction.content_object.get_absolute_url }}" target="_blank" title="عرض تفاصيل العملية">
+                                        {{ item.transaction.description }} <i class="fas fa-external-link-alt fa-xs"></i>
+                                    </a>
+                                {% else %}
+                                    {{ item.transaction.description }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.production_order %}
+                                    <a href="{{ item.production_order.get_absolute_url }}" target="_blank" title="عرض تفاصيل أمر الإنتاج">
+                                        {{ item.production_order.order_number }}
+                                    </a>
+                                {% else %}
+                                    --
+                                {% endif %}
+                            </td>
+                            <td>{{ item.product_name|default:"--" }}</td>
+                            <td class="text-success">{{ item.debit|currency }}</td>
+                            <td class="text-danger">{{ item.credit|currency }}</td>
+                            <td class="fw-bold">{{ item.running_balance|neg_currency }}</td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="12" class="text-center">لا توجد حركات مالية لهذه الفترة.</td>
+                            <td colspan="7" class="text-center">لا توجد حركات مالية لهذه الفترة.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
-                    <tfoot class="table-light">
-                        <tr>
-                            <th colspan="11" class="text-end">الرصيد الختامي</th>
-                            <th class="text-end">{{ closing_balance|floatformat:2|intcomma }}</th>
+                    <tfoot>
+                        <tr class="table-primary">
+                            <th colspan="6" class="text-end">الرصيد الختامي</th>
+                            <th class="fs-5">{{ closing_balance|neg_currency }}</th>
                         </tr>
                     </tfoot>
                 </table>
@@ -117,3 +173,21 @@
     </div>
 </div>
 {% endblock content %}
+
+{% block styles %}
+{{ block.super }}
+<style>
+.table-success-light {
+    background-color: #e6ffed !important;
+}
+@media print {
+    .btn, .sidebar, .navbar, .card-header form {
+        display: none !important;
+    }
+    .container-fluid {
+        padding: 0 !important;
+    }
+}
+</style>
+{% endblock styles %}
+

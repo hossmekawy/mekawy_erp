@@ -92,107 +92,90 @@ class ManufacturerStatementDetailView(LoginRequiredMixin, View):
     """
     template_name = 'finance/manufacturer_statement_detail.html'
 
-    def get(self, request, pk):
+    def get_context_data(self, request, pk):
+        """
+        A new helper method to build the context dictionary. 
+        This can be reused by both the normal view and the PDF view.
+        """
         manufacturer = get_object_or_404(ExternalManufacturer.objects.select_related('finance_account'), pk=pk)
         
-        if not manufacturer.finance_account:
-            messages.error(request, "This manufacturer does not have a financial account linked.")
-            return redirect('finance:manufacturer_statement_list')
-
+        # This part handles redirection if the account doesn't exist.
+        # It's better to keep it in the main `get` method.
+        
         account = manufacturer.finance_account
         
-        # Get all transactions for the account, prefetching related source objects
-        # This is a key optimization to prevent many database queries.
-        transactions_qs = Transaction.objects.filter(account=account).order_by('timestamp').prefetch_related('content_object')
+        transactions_qs = Transaction.objects.filter(
+            Q(account=account) | Q(to_account=account)
+        ).prefetch_related('content_object').order_by('timestamp').distinct()
         
         start_date_str = request.GET.get('start_date')
         end_date_str = request.GET.get('end_date')
 
         opening_balance = Decimal('0.00')
         
-        # FIX: The opening balance calculation is now correctly placed inside the
-        # date filter check to ensure 'start_date' exists before it's used.
+        transactions_to_process = transactions_qs
         if start_date_str:
             try:
                 start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                transactions_before = transactions_qs.filter(timestamp__date__lt=start_date)
                 
-                # Calculate opening balance
-                opening_debit = Transaction.objects.filter(
-                    account=account, timestamp__date__lt=start_date, type='MANUFACTURING_DEBT'
-                ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
-                
-                opening_credit = Transaction.objects.filter(
-                    account=account, timestamp__date__lt=start_date, type='MANUFACTURER_PAYMENT'
+                opening_credits = transactions_before.filter(
+                    account=account, type='MANUFACTURING_DEBT'
                 ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
-                opening_balance = opening_debit - opening_credit
+                opening_debits = transactions_before.filter(
+                    to_account=account, type='MANUFACTURER_PAYMENT'
+                ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
                 
-                # Filter the main queryset for the selected date range
-                transactions_qs = transactions_qs.filter(timestamp__date__gte=start_date)
+                opening_balance = opening_credits - opening_debits
+
+                transactions_to_process = transactions_qs.filter(timestamp__date__gte=start_date)
             except (ValueError, TypeError):
-                messages.error(request, "Invalid start date format. Please use YYYY-MM-DD.")
-                start_date_str = None # Reset if invalid
+                start_date_str = None
 
         if end_date_str:
             try:
                 end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-                transactions_qs = transactions_qs.filter(timestamp__date__lte=end_date)
+                transactions_to_process = transactions_to_process.filter(timestamp__date__lte=end_date)
             except (ValueError, TypeError):
-                messages.error(request, "Invalid end date format. Please use YYYY-MM-DD.")
-                end_date_str = None # Reset if invalid
+                end_date_str = None
 
         statement_items = []
         running_balance = opening_balance
         
-        for trans in transactions_qs:
+        for trans in transactions_to_process:
             item = {
-                'is_payment': False,
-                'date': trans.timestamp,
-                'order_code': '--', 'product_name': '--', 'qty_sent': '--',
-                'qty_received': '--', 'defects': '--', 'lost': '--',
-                'price': Decimal('0.00'), 'debit': Decimal('0.00'), 'credit': Decimal('0.00'),
-                'notes': trans.description,
+                'transaction': trans,
+                'debit': Decimal('0.00'),
+                'credit': Decimal('0.00'),
+                'production_order': None,
+                'product_name': None,
             }
 
-            if trans.type == 'MANUFACTURING_DEBT':
-                # This is a charge from a production process
+            if trans.type == 'MANUFACTURING_DEBT' and trans.account == account:
+                item['credit'] = trans.amount
+                running_balance += trans.amount
                 process = trans.content_object
                 if process:
-                    # Safely get production order details, works for Assembly, Dyeing, Finishing
-                    production_order = getattr(process, 'production_order', getattr(getattr(process, 'assembly_process', None), 'production_order', None))
+                    production_order = getattr(process, 'production_order', None)
+                    if not production_order and hasattr(process, 'assembly_process'):
+                        production_order = getattr(process.assembly_process, 'production_order', None)
+                    if not production_order and hasattr(process, 'dyeing_process'):
+                        production_order = getattr(process.dyeing_process.assembly_process, 'production_order', None)
+                    
                     if production_order:
-                        item['order_code'] = production_order.order_number
+                        item['production_order'] = production_order
                         item['product_name'] = production_order.product.name
 
-                    # Get process-specific quantities
-                    qty_sent = getattr(process, 'quantity_sent', getattr(process, 'quantity_input', 0))
-                    qty_received = getattr(process, 'quantity_received', getattr(process, 'quantity_output', 0))
-                    defects = getattr(process, 'defects_count', getattr(process, 'defects_in_finishing', 0))
-                    
-                    item.update({
-                        'qty_sent': qty_sent,
-                        'qty_received': qty_received,
-                        'defects': defects,
-                        'lost': (qty_sent or 0) - (qty_received or 0) - (defects or 0)
-                    })
-                    
-                    effective_qty = qty_received or 0
-                    if effective_qty > 0:
-                        item['price'] = trans.amount / effective_qty
-                
+            elif trans.type == 'MANUFACTURER_PAYMENT' and trans.to_account == account:
                 item['debit'] = trans.amount
-                running_balance += trans.amount
-
-            elif trans.type == 'MANUFACTURER_PAYMENT':
-                # This is a payment we made to them
-                item['is_payment'] = True
-                item['credit'] = trans.amount
                 running_balance -= trans.amount
+                item['transaction'].description = item['transaction'].description or "دفعة للمصنع"
             
-            item['balance'] = running_balance
+            item['running_balance'] = running_balance
             statement_items.append(item)
 
-        context = {
+        return {
             'manufacturer': manufacturer,
             'account': account,
             'statement_items': statement_items,
@@ -201,8 +184,15 @@ class ManufacturerStatementDetailView(LoginRequiredMixin, View):
             'opening_balance': opening_balance,
             'closing_balance': running_balance,
         }
-        return render(request, self.template_name, context)
 
+    def get(self, request, pk):
+        manufacturer = get_object_or_404(ExternalManufacturer, pk=pk)
+        if not manufacturer.finance_account:
+            messages.error(request, "This manufacturer does not have a financial account linked.")
+            return redirect('finance:manufacturer_statement_list')
+
+        context = self.get_context_data(request, pk)
+        return render(request, self.template_name, context)
 
 class CreateManufacturerPaymentView(LoginRequiredMixin, SuccessMessageMixin, FormView):
     """
@@ -535,3 +525,48 @@ def recalculate_and_create_transactions(request, pk):
         messages.info(request, "No transactions needed to be created or updated.")
         
     return redirect('finance:manufacturer_statement_detail', pk=manufacturer.pk)
+
+class PrintManufacturerStatementView(LoginRequiredMixin, View):
+    """
+    Handles the generation of a PDF for the manufacturer statement.
+    """
+    def get(self, request, pk):
+        # This view reuses the logic from ManufacturerStatementDetailView to get the context
+        detail_view = ManufacturerStatementDetailView()
+        detail_view.request = request
+        
+        # We call the get method of the detail view to get the fully populated context
+        try:
+            # Call the helper method to get the context dictionary directly.
+            context = detail_view.get_context_data(request, pk)
+        except ExternalManufacturer.DoesNotExist:
+            messages.error(request, "Manufacturer not found.")
+            return redirect('finance:manufacturer_statement_list')
+        
+        # Render the dedicated PDF template with the context
+        html_string = render_to_string('pdf/finance/manufacturer_statement_pdf.html', context)
+
+        try:
+            pdf_config = pdfkit.configuration(wkhtmltopdf=settings.WKHTMLTOPDF_PATH)
+            options = {
+                'page-size': 'A4',
+                'orientation': 'Landscape', # Use landscape for wider tables
+                'margin-top': '0.75in',
+                'margin-right': '0.75in',
+                'margin-bottom': '0.75in',
+                'margin-left': '0.75in',
+                'encoding': "UTF-8",
+                '--header-font-name': 'Tajawal',
+                '--footer-font-name': 'Tajawal',
+                '--load-error-handling': 'ignore',
+            }
+            pdf = pdfkit.from_string(html_string, False, configuration=pdf_config, options=options)
+            
+            response = HttpResponse(pdf, content_type='application/pdf')
+            filename = f"Statement_{context['manufacturer'].name}_{timezone.now().strftime('%Y-%m-%d')}.pdf"
+            response['Content-Disposition'] = f'inline; filename="{filename}"'
+            return response
+
+        except Exception as e:
+            messages.error(request, f"خطأ في إنشاء ملف PDF: {e}")
+            return redirect('finance:manufacturer_statement_detail', pk=pk)
