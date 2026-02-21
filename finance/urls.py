@@ -6,6 +6,9 @@ from . import views
 app_name = 'finance'
 
 urlpatterns = [
+    path('cash-count/', views.CashCountView.as_view(), name='cash_count'),
+    path('handovers/', views.CustodyHandoverListView.as_view(), name='custody_handover_list'),
+    path('handovers/new/', views.CustodyHandoverCreateView.as_view(), name='custody_handover_create'),
     # --- NEW: Manufacturer Finance URLs ---
     path('manufacturers/', views.ManufacturerStatementListView.as_view(), name='manufacturer_statement_list'),
     path('manufacturers/<int:pk>/statement/', views.ManufacturerStatementDetailView.as_view(), name='manufacturer_statement_detail'),

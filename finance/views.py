@@ -31,9 +31,85 @@ from datetime import datetime
 import pdfkit
 
 # Local App Imports
-from .models import Account, Transaction
-from .forms import AccountForm, TransactionForm, ManufacturerPaymentForm # Import new form
+from .models import Account, Transaction, CashCount, CustodyHandover
+from .forms import AccountForm, TransactionForm, ManufacturerPaymentForm , CashCountForm, CustodyHandoverForm # Import new form
 from production.models import ExternalManufacturer
+
+
+
+# =================================================================
+# NEW: Cash Count (جرد) and Custody Handover (تسليم عهدة) Views
+# =================================================================
+
+class CashCountView(LoginRequiredMixin, FormView):
+    """
+    Handles the process of performing a cash count for a treasury.
+    Displays the form and a list of previous counts.
+    """
+    template_name = 'finance/cash_count_form.html'
+    form_class = CashCountForm
+    success_url = reverse_lazy('finance:cash_count')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['recent_counts'] = CashCount.objects.all().select_related('account', 'user')[:20]
+        return context
+
+    def form_valid(self, form):
+        account = form.cleaned_data['account']
+        counted_amount = form.cleaned_data['counted_amount']
+        
+        # Create a new CashCount record
+        cash_count = form.save(commit=False)
+        cash_count.user = self.request.user
+        cash_count.actual_balance = account.balance
+        cash_count.difference = counted_amount - account.balance
+        cash_count.save()
+
+        # Display a message with the result
+        if cash_count.difference == 0:
+            messages.success(self.request, f"تم تسجيل الجرد بنجاح. الرصيد مطابق للمبلغ المعدود: {counted_amount}")
+        elif cash_count.difference > 0:
+            messages.warning(self.request, f"تم تسجيل الجرد بزيادة قدرها {cash_count.difference}. الرصيد الدفتري: {account.balance} | المبلغ المعدود: {counted_amount}")
+        else:
+            messages.error(self.request, f"تم تسجيل الجرد بعجز قدره {abs(cash_count.difference)}. الرصيد الدفتري: {account.balance} | المبلغ المعدود: {counted_amount}")
+
+        return super().form_valid(form)
+
+
+class CustodyHandoverListView(LoginRequiredMixin, ListView):
+    """
+    Displays a list of all custody handover records.
+    """
+    model = CustodyHandover
+    template_name = 'finance/custody_handover_list.html'
+    context_object_name = 'handovers'
+    paginate_by = 20
+
+    def get_queryset(self):
+        return CustodyHandover.objects.all().select_related('account', 'from_user', 'to_user')
+
+
+class CustodyHandoverCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+    """
+    Handles the creation of a new custody handover record.
+    """
+    model = CustodyHandover
+    form_class = CustodyHandoverForm
+    template_name = 'finance/custody_handover_form.html'
+    success_url = reverse_lazy('finance:custody_handover_list')
+    success_message = "تم إنشاء محضر تسليم العهدة بنجاح."
+
+    def get_form_kwargs(self):
+        """Pass the current user to the form."""
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        """Set the 'from_user' to the currently logged-in user before saving."""
+        form.instance.from_user = self.request.user
+        return super().form_valid(form)
 
 
 # =================================================================

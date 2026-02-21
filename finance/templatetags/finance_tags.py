@@ -42,8 +42,22 @@ def neg_currency(value):
     except (TypeError, ValueError, InvalidOperation):
         return value
         
-    formatted = currency(d_value)
     if d_value < 0:
+        # Use abs() to get the positive value, then format it with the currency filter
+        formatted = currency(abs(d_value))
         # Use Bootstrap's 'text-danger' class for red color
-        return mark_safe(f'<span class="text-danger fw-bold">({formatted.replace("-", "")})</span>')
-    return formatted
+        return mark_safe(f'<span class="text-danger fw-bold">({formatted})</span>')
+    return currency(d_value)
+
+@register.filter(name='abs')
+def absolute_value(value):
+    """
+    Returns the absolute value of a number.
+    Useful for displaying negative numbers without the minus sign in templates.
+    """
+    try:
+        # Convert to Decimal for precision, then get the absolute value
+        return abs(Decimal(value))
+    except (TypeError, ValueError, InvalidOperation):
+        # If the value isn't a number-like type, return it as is or an empty string.
+        return ''

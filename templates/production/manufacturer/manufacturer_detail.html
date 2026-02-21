@@ -136,15 +136,15 @@
                          <i class="fas fa-edit me-2"></i>تعديل بيانات المصنع
                      </a>
                      <div class="btn-group">
-                        <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-print me-2"></i>تصدير
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="{% url 'production:manufacturers:exports:pdf' manufacturer.pk %}" target="_blank">تقرير شامل PDF</a></li>
-                            <li><a class="dropdown-item" href="{% url 'production:manufacturers:export_active_jobs_pdf' manufacturer.pk %}" target="_blank">تقرير المهام النشطة PDF</a></li>
-                            <li><a class="dropdown-item" href="{% url 'production:manufacturers:exports:excel' manufacturer.pk %}">تصدير Excel</a></li>
-                        </ul>
-                    </div>
+                         <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                             <i class="fas fa-print me-2"></i>تصدير
+                         </button>
+                         <ul class="dropdown-menu dropdown-menu-end">
+                             <li><a class="dropdown-item" href="{% url 'production:manufacturers:exports:pdf' manufacturer.pk %}" target="_blank">تقرير شامل PDF</a></li>
+                             <li><a class="dropdown-item" href="{% url 'production:manufacturers:export_active_jobs_pdf' manufacturer.pk %}" target="_blank">تقرير المهام النشطة PDF</a></li>
+                             <li><a class="dropdown-item" href="{% url 'production:manufacturers:exports:excel' manufacturer.pk %}">تصدير Excel</a></li>
+                         </ul>
+                     </div>
                 </div>
             </div>
         </div>
@@ -287,7 +287,8 @@
                         <th scope="col">المنتج</th>
                         <th scope="col" class="text-center">الكمية المرسلة</th>
                         <th scope="col" class="text-center">الكمية المستلمة</th>
-                        <th scope="col" class="text-center">العجز</th>
+                        <th scope="col" class="text-center">العيوب</th>
+                        <th scope="col" class="text-center">المتبقي</th>
                         <th scope="col" class="text-center">التكلفة</th>
                         <th scope="col" class="text-center">تاريخ الإكمال</th>
                         <th scope="col"></th>
@@ -303,7 +304,8 @@
                             <td>{{ job.order.product.name }}</td>
                             <td class="text-center">{{ job.quantity_sent|intcomma }}</td>
                             <td class="text-center">{{ job.quantity_received|intcomma }}</td>
-                            <td class="text-center {% if job.deficit > 0 %}text-danger fw-bold{% endif %}">{{ job.deficit|intcomma }}</td>
+                            <td class="text-center {% if job.defects > 0 %}text-danger{% endif %}">{{ job.defects|intcomma }}</td>
+                            <td class="text-center {% if job.remaining > 0 %}text-danger fw-bold{% endif %}">{{ job.remaining|intcomma }}</td>
                             <td class="text-center text-success fw-bold">{{ job.cost|intcomma }} جنيه</td>
                             <td class="text-center">{{ job.completion_date|date:"d M Y" }}</td>
                             <td class="text-end">
@@ -314,7 +316,7 @@
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="8" class="text-center text-muted p-5">
+                            <td colspan="9" class="text-center text-muted p-5">
                                 <i class="fas fa-history fa-2x mb-2"></i>
                                 <p>لا يوجد سجل للمهام المكتملة.</p>
                             </td>
@@ -630,5 +632,3 @@ $(document).ready(function() {
 });
 </script>
 {% endblock %}
-
-

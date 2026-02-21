@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load finance_tags %}
+{% block title %}سجل تسليم العهد{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="direction: rtl; text-align: right;">
+    <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">سجل محاضر تسليم العهد</h4>
+            <a href="{% url 'finance:custody_handover_create' %}" class="btn btn-light btn-sm">
+                <i class="fas fa-plus-circle me-1"></i> إنشاء محضر جديد
+            </a>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>تاريخ التسليم</th>
+                            <th>العهدة (الحساب)</th>
+                            <th>المبلغ</th>
+                            <th>الموظف المُسلِّم</th>
+                            <th>الموظف المُستلِم</th>
+                            <th>ملاحظات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for handover in handovers %}
+                        <tr>
+                            <td>{{ handover.timestamp|date:"Y-m-d H:i" }}</td>
+                            <td>{{ handover.account.name }}</td>
+                            <td>{{ handover.amount_handed_over|floatformat:2 }}</td>
+                            <td>{{ handover.from_user.get_full_name|default:handover.from_user.username }}</td>
+                            <td>{{ handover.to_user.get_full_name|default:handover.to_user.username }}</td>
+                            <td>{{ handover.notes|default:"--" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center">لم يتم تسجيل أي محاضر تسليم عهدة بعد.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if is_paginated %}
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">السابق</a></li>
+                    {% endif %}
+                    
+                    <li class="page-item disabled"><span class="page-link">صفحة {{ page_obj.number }} من {{ page_obj.paginator.num_pages }}</span></li>
+                    
+                    {% if page_obj.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">التالي</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -5,6 +5,8 @@ from django.urls import reverse
 from decimal import Decimal
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.conf import settings # Import settings
+
 
 # --- FIX: Import ExternalManufacturer to link it to transactions ---
 # Make sure the production app is listed before the finance app in INSTALLED_APPS
@@ -91,3 +93,69 @@ class Transaction(models.Model):
     def __str__(self):
         return f"{self.get_type_display()} - {self.amount} - {self.account.name}"
 
+
+class CashCount(models.Model):
+    """
+    Records an instance of counting the cash in an asset account (Treasury/Safe).
+    This creates an audit trail for treasury management.
+    """
+    account = models.ForeignKey(
+        Account, 
+        on_delete=models.PROTECT, 
+        verbose_name="الحساب",
+        limit_choices_to={'account_type': 'ASSET'}
+    )
+    counted_amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="المبلغ المعدود")
+    actual_balance = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="الرصيد الدفتري")
+    difference = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="الفرق (عجز/زيادة)")
+    timestamp = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الجرد")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.PROTECT, 
+        verbose_name="المسؤول عن الجرد"
+    )
+    notes = models.TextField(blank=True, null=True, verbose_name="ملاحظات")
+
+    class Meta:
+        verbose_name = "جرد خزينة"
+        verbose_name_plural = "جرد الخزائن"
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"جرد حساب {self.account.name} بتاريخ {self.timestamp.strftime('%Y-%m-%d')}"
+
+
+class CustodyHandover(models.Model):
+    """
+    Records the formal transfer of custody of a financial account (e.g., a safe)
+    from one user to another.
+    """
+    account = models.ForeignKey(
+        Account, 
+        on_delete=models.PROTECT, 
+        verbose_name="الحساب (العهدة)",
+        limit_choices_to={'account_type': 'ASSET'}
+    )
+    amount_handed_over = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="المبلغ المسلَّم")
+    from_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        related_name='handovers_from', 
+        on_delete=models.PROTECT, 
+        verbose_name="الموظف المُسلِّم"
+    )
+    to_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        related_name='handovers_to', 
+        on_delete=models.PROTECT, 
+        verbose_name="الموظف المُستلِم"
+    )
+    timestamp = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ التسليم")
+    notes = models.TextField(blank=True, verbose_name="ملاحظات")
+
+    class Meta:
+        verbose_name = "محضر تسليم عهدة"
+        verbose_name_plural = "محاضر تسليم العهد"
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"تسليم عهدة {self.account.name} من {self.from_user} إلى {self.to_user}"

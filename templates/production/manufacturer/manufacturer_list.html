@@ -17,11 +17,23 @@
 
 {% block production_content %}
 <div class="production-card">
-    <div class="production-card-header d-flex justify-content-between align-items-center">
+    <div class="production-card-header d-flex justify-content-between align-items-center flex-wrap">
         <span><i class="fas fa-industry me-2"></i>قائمة المصانع الخارجية</span>
-        <span class="text-muted fs-6">إجمالي: {{ manufacturers.count }} مصنع</span>
+        <span class="text-muted fs-6">إجمالي: {{ paginator.count }} مصنع</span>
     </div>
-    <div class="production-card-body p-0">
+    <div class="production-card-body">
+        <!-- Search Form -->
+        <div class="mb-3">
+            <form method="get" action="">
+                <div class="input-group">
+                    <input type="text" name="search" class="form-control" placeholder="ابحث بالاسم أو الشخص المسؤول..." value="{{ request.GET.search }}">
+                    <button class="btn btn-outline-secondary" type="submit">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+
         <div class="table-responsive">
             <table class="table production-table table-hover mb-0">
                 <thead>
@@ -46,11 +58,11 @@
                             <span class="badge bg-warning text-dark fs-6 rounded-pill">{{ manufacturer.active_jobs_count }}</span>
                         </td>
                         <td class="text-center text-success fw-bold">
-                            {{ manufacturer.total_value_of_completed_jobs|default:0|intcomma }} جنيه 
+                            {{ manufacturer.total_value_of_completed_jobs|default:0|intcomma }} جنيه
                         </td>
                         <td class="text-center">
-                             <span class="badge 
-                                {% if manufacturer.quality_rating >= 4.5 %} bg-success-subtle text-success-emphasis 
+                            <span class="badge
+                                {% if manufacturer.quality_rating >= 4.5 %} bg-success-subtle text-success-emphasis
                                 {% elif manufacturer.quality_rating >= 3.5 %} bg-warning-subtle text-warning-emphasis
                                 {% else %} bg-danger-subtle text-danger-emphasis {% endif %} fs-6 rounded-pill">
                                 <i class="fas fa-star me-1"></i>
@@ -59,13 +71,13 @@
                         </td>
                         <td class="text-end">
                             <div class="btn-group">
-                                <a href="{% url 'production:manufacturers:manufacturer_detail' manufacturer.pk %}" class="btn btn-sm btn-outline-secondary">
+                                <a href="{% url 'production:manufacturers:manufacturer_detail' manufacturer.pk %}" class="btn btn-sm btn-outline-secondary" title="عرض">
                                     <i class="fas fa-eye"></i>
                                 </a>
-                                <a href="{% url 'production:manufacturers:manufacturer_update' manufacturer.pk %}" class="btn btn-sm btn-outline-secondary">
+                                <a href="{% url 'production:manufacturers:manufacturer_update' manufacturer.pk %}" class="btn btn-sm btn-outline-secondary" title="تعديل">
                                     <i class="fas fa-edit"></i>
                                 </a>
-                                <a href="{% url 'production:manufacturers:manufacturer_delete' manufacturer.pk %}" class="btn btn-sm btn-outline-danger">
+                                <a href="{% url 'production:manufacturers:manufacturer_delete' manufacturer.pk %}" class="btn btn-sm btn-outline-danger" title="حذف">
                                     <i class="fas fa-trash-alt"></i>
                                 </a>
                             </div>
@@ -77,7 +89,13 @@
                             <div class="production-empty">
                                 <i class="fas fa-industry fs-1 text-light mb-3"></i>
                                 <h5 class="mb-1">لا توجد مصانع خارجية</h5>
-                                <p class="text-muted">يمكنك إضافة مصنع جديد من الزر أعلاه.</p>
+                                <p class="text-muted">
+                                    {% if request.GET.search %}
+                                        لا توجد نتائج تطابق بحثك.
+                                    {% else %}
+                                        يمكنك إضافة مصنع جديد من الزر أعلاه.
+                                    {% endif %}
+                                </p>
                             </div>
                         </td>
                     </tr>
@@ -86,5 +104,51 @@
             </table>
         </div>
     </div>
+    
+    {% if is_paginated %}
+    <div class="production-card-footer">
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center mb-0">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1&search={{ request.GET.search }}">الأولى</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}&search={{ request.GET.search }}" aria-label="Previous">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">&laquo;</span>
+                    </li>
+                {% endif %}
+
+                {% for num in paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <li class="page-item active" aria-current="page"><span class="page-link">{{ num }}</span></li>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item"><a class="page-link" href="?page={{ num }}&search={{ request.GET.search }}">{{ num }}</a></li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}&search={{ request.GET.search }}" aria-label="Next">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                     <li class="page-item">
+                        <a class="page-link" href="?page={{ paginator.num_pages }}&search={{ request.GET.search }}">الأخيرة</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">&raquo;</span>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

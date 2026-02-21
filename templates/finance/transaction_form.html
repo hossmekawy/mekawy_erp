@@ -1,71 +1,101 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load widget_tweaks %}
 
 {% block title %}إضافة حركة مالية جديدة{% endblock %}
 
 {% block content %}
-<div class="card shadow mb-4">
-    <div class="card-header py-3">
-        <h6 class="m-0 font-weight-bold text-primary">تسجيل حركة مالية</h6>
-    </div>
-    <div class="card-body">
-        <form method="post" id="transactionForm">
-            {% csrf_token %}
-            
-            {% if form.non_field_errors %}
-                <div class="alert alert-danger">
-                    {% for error in form.non_field_errors %}
-                        <p>{{ error }}</p>
-                    {% endfor %}
+<div class="container mt-4" style="direction: rtl; text-align: right;">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-lg border-left-success">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-success"><i class="fas fa-exchange-alt me-2"></i>تسجيل حركة مالية جديدة</h6>
                 </div>
-            {% endif %}
+                <div class="card-body p-4">
+                    <p class="text-muted mb-4">أدخل تفاصيل الحركة المالية. سيتم تحديث أرصدة الحسابات تلقائياً.</p>
+                    
+                    <form method="post" id="transactionForm" novalidate>
+                        {% csrf_token %}
+                        
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger" role="alert">
+                                {% for error in form.non_field_errors %}
+                                    <p class="mb-0">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
 
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label for="{{ form.type.id_for_label }}" class="form-label">{{ form.type.label }}</label>
-                    {{ form.type }}
-                    {% if form.type.errors %}<div class="text-danger small mt-1">{{ form.type.errors.0 }}</div>{% endif %}
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label for="{{ form.amount.id_for_label }}" class="form-label">{{ form.amount.label }}</label>
-                    {{ form.amount }}
-                    {% if form.amount.errors %}<div class="text-danger small mt-1">{{ form.amount.errors.0 }}</div>{% endif %}
-                </div>
-            </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.type.id_for_label }}" class="form-label">نوع الحركة</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-list-ul"></i></span>
+                                    {% render_field form.type class="form-select" %}
+                                </div>
+                                {% if form.type.errors %}<div class="text-danger small mt-1">{{ form.type.errors.0 }}</div>{% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.amount.id_for_label }}" class="form-label">المبلغ</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-money-bill-wave"></i></span>
+                                    {% render_field form.amount class="form-control" placeholder="0.00" %}
+                                </div>
+                                {% if form.amount.errors %}<div class="text-danger small mt-1">{{ form.amount.errors.0 }}</div>{% endif %}
+                            </div>
+                        </div>
 
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label for="{{ form.account.id_for_label }}" class="form-label">{{ form.account.label }}</label>
-                    {{ form.account }}
-                     {% if form.account.errors %}<div class="text-danger small mt-1">{{ form.account.errors.0 }}</div>{% endif %}
-                </div>
-                <div class="col-md-6 mb-3" id="to_account_div" style="display: none;">
-                    <label for="{{ form.to_account.id_for_label }}" class="form-label">{{ form.to_account.label }}</label>
-                    {{ form.to_account }}
-                    {% if form.to_account.errors %}<div class="text-danger small mt-1">{{ form.to_account.errors.0 }}</div>{% endif %}
-                </div>
-            </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.account.id_for_label }}" class="form-label">{{ form.account.label }}</label>
+                                <div class="input-group">
+                                     <span class="input-group-text"><i class="fas fa-arrow-circle-up text-danger"></i></span>
+                                     {% render_field form.account class="form-select" %}
+                                </div>
+                                {% if form.account.errors %}<div class="text-danger small mt-1">{{ form.account.errors.0 }}</div>{% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3" id="to_account_div" style="display: none;">
+                                <label for="{{ form.to_account.id_for_label }}" class="form-label">{{ form.to_account.label }}</label>
+                                 <div class="input-group">
+                                     <span class="input-group-text"><i class="fas fa-arrow-circle-down text-success"></i></span>
+                                     {% render_field form.to_account class="form-select" %}
+                                 </div>
+                                {% if form.to_account.errors %}<div class="text-danger small mt-1">{{ form.to_account.errors.0 }}</div>{% endif %}
+                            </div>
+                        </div>
 
-            <div class="mb-3">
-                <label for="{{ form.description.id_for_label }}" class="form-label">{{ form.description.label }}</label>
-                {{ form.description }}
-                {% if form.description.errors %}<div class="text-danger small mt-1">{{ form.description.errors.0 }}</div>{% endif %}
+                        <div class="mb-3">
+                            <label for="{{ form.description.id_for_label }}" class="form-label">{{ form.description.label }}</label>
+                             <div class="input-group">
+                                 <span class="input-group-text"><i class="fas fa-file-alt"></i></span>
+                                 {% render_field form.description class="form-control" rows="3" placeholder="أدخل وصفاً واضحاً للعملية" %}
+                             </div>
+                            {% if form.description.errors %}<div class="text-danger small mt-1">{{ form.description.errors.0 }}</div>{% endif %}
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="{{ form.reference.id_for_label }}" class="form-label">{{ form.reference.label }}</label>
+                             <div class="input-group">
+                                 <span class="input-group-text"><i class="fas fa-hashtag"></i></span>
+                                 {% render_field form.reference class="form-control" placeholder="رقم فاتورة، إيصال، إلخ..." %}
+                             </div>
+                            {% if form.reference.errors %}<div class="text-danger small mt-1">{{ form.reference.errors.0 }}</div>{% endif %}
+                        </div>
+                        
+                        <hr class="my-4">
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'finance:transaction_list' %}" class="btn btn-secondary btn-lg">
+                                <i class="fas fa-times me-2"></i> إلغاء
+                            </a>
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-save me-2"></i> حفظ الحركة
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
-            
-            <div class="mb-3">
-                <label for="{{ form.reference.id_for_label }}" class="form-label">{{ form.reference.label }}</label>
-                {{ form.reference }}
-                {% if form.reference.errors %}<div class="text-danger small mt-1">{{ form.reference.errors.0 }}</div>{% endif %}
-            </div>
-            
-            <hr>
-            <button type="submit" class="btn btn-success">
-                <i class="fas fa-save"></i> حفظ الحركة
-            </button>
-            <a href="{% url 'finance:transaction_list' %}" class="btn btn-secondary">
-                <i class="fas fa-times"></i> إلغاء
-            </a>
-        </form>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -75,12 +105,22 @@
 document.addEventListener('DOMContentLoaded', function() {
     const typeSelect = document.getElementById('{{ form.type.id_for_label }}');
     const toAccountDiv = document.getElementById('to_account_div');
+    const fromAccountLabel = document.querySelector('label[for="{{ form.account.id_for_label }}"]');
 
     function toggleToAccountField() {
         if (typeSelect.value === 'TRANSFER') {
             toAccountDiv.style.display = 'block';
+            fromAccountLabel.textContent = 'من حساب';
         } else {
             toAccountDiv.style.display = 'none';
+            // Dynamically change label based on context
+            if (typeSelect.value === 'DEPOSIT') {
+                 fromAccountLabel.textContent = 'إيداع في حساب';
+            } else if (typeSelect.value === 'WITHDRAWAL') {
+                fromAccountLabel.textContent = 'سحب من حساب';
+            } else {
+                fromAccountLabel.textContent = 'الحساب';
+            }
         }
     }
 

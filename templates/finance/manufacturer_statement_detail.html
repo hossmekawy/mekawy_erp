@@ -116,6 +116,12 @@
                             <th>البيان</th>
                             <th>أمر الإنتاج</th>
                             <th>المنتج</th>
+                            <!-- NEW COLUMNS -->
+                            <th>ت. الاستلام</th>
+                            <th>المرسل</th>
+                            <th>المستلم</th>
+                            <th class="text-danger">العجز</th>
+                            <!-- END NEW COLUMNS -->
                             <th>مدين (له)</th>
                             <th>دائن (عليه)</th>
                             <th>الرصيد</th>
@@ -124,7 +130,8 @@
                     <tbody>
                         {% if start_date %}
                         <tr>
-                            <td colspan="6" class="text-end fw-bold">رصيد افتتاحي</td>
+                            <!-- UPDATE COLSPAN -->
+                            <td colspan="10" class="text-end fw-bold">رصيد افتتاحي</td>
                             <td class="fw-bold">{{ opening_balance|neg_currency }}</td>
                         </tr>
                         {% endif %}
@@ -151,19 +158,27 @@
                                 {% endif %}
                             </td>
                             <td>{{ item.product_name|default:"--" }}</td>
+                            <!-- NEW CELLS -->
+                            <td>{{ item.received_date|date:"Y-m-d"|default:"--" }}</td>
+                            <td>{{ item.quantity_sent|default:"--" }}</td>
+                            <td>{{ item.quantity_received|default:"--" }}</td>
+                            <td class="text-danger fw-bold">{{ item.shortage|default:"--" }}</td>
+                            <!-- END NEW CELLS -->
                             <td class="text-success">{{ item.debit|currency }}</td>
                             <td class="text-danger">{{ item.credit|currency }}</td>
                             <td class="fw-bold">{{ item.running_balance|neg_currency }}</td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="text-center">لا توجد حركات مالية لهذه الفترة.</td>
+                            <!-- UPDATE COLSPAN -->
+                            <td colspan="11" class="text-center">لا توجد حركات مالية لهذه الفترة.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                     <tfoot>
                         <tr class="table-primary">
-                            <th colspan="6" class="text-end">الرصيد الختامي</th>
+                            <!-- UPDATE COLSPAN -->
+                            <th colspan="10" class="text-end">الرصيد الختامي</th>
                             <th class="fs-5">{{ closing_balance|neg_currency }}</th>
                         </tr>
                     </tfoot>
@@ -190,4 +205,3 @@
 }
 </style>
 {% endblock styles %}
-

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% load finance_tags %}
+{% block title %}جرد خزينة{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="direction: rtl; text-align: right;">
+    <div class="row">
+        <!-- Cash Count Form -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">تسجيل جرد خزينة</h4>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">استخدم هذا النموذج لتسجيل المبلغ الفعلي الموجود في الخزينة ومقارنته بالرصيد الدفتري.</p>
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        {{ form.as_p }}
+                        <button type="submit" class="btn btn-primary w-100 mt-3">حفظ وتسجيل الجرد</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Counts Table -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h4 class="mb-0">آخر عمليات الجرد</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>التاريخ</th>
+                                    <th>الخزينة</th>
+                                    <th>المبلغ المعدود</th>
+                                    <th>الرصيد الدفتري</th>
+                                    <th>الفرق</th>
+                                    <th>المسؤول</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for count in recent_counts %}
+                                <tr>
+                                    <td>{{ count.timestamp|date:"Y-m-d H:i" }}</td>
+                                    <td>{{ count.account.name }}</td>
+                                    <td>{{ count.counted_amount|floatformat:2 }}</td>
+                                    <td>{{ count.actual_balance|floatformat:2 }}</td>
+                                    <td>
+                                        {% if count.difference > 0 %}
+                                            <span class="badge bg-success">زيادة: {{ count.difference|floatformat:2 }}</span>
+                                        {% elif count.difference < 0 %}
+                                            <span class="badge bg-danger">عجز: {{ count.difference|abs|floatformat:2 }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">مطابق</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ count.user.username }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center">لا توجد عمليات جرد مسجلة بعد.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

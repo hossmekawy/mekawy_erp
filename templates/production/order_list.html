@@ -1,5 +1,5 @@
 {% extends 'production/production_base.html' %}
-{% load static %}
+{% load static i18n humanize %}
 {% load production_extras %}
 
 {% block production_page_title %}قائمة أوامر الإنتاج{% endblock %}
@@ -22,7 +22,7 @@
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
                 <li>
-                    <a class="dropdown-item" href="{% url 'production:export_orders' %}">
+                    <a class="dropdown-item" href="{% url 'production:export_orders' %}?{{ request.GET.urlencode }}">
                         <i class="fas fa-file-csv me-2"></i>تصدير CSV
                     </a>
                 </li>
@@ -33,8 +33,44 @@
 
 {% block production_content %}
     <!-- Search & Filters -->
-    {% include 'production/partials/components/search_filters.html' with search_enabled=True search_placeholder='البحث برقم الأمر، رقم الباتش، أو اسم المنتج...' filters=filter_config total_count=paginator.count %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" action="">
+                <div class="row g-3 align-items-end">
+                    <div class="col-lg-4 col-md-12">
+                        <label for="search-input" class="form-label">بحث</label>
+                        <input type="text" id="search-input" name="search" class="form-control" placeholder="البحث برقم الأمر، الباتش، أو المنتج..." value="{{ current_filters.search }}">
+                    </div>
+                    
+                    <div class="col-lg-3 col-md-6">
+                        <label for="status-filter" class="form-label">الحالة</label>
+                        <select id="status-filter" name="status" class="form-select">
+                            <option value="">كل الحالات</option>
+                            {% for value, display in status_choices %}
+                                <option value="{{ value }}" {% if current_filters.status == value %}selected{% endif %}>{{ display }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
+                    <div class="col-lg-3 col-md-6">
+                        <label for="manufacturer-filter" class="form-label">المصنع الخارجي</label>
+                        <select id="manufacturer-filter" name="manufacturer" class="form-select">
+                            <option value="">كل المصانع</option>
+                            {% for manufacturer in manufacturers %}
+                                <option value="{{ manufacturer.pk }}" {% if current_filters.manufacturer|stringformat:"s" == manufacturer.pk|stringformat:"s" %}selected{% endif %}>{{ manufacturer.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-lg-2 col-md-12 text-end">
+                        <a href="{% url 'production:order_list' %}" class="btn btn-outline-secondary me-2">إعادة تعيين</a>
+                        <button class="btn btn-production" type="submit">تطبيق</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
     <!-- Orders Table -->
     <div class="production-card">
         <div class="production-card-header d-flex justify-content-between align-items-center">
@@ -57,11 +93,11 @@
                             <tr>
                                 <th scope="col">رقم الأمر</th>
                                 <th scope="col">المنتج</th>
-                                <th scope="col">الكمية</th>
+                                <th scope="col" class="text-center">الكمية</th>
                                 <th scope="col">الحالة</th>
-                                <th scope="col">الأولوية</th>
+                                <th scope="col" class="text-center">الأولوية</th>
                                 <th scope="col">تاريخ الإنشاء</th>
-                                <th scope="col">الإجراءات</th>
+                                <th scope="col" class="text-end">الإجراءات</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -73,17 +109,15 @@
                                     </td>
                                     <td>
                                         <div>
-                                            <div class="fw-medium">{{ order.product.name }}</div>
-                                            <small class="text-muted">{{ order.product.code }}</small>
+                                            <a href="{% url 'warehouses:product_detail' order.product.pk %}" class="fw-medium text-dark">{{ order.product.name }}</a>
+                                            <small class="text-muted d-block">{{ order.product.code }}</small>
                                         </div>
                                     </td>
-                                    <td>{{ order.quantity_ordered|floatformat:0 }}</td>
+                                    <td class="text-center">{{ order.quantity_ordered|floatformat:0 }}</td>
                                     <td>
                                         <span class="production-status {{ order.status }}">
                                             {{ order.get_status_display }}
                                         </span>
-                                        
-                                        {# UPDATE: Display detailed status based on the current stage #}
                                         {% if order.status == 'in_cutting' and order.cutting_process %}
                                             <small class="d-block text-muted">
                                                 <i class="fas fa-user me-1"></i>
@@ -92,25 +126,29 @@
                                         {% elif order.status == 'in_assembly' %}
                                             {% for process in order.assembly_processes.all %}
                                                 {% if not process.is_completed %}
-                                                    <small class="d-block text-muted">
-                                                        {% if process.assembly_type == 'in_house' %}
-                                                            <i class="fas fa-user-cog me-1"></i>
-                                                            {{ process.assembler.get_full_name|default:'داخلي' }}
-                                                        {% else %}
-                                                            <i class="fas fa-industry me-1"></i>
+                                                <small class="d-block text-muted">
+                                                    {% if process.assembly_type == 'in_house' %}
+                                                        <i class="fas fa-user-cog me-1"></i>
+                                                        {{ process.assembler.get_full_name|default:'داخلي' }}
+                                                    {% elif process.external_manufacturer %}
+                                                        <i class="fas fa-industry me-1"></i>
+                                                        <a href="{% url 'production:manufacturers:manufacturer_detail' process.external_manufacturer.pk %}">
                                                             {{ process.external_manufacturer.name|default:'خارجي' }}
-                                                        {% endif %}
-                                                    </small>
+                                                        </a>
+                                                    {% endif %}
+                                                </small>
                                                 {% endif %}
                                             {% endfor %}
                                         {% elif order.status == 'in_dyeing' %}
                                             {% for a_process in order.assembly_processes.all %}
                                                 {% for d_process in a_process.dyeing_processes.all %}
-                                                    {% if not d_process.is_completed %}
-                                                        <small class="d-block text-muted">
-                                                            <i class="fas fa-industry me-1"></i>
+                                                    {% if not d_process.is_completed and d_process.dyeing_facility %}
+                                                    <small class="d-block text-muted">
+                                                        <i class="fas fa-industry me-1"></i>
+                                                        <a href="{% url 'production:manufacturers:manufacturer_detail' d_process.dyeing_facility.pk %}">
                                                             {{ d_process.dyeing_facility.name|default:'غير محدد' }}
-                                                        </small>
+                                                        </a>
+                                                    </small>
                                                     {% endif %}
                                                 {% endfor %}
                                             {% endfor %}
@@ -119,26 +157,28 @@
                                                 {% for d_process in a_process.dyeing_processes.all %}
                                                     {% if d_process.finishing_process and not d_process.finishing_process.is_completed %}
                                                         {% with f_process=d_process.finishing_process %}
-                                                            <small class="d-block text-muted">
-                                                                {% if f_process.finishing_type == 'in_house' %}
-                                                                    <i class="fas fa-user-cog me-1"></i>
-                                                                    {{ f_process.finisher.get_full_name|default:f_process.supervisor.get_full_name|default:'داخلي' }}
-                                                                {% else %}
-                                                                    <i class="fas fa-industry me-1"></i>
+                                                        <small class="d-block text-muted">
+                                                            {% if f_process.finishing_type == 'in_house' %}
+                                                                <i class="fas fa-user-cog me-1"></i>
+                                                                {{ f_process.finisher.get_full_name|default:f_process.supervisor.get_full_name|default:'داخلي' }}
+                                                            {% elif f_process.external_manufacturer %}
+                                                                <i class="fas fa-industry me-1"></i>
+                                                                <a href="{% url 'production:manufacturers:manufacturer_detail' f_process.external_manufacturer.pk %}">
                                                                     {{ f_process.external_manufacturer.name|default:'خارجي' }}
-                                                                {% endif %}
-                                                            </small>
+                                                                </a>
+                                                            {% endif %}
+                                                        </small>
                                                         {% endwith %}
                                                     {% endif %}
                                                 {% endfor %}
                                             {% endfor %}
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td class="text-center">
                                         <span class="badge bg-{{ order.priority|status_color }}">{{ order.get_priority_display }}</span>
                                     </td>
-                                    <td>{{ order.created_at|date:"Y-m-d" }}</td>
-                                    <td>
+                                    <td>{{ order.created_at|date:"d M, Y" }}</td>
+                                    <td class="text-end">
                                         <a href="{% url 'production:order_detail' order.pk %}" 
                                            class="btn btn-sm btn-outline-secondary" 
                                            data-bs-toggle="tooltip" title="عرض التفاصيل">
@@ -155,7 +195,13 @@
                 <div class="production-empty p-5">
                     <i class="fas fa-clipboard-list"></i>
                     <h5>لا توجد أوامر إنتاج</h5>
-                    <p class="text-muted mb-4">لم يتم العثور على أوامر إنتاج تطابق معايير البحث.</p>
+                    <p class="text-muted mb-4">
+                        {% if request.GET %}
+                            لم يتم العثور على أوامر تطابق معايير البحث.
+                        {% else %}
+                            يمكنك إنشاء أمر جديد للبدء.
+                        {% endif %}
+                    </p>
                     <a href="{% url 'production:order_create' %}" class="btn btn-production">
                         <i class="fas fa-plus me-2"></i>
                         إنشاء أمر إنتاج جديد
@@ -163,31 +209,38 @@
                 </div>
             {% endif %}
         </div>
-    </div>
 
-    <!-- Pagination -->
-    {% if orders and paginator.num_pages > 1 %}
-        <nav aria-label="Page navigation" class="mt-4">
-            <ul class="pagination justify-content-center">
-                {% if page_obj.has_previous %}
-                    <li class="page-item"><a class="page-link" href="?page=1">&laquo;</a></li>
-                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">&lsaquo;</a></li>
-                {% endif %}
-
-                {% for num in paginator.page_range %}
-                    {% if page_obj.number == num %}
-                        <li class="page-item active" aria-current="page"><span class="page-link">{{ num }}</span></li>
-                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                        <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+        {% if is_paginated %}
+        <div class="production-card-footer">
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center mb-0">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item"><a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ value }}{% endif %}{% endfor %}">&laquo;</a></li>
+                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ value }}{% endif %}{% endfor %}">&lsaquo;</a></li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
+                        <li class="page-item disabled"><span class="page-link">&lsaquo;</span></li>
                     {% endif %}
-                {% endfor %}
 
-                {% if page_obj.has_next %}
-                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">&rsaquo;</a></li>
-                    <li class="page-item"><a class="page-link" href="?page={{ paginator.num_pages }}">&raquo;</a></li>
-                {% endif %}
-            </ul>
-        </nav>
-    {% endif %}
+                    {% for num in paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="page-item active" aria-current="page"><span class="page-link">{{ num }}</span></li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item"><a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a></li>
+                        {% endif %}
+                    {% endfor %}
 
+                    {% if page_obj.has_next %}
+                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ value }}{% endif %}{% endfor %}">&rsaquo;</a></li>
+                        <li class="page-item"><a class="page-link" href="?page={{ paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&amp;{{ key }}={{ value }}{% endif %}{% endfor %}">&raquo;</a></li>
+                    {% else %}
+                         <li class="page-item disabled"><span class="page-link">&rsaquo;</span></li>
+                         <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
 {% endblock %}
+

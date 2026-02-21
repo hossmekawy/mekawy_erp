@@ -392,14 +392,15 @@ class ExportProductionReportView(LoginRequiredMixin, View):
 # Production Order Views
 class ProductionOrderListView(LoginRequiredMixin, ListView):
     model = ProductionOrder
+    # FIX: Corrected the template path to prevent the TemplateDoesNotExist error.
     template_name = 'production/order_list.html'
     context_object_name = 'orders'
     paginate_by = 20
     
     def get_queryset(self):
-        # Combines the original select_related with the new prefetch_related for efficiency
+        # This queryset now includes all the filters you provided, plus the manufacturer filter.
         queryset = ProductionOrder.objects.select_related(
-            'product', 'product__category', 'textile_stock__product', 
+            'product', 'product__category', 
             'created_by', 'cutting_process__cutter'
         ).prefetch_related(
             'assembly_processes__assembler', 
@@ -409,7 +410,6 @@ class ProductionOrderListView(LoginRequiredMixin, ListView):
             'assembly_processes__dyeing_processes__finishing_process__external_manufacturer'
         ).order_by('-created_at')
         
-        # --- All of your original filtering logic is preserved ---
         search = self.request.GET.get('search')
         if search:
             queryset = queryset.filter(
@@ -421,6 +421,14 @@ class ProductionOrderListView(LoginRequiredMixin, ListView):
         status_filter = self.request.GET.get('status')
         if status_filter:
             queryset = queryset.filter(status=status_filter)
+
+        manufacturer_id = self.request.GET.get('manufacturer')
+        if manufacturer_id:
+            queryset = queryset.filter(
+                Q(assembly_processes__external_manufacturer_id=manufacturer_id) |
+                Q(assembly_processes__dyeing_processes__dyeing_facility_id=manufacturer_id) |
+                Q(assembly_processes__dyeing_processes__finishing_process__external_manufacturer_id=manufacturer_id)
+            ).distinct()
         
         priority_filter = self.request.GET.get('priority')
         if priority_filter:
@@ -453,34 +461,19 @@ class ProductionOrderListView(LoginRequiredMixin, ListView):
         return queryset
     
     def get_context_data(self, **kwargs):
-        # --- Your original context data logic is preserved ---
+        # This context is structured to work with the new template.
         context = super().get_context_data(**kwargs)
-        context['filter_config'] = [
-            {
-                'name': 'status',
-                'label': 'الحالة',
-                'placeholder': 'جميع الحالات',
-                'options': [
-                    {'value': choice[0], 'label': choice[1]} 
-                    for choice in ProductionOrder.STATUS_CHOICES
-                ]
-            },
-            {
-                'name': 'priority',
-                'label': 'الأولوية',
-                'placeholder': 'جميع الأولويات',
-                'options': [
-                    {'value': choice[0], 'label': choice[1]} 
-                    for choice in ProductionOrder.PRIORITY_CHOICES
-                ]
-            }
-        ]
-        context['search_enabled'] = True
-        context['search_placeholder'] = 'البحث برقم الأمر، رقم الباتش، أو اسم المنتج...'
-        context['total_count'] = self.get_queryset().count()
-        context['search'] = self.request.GET.get('search', '')
-        context['status_filter'] = self.request.GET.get('status', '')
-        context['priority_filter'] = self.request.GET.get('priority', '')
+        
+        context['status_choices'] = ProductionOrder.STATUS_CHOICES
+        context['manufacturers'] = ExternalManufacturer.objects.all().order_by('name')
+        
+        context['current_filters'] = {
+            'search': self.request.GET.get('search', ''),
+            'status': self.request.GET.get('status', ''),
+            'manufacturer': self.request.GET.get('manufacturer', ''),
+            'priority': self.request.GET.get('priority', ''),
+        }
+        
         context['users'] = User.objects.filter(is_active=True)
         context['product_categories'] = Category.objects.all()
         return context
@@ -2372,6 +2365,12 @@ class ExternalManufacturerListView(LoginRequiredMixin, ListView):
             )
         return queryset.order_by('name')
 
+from itertools import chain
+from collections import defaultdict
+from django.utils import timezone
+from django.urls import reverse
+from .models import AssemblyProcess, DyeingProcess, FinishingProcess, AssemblyComponent, FinishingComponent
+
 class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
     """
     Displays the details for a single external manufacturer, including their
@@ -2402,7 +2401,7 @@ class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         manufacturer = self.get_object()
         
-        # --- Prefetch related data for efficiency ---
+        # --- Fetch all jobs efficiently using the prefetched data from get_queryset ---
         assembly_jobs = manufacturer.assembly_processes.all()
         dyeing_jobs = manufacturer.dyeing_jobs.all()
         finishing_jobs = manufacturer.finishing_jobs.all()
@@ -2412,30 +2411,24 @@ class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
         completed_jobs_raw = [job for job in all_jobs if job.is_completed]
         default_date = timezone.now()
 
-        # --- Standardize Active/Completed Jobs Lists ---
+        # --- Standardize Active Jobs List ---
         active_jobs_list = []
         for job in active_jobs_raw:
             production_order, job_type_display, start_date, detail_url = None, "غير محدد", None, "#"
+            quantity_sent, quantity_received = 0, 0
+
             if isinstance(job, AssemblyProcess):
                 production_order, job_type_display, start_date, detail_url = job.production_order, "تجميع", job.start_date, reverse('production:assembly_detail', kwargs={'pk': job.pk})
+                quantity_sent, quantity_received = job.quantity_sent, job.quantity_received
             elif isinstance(job, DyeingProcess):
                 production_order, job_type_display, start_date, detail_url = job.assembly_process.production_order, "صباغة", job.sent_date, reverse('production:dyeing_detail', kwargs={'pk': job.pk})
+                quantity_sent, quantity_received = job.quantity_sent, job.quantity_received
             elif isinstance(job, FinishingProcess):
                 production_order, job_type_display, start_date, detail_url = job.dyeing_process.assembly_process.production_order, "تشطيب", job.start_date, reverse('production:finishing_detail', kwargs={'pk': job.pk})
+                quantity_sent, quantity_received = job.quantity_input, job.quantity_output
             
             if production_order:
-                quantity_sent = 0
-                quantity_received = 0
-
-                if isinstance(job, (AssemblyProcess, DyeingProcess)):
-                    quantity_sent = job.quantity_sent
-                    quantity_received = job.quantity_received
-                elif isinstance(job, FinishingProcess):
-                    quantity_sent = job.quantity_input
-                    quantity_received = job.quantity_output
-                
                 remaining_quantity = (quantity_sent or 0) - (quantity_received or 0)
-
                 active_jobs_list.append({
                     'job_object': job, 
                     'order': production_order, 
@@ -2446,60 +2439,60 @@ class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
                 })
         context['active_jobs'] = sorted(active_jobs_list, key=lambda x: x['start_date'] or default_date, reverse=True)
 
+        # --- Standardize Job History List (WITH CORRECTED LOGIC) ---
         job_history_list = []
         for job in completed_jobs_raw:
             cost, completion_date, detail_url, production_order, job_type_display = 0, None, "#", None, "غير محدد"
+            quantity_sent, quantity_received, actual_defects = 0, 0, 0
+            
             if isinstance(job, AssemblyProcess):
                 cost, completion_date, production_order, job_type_display, detail_url = job.assembly_cost, job.actual_completion_date, job.production_order, "تجميع", reverse('production:assembly_detail', kwargs={'pk': job.pk})
+                quantity_sent, quantity_received, actual_defects = job.quantity_sent, job.quantity_received, job.defects_count
             elif isinstance(job, DyeingProcess):
                 cost, completion_date, production_order, job_type_display, detail_url = job.total_dyeing_cost, job.actual_return_date, job.assembly_process.production_order, "صباغة", reverse('production:dyeing_detail', kwargs={'pk': job.pk})
+                quantity_sent, quantity_received, actual_defects = job.quantity_sent, job.quantity_received, job.losses_count
             elif isinstance(job, FinishingProcess):
                 cost, completion_date, production_order, job_type_display, detail_url = job.total_finishing_cost, job.actual_completion_date, job.dyeing_process.assembly_process.production_order, "تشطيب", reverse('production:finishing_detail', kwargs={'pk': job.pk})
-            
-            if production_order:
-                quantity_sent = 0
-                quantity_received = 0
-                
-                if isinstance(job, (AssemblyProcess, DyeingProcess)):
-                    quantity_sent = job.quantity_sent
-                    quantity_received = job.quantity_received
-                elif isinstance(job, FinishingProcess):
-                    quantity_sent = job.quantity_input
-                    quantity_received = job.quantity_output
-                
-                deficit = (quantity_sent or 0) - (quantity_received or 0)
+                quantity_sent, quantity_received, actual_defects = job.quantity_input, job.quantity_output, job.defects_in_finishing
 
+            if production_order:
+                sent_val = quantity_sent or 0
+                received_val = quantity_received or 0
+                defects_val = actual_defects or 0
+                
+                # CORRECTED LOGIC:
+                # "Defects" should show the actual recorded defects.
+                defects_for_display = defects_val
+                # "Remaining" is what's left after accounting for received items and defects.
+                remaining_for_display = sent_val - received_val - defects_val
+                
                 job_history_list.append({
                     'order': production_order, 
                     'cost': cost or 0, 
                     'completion_date': completion_date, 
                     'job_type': job_type_display, 
                     'detail_url': detail_url,
-                    'quantity_sent': quantity_sent or 0,
-                    'quantity_received': quantity_received or 0,
-                    'deficit': deficit
+                    'quantity_sent': sent_val,
+                    'quantity_received': received_val,
+                    'defects': defects_for_display,
+                    'remaining': remaining_for_display
                 })
         context['job_history'] = sorted(job_history_list, key=lambda x: x['completion_date'] or default_date, reverse=True)
         
+        # --- The rest of the function remains unchanged ---
         context['product_prices'] = manufacturer.product_prices.all()
         context['total_value_of_completed_jobs'] = sum(item['cost'] for item in job_history_list)
 
-        # --- NEW LOGIC: Calculate Piece Totals and Category Breakdowns ---
         total_pieces_completed = 0
         completed_pieces_by_category = defaultdict(int)
         for job in completed_jobs_raw:
-            quantity = 0
-            product = None
+            quantity, product = 0, None
             if isinstance(job, AssemblyProcess):
-                quantity = job.quantity_received or 0
-                product = job.production_order.product
+                quantity, product = job.quantity_received or 0, job.production_order.product
             elif isinstance(job, DyeingProcess):
-                 quantity = job.quantity_received or 0
-                 product = job.assembly_process.production_order.product
+                quantity, product = job.quantity_received or 0, job.assembly_process.production_order.product
             elif isinstance(job, FinishingProcess):
-                quantity = job.quantity_output or 0
-                product = job.dyeing_process.assembly_process.production_order.product
-            
+                quantity, product = job.quantity_output or 0, job.dyeing_process.assembly_process.production_order.product
             total_pieces_completed += quantity
             if product and product.category:
                 completed_pieces_by_category[product.category.name] += quantity
@@ -2507,18 +2500,13 @@ class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
         total_pieces_active = 0
         active_pieces_by_category = defaultdict(int)
         for job in active_jobs_raw:
-            quantity = 0
-            product = None
+            quantity, product = 0, None
             if isinstance(job, AssemblyProcess):
-                quantity = job.quantity_sent or 0
-                product = job.production_order.product
+                quantity, product = job.quantity_sent or 0, job.production_order.product
             elif isinstance(job, DyeingProcess):
-                quantity = job.quantity_sent or 0
-                product = job.assembly_process.production_order.product
+                quantity, product = job.quantity_sent or 0, job.assembly_process.production_order.product
             elif isinstance(job, FinishingProcess):
-                quantity = job.quantity_input or 0
-                product = job.dyeing_process.assembly_process.production_order.product
-            
+                quantity, product = job.quantity_input or 0, job.dyeing_process.assembly_process.production_order.product
             total_pieces_active += quantity
             if product and product.category:
                 active_pieces_by_category[product.category.name] += quantity
@@ -2529,19 +2517,24 @@ class ExternalManufacturerDetailView(LoginRequiredMixin, DetailView):
         context['completed_pieces_by_category'] = dict(sorted(completed_pieces_by_category.items()))
         context['active_pieces_by_category'] = dict(sorted(active_pieces_by_category.items()))
 
-        # --- Existing Materials Logic ---
         materials_by_order = defaultdict(list)
         assembly_components = AssemblyComponent.objects.filter(assembly_process__external_manufacturer=manufacturer).select_related('assembly_process__production_order__product', 'material__unit_new', 'source_warehouse').order_by('assembly_process__start_date')
         for comp in assembly_components:
             order = comp.assembly_process.production_order
             materials_by_order[order].append({'material': comp.material, 'quantity': comp.quantity_sent, 'warehouse': comp.source_warehouse.name if comp.source_warehouse else 'N/A', 'stage': 'تجميع / إضافي', 'date': comp.assembly_process.start_date, 'process_url': reverse('production:assembly_detail', kwargs={'pk': comp.assembly_process.pk})})
+        
         finishing_components = FinishingComponent.objects.filter(finishing_process__external_manufacturer=manufacturer).select_related('finishing_process__dyeing_process__assembly_process__production_order__product', 'material__unit_new', 'source_warehouse').order_by('finishing_process__start_date')
         for comp in finishing_components:
             order = comp.finishing_process.dyeing_process.assembly_process.production_order
             materials_by_order[order].append({'material': comp.material, 'quantity': comp.quantity_sent, 'warehouse': comp.source_warehouse.name if comp.source_warehouse else 'N/A', 'stage': 'تشطيب', 'date': comp.finishing_process.start_date, 'process_url': reverse('production:finishing_detail', kwargs={'pk': comp.finishing_process.pk})})
+        
         context['materials_by_order'] = dict(sorted(materials_by_order.items(), key=lambda item: item[0].created_at, reverse=True))
 
         return context
+
+
+
+
 
 
 

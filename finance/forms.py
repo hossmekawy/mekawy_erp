@@ -1,10 +1,14 @@
 # finance/forms.py
 
 from django import forms
-from .models import Account, Transaction
+from .models import Account, Transaction ,  CashCount, CustodyHandover
 from django.core.exceptions import ValidationError
 from django.db import transaction as db_transaction
 from decimal import Decimal
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
 
 class AccountForm(forms.ModelForm):
     class Meta:
@@ -23,6 +27,21 @@ class TransactionForm(forms.ModelForm):
         label="إلى حساب",
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+
+    def __init__(self, *args, **kwargs):
+        """
+        Override the init method to set a default 'from' account.
+        """
+        super().__init__(*args, **kwargs)
+        try:
+            # Attempt to find the account named 'خزينه المكتب'
+            default_account = Account.objects.get(name='خزينه المكتب')
+            # Set it as the initial value for the 'account' field
+            self.fields['account'].initial = default_account.pk
+        except Account.DoesNotExist:
+            # If the account doesn't exist, do nothing. The form will fall back to
+            # the default behavior (usually the first account or an empty selection).
+            pass
 
     class Meta:
         model = Transaction
@@ -197,3 +216,58 @@ class ManufacturerPaymentForm(forms.Form):
             raise ValidationError("أحد الحسابات لم يعد موجوداً. يرجى تحديث الصفحة والمحاولة مرة أخرى.")
 
         return transaction
+
+class CashCountForm(forms.ModelForm):
+    """
+    Form for a user to perform a cash count on a treasury/asset account.
+    """
+    account = forms.ModelChoiceField(
+        queryset=Account.objects.filter(account_type='ASSET'),
+        label="اختر الخزينة",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    
+    class Meta:
+        model = CashCount
+        fields = ['account', 'counted_amount', 'notes']
+        widgets = {
+            'counted_amount': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'أدخل المبلغ الذي قمت بجردِه'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'أي ملاحظات حول عملية الجرد...'}),
+        }
+
+
+class CustodyHandoverForm(forms.ModelForm):
+    """
+    Form for creating a custody handover record.
+    """
+    account = forms.ModelChoiceField(
+        queryset=Account.objects.filter(account_type='ASSET'),
+        label="العهدة (الحساب)",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    to_user = forms.ModelChoiceField(
+        queryset=User.objects.filter(is_active=True),
+        label="الموظف المُستلِم",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = CustodyHandover
+        fields = ['account', 'amount_handed_over', 'to_user', 'notes']
+        widgets = {
+            'amount_handed_over': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'المبلغ الموجود بالعهدة وقت التسليم'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'أي ملاحظات أو تفاصيل حول التسليم...'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        # Exclude the current user from the list of users to whom custody can be handed over.
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        if self.user:
+            self.fields['to_user'].queryset = User.objects.filter(is_active=True).exclude(pk=self.user.pk)
+
+    def clean_to_user(self):
+        to_user = self.cleaned_data.get('to_user')
+        if self.user and to_user == self.user:
+            raise ValidationError("لا يمكن تسليم العهدة لنفسك.")
+        return to_user

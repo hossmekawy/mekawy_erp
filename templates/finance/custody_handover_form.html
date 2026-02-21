@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% load finance_tags %}
+{% block title %}إنشاء محضر تسليم عهدة{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="direction: rtl; text-align: right;">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-dark text-white">
+                    <h4 class="mb-0">محضر تسليم عهدة جديد</h4>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        هذا النموذج لتوثيق نقل عهدة مالية من موظف لآخر.
+                        <br>
+                        <strong>الموظف المُسلِّم:</strong> {{ user.get_full_name|default:user.username }} (المستخدم الحالي)
+                    </p>
+                    <hr>
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        {{ form.as_p }}
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-check-circle me-1"></i> حفظ المحضر
+                            </button>
+                            <a href="{% url 'finance:custody_handover_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i> إلغاء
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
